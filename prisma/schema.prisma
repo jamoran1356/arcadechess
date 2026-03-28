@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum MatchStatus {
+  OPEN
+  IN_PROGRESS
+  ARCADE_PENDING
+  FINISHED
+  CANCELLED
+}
+
+enum TransactionNetwork {
+  INITIA
+  FLOW
+  SOLANA
+}
+
+enum TransactionType {
+  ENTRY_STAKE
+  ESCROW_LOCK
+  PRIZE_PAYOUT
+  BRIDGE_SYNC
+}
+
+enum TransactionStatus {
+  PENDING
+  SETTLED
+  FAILED
+}
+
+enum ArcadeGameType {
+  TARGET_RUSH
+  MEMORY_GRID
+  KEY_CLASH
+}
+
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  passwordHash String
+  role         UserRole      @default(USER)
+  rating       Int           @default(1200)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  hostedMatches Match[]      @relation("HostMatches")
+  joinedMatches Match[]      @relation("GuestMatches")
+  wonMatches    Match[]      @relation("WinningMatches")
+  wallets       Wallet[]
+  transactions  Transaction[]
+  attackDuels   ArcadeDuel[] @relation("AttackerDuels")
+  defendDuels   ArcadeDuel[] @relation("DefenderDuels")
+  wonDuels      ArcadeDuel[] @relation("WinnerDuels")
+}
+
+model Wallet {
+  id        String             @id @default(cuid())
+  network   TransactionNetwork
+  address   String
+  balance   String             @default("0")
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime           @default(now())
+
+  @@unique([network, address])
+}
+
+model Plan {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  price       Decimal  @db.Decimal(18, 6)
+  token       String   @default("INIT")
+  features    Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Match {
+  id               String             @id @default(cuid())
+  title            String
+  theme            String
+  boardTheme       String             @default("arena")
+  stakeAmount      Decimal            @db.Decimal(18, 6)
+  stakeToken       String             @default("INIT")
+  preferredNetwork TransactionNetwork @default(INITIA)
+  fen              String
+  turn             String             @default("w")
+  moveHistory      Json
+  arcadeGamePool   Json
+  isSolo           Boolean            @default(false)
+  status           MatchStatus        @default(OPEN)
+  hostId           String
+  guestId          String?
+  winnerId         String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  host             User               @relation("HostMatches", fields: [hostId], references: [id], onDelete: Cascade)
+  guest            User?              @relation("GuestMatches", fields: [guestId], references: [id], onDelete: SetNull)
+  winner           User?              @relation("WinningMatches", fields: [winnerId], references: [id], onDelete: SetNull)
+  duels            ArcadeDuel[]
+  transactions     Transaction[]
+
+  @@index([status])
+}
+
+model ArcadeDuel {
+  id            String         @id @default(cuid())
+  matchId       String
+  attackerId    String
+  defenderId    String
+  gameType      ArcadeGameType
+  seed          String
+  boardMove     Json
+  attackerScore Int?
+  defenderScore Int?
+  winnerId      String?
+  resolvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  match         Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  attacker      User           @relation("AttackerDuels", fields: [attackerId], references: [id], onDelete: Cascade)
+  defender      User           @relation("DefenderDuels", fields: [defenderId], references: [id], onDelete: Cascade)
+  winner        User?          @relation("WinnerDuels", fields: [winnerId], references: [id], onDelete: SetNull)
+
+  @@index([matchId, resolvedAt])
+}
+
+model Transaction {
+  id        String             @id @default(cuid())
+  userId    String
+  matchId   String?
+  network   TransactionNetwork
+  type      TransactionType
+  status    TransactionStatus  @default(PENDING)
+  amount    Decimal            @db.Decimal(18, 6)
+  token     String             @default("INIT")
+  txHash    String?
+  metadata  Json?
+  createdAt DateTime           @default(now())
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match     Match?             @relation(fields: [matchId], references: [id], onDelete: SetNull)
+
+  @@index([network, status])
+}
