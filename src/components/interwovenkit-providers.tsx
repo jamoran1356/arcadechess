@@ -20,6 +20,24 @@ const wagmiConfig = createConfig({
 
 const queryClient = new QueryClient();
 
+function resolveInterwovenChainId() {
+  const configuredChainId = (process.env.NEXT_PUBLIC_INITIA_CHAIN_ID ?? "").trim();
+
+  if (!configuredChainId) {
+    return TESTNET.defaultChainId;
+  }
+
+  // Backward-compatible alias used in previous env values.
+  const normalizedChainId =
+    configuredChainId === "initia-testnet" || configuredChainId === "initia-testnet-1"
+      ? "initiation-2"
+      : configuredChainId;
+
+  return normalizedChainId === "initiation-2" ? normalizedChainId : TESTNET.defaultChainId;
+}
+
+const defaultInterwovenChainId = resolveInterwovenChainId();
+
 export function InterwovenKitProviders({ children }: PropsWithChildren) {
   useEffect(() => {
     injectStyles(interwovenKitStyles);
@@ -30,7 +48,7 @@ export function InterwovenKitProviders({ children }: PropsWithChildren) {
       <WagmiProvider config={wagmiConfig}>
         <InterwovenKitProvider
           {...TESTNET}
-          defaultChainId={process.env.NEXT_PUBLIC_INITIA_CHAIN_ID || TESTNET.defaultChainId}
+          defaultChainId={defaultInterwovenChainId}
           enableAutoSign={true}
         >
           {children}
