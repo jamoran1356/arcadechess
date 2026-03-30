@@ -25,7 +25,9 @@ export const loginSchema = z.object({
 export const createMatchSchema = z.object({
   title: z.string().min(4, "Define un titulo para la partida.").max(60),
   theme: z.string().min(8, "Describe mejor la tematica.").max(140),
-  stakeAmount: z.coerce.number().min(0.01, "El precio de entrada debe ser mayor que 0."),
+  stakeAmount: z.coerce.number().min(0, "El stake no puede ser negativo."),
+  entryFee: z.coerce.number().min(0, "El fee no puede ser negativo.").max(9999, "Fee demasiado alto."),
+  gameClockMinutes: z.coerce.number().int().min(1, "Minimo 1 minuto.").max(30, "Maximo 30 minutos."),
   stakeToken: z.string().min(2).max(10).default("INIT"),
   network: z.nativeEnum(TransactionNetwork),
   arcadeGamePool: z.array(z.nativeEnum(ArcadeGameType)).min(1),

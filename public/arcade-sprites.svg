@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <symbol id="target-idle" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="22" fill="#132436" stroke="#6f8faa" stroke-width="3"/>
+      <circle cx="32" cy="32" r="13" fill="#0c1a2a" stroke="#8ca8bf" stroke-width="2"/>
+      <circle cx="32" cy="32" r="5" fill="#9bb5ca"/>
+    </symbol>
+    <symbol id="target-live" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="24" fill="#553816" stroke="#ffd98a" stroke-width="3"/>
+      <circle cx="32" cy="32" r="14" fill="#7a4a16" stroke="#ffd98a" stroke-width="2"/>
+      <circle cx="32" cy="32" r="5" fill="#ffe8b8"/>
+    </symbol>
+    <symbol id="target-done" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="23" fill="#0d3f3a" stroke="#73f3df" stroke-width="3"/>
+      <path d="M19 32l8 8 18-18" fill="none" stroke="#c8fff6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <symbol id="reticle" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="20" fill="none" stroke="#6ff8ff" stroke-width="3"/>
+      <circle cx="32" cy="32" r="8" fill="none" stroke="#6ff8ff" stroke-width="3"/>
+      <path d="M32 4v12M32 48v12M4 32h12M48 32h12" stroke="#6ff8ff" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="memory-idle" viewBox="0 0 64 64">
+      <rect x="10" y="10" width="44" height="44" rx="8" fill="#1d2b40" stroke="#8ba4be" stroke-width="3"/>
+      <rect x="18" y="18" width="28" height="28" rx="4" fill="#0e1a29"/>
+    </symbol>
+    <symbol id="memory-live" viewBox="0 0 64 64">
+      <rect x="10" y="10" width="44" height="44" rx="8" fill="#19414f" stroke="#78f7ff" stroke-width="3"/>
+      <rect x="18" y="18" width="28" height="28" rx="4" fill="#2cc6cf"/>
+    </symbol>
+
+    <symbol id="key-idle" viewBox="0 0 64 64">
+      <rect x="8" y="8" width="48" height="48" rx="9" fill="#1a2838" stroke="#98abc0" stroke-width="3"/>
+      <rect x="16" y="16" width="32" height="24" rx="4" fill="#122033"/>
+    </symbol>
+    <symbol id="key-live" viewBox="0 0 64 64">
+      <rect x="8" y="8" width="48" height="48" rx="9" fill="#1d4254" stroke="#7ff8ff" stroke-width="3"/>
+      <path d="M32 18l-7 14h7l-4 13 11-16h-7l4-11z" fill="#d9ffff"/>
+    </symbol>
+  </defs>
+</svg>

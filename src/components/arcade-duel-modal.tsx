@@ -144,6 +144,7 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
 
   function startGame() {
     setMessage(null);
+    setPhase("active");
     setTargetIndex(0);
     setMemoryIndex(0);
     setKeyIndex(0);
@@ -154,13 +155,19 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
       window.clearTimeout(previewTimeoutRef.current);
     }
 
+    // Registrar participación en segundo plano
+    fetch(`/api/duels/${duel.id}/enter-arcade`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }).catch((error) => {
+      console.error("Error registering arcade participation:", error);
+    });
+
     if (duel.scenario.kind === "memory") {
       setMemoryPreview(true);
       previewTimeoutRef.current = window.setTimeout(() => {
         setMemoryPreview(false);
       }, 3000);
-    } else {
-      setPhase("active");
     }
   }
 
@@ -209,6 +216,34 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (phase === "submitted") {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void fetch("/api/duels/arcade-participation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ duelId: duel.id }),
+      })
+        .then(async (response) => {
+          const data = await response.json();
+          if (!response.ok) {
+            return;
+          }
+          if (Number(data.processed ?? 0) > 0) {
+            router.refresh();
+          }
+        })
+        .catch(() => {
+          // no-op: el polling es best-effort
+        });
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [duel.id, phase, router]);
 
   if (playerRole === "spectator") {
     return null;
@@ -332,7 +367,7 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
               </div>
             ) : null}
 
-            {message && phase !== "submitted" ? <p className="mt-4 text-sm text-rose-300">{message}</p> : null}
+            {message ? <p className="mt-4 text-sm text-rose-300">{message}</p> : null}
           </div>
         )}
 

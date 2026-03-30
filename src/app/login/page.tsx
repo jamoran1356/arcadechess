@@ -11,11 +11,10 @@ export default function LoginPage() {
         </p>
 
         <div className="panel mt-8 rounded-[2rem] p-6">
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">Cuentas demo</p>
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">Acceso seguro</p>
           <div className="mt-4 space-y-3 text-sm text-slate-300">
-            <p>admin@playchess.gg / Admin123!</p>
-            <p>luna@playchess.gg / Demo123!</p>
-            <p>marco@playchess.gg / Demo123!</p>
+            <p>Las credenciales de prueba ya no se muestran en pantalla.</p>
+            <p>Si no tienes cuenta, usa el registro para crear tu perfil y entrar al lobby.</p>
           </div>
         </div>
       </div>

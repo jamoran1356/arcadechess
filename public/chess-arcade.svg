@@ -1,0 +1,63 @@
+<svg width="1200" height="720" viewBox="0 0 1200 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1200" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A1220"/>
+      <stop offset="1" stop-color="#1A2333"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#FDE68A"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="720" rx="32" fill="url(#bg2)"/>
+
+  <g opacity="0.18">
+    <circle cx="180" cy="140" r="120" fill="#67E8F9"/>
+    <circle cx="1040" cy="600" r="140" fill="#FDE68A"/>
+  </g>
+
+  <rect x="120" y="120" width="430" height="480" rx="24" fill="#0D1727" stroke="#67E8F9" stroke-opacity="0.4"/>
+  <rect x="650" y="120" width="430" height="480" rx="24" fill="#140F0A" stroke="#FDE68A" stroke-opacity="0.4"/>
+
+  <text x="170" y="185" fill="#BFF7FF" font-family="Verdana, sans-serif" font-size="30" font-weight="700">Atacante</text>
+  <text x="700" y="185" fill="#FFE5A9" font-family="Verdana, sans-serif" font-size="30" font-weight="700">Defensor</text>
+
+  <rect x="170" y="220" width="330" height="16" rx="8" fill="#11344A"/>
+  <rect x="170" y="220" width="260" height="16" rx="8" fill="url(#neon)"/>
+  <rect x="700" y="220" width="330" height="16" rx="8" fill="#3D2A0B"/>
+  <rect x="700" y="220" width="220" height="16" rx="8" fill="url(#amber)"/>
+
+  <g>
+    <rect x="170" y="285" width="70" height="70" rx="12" fill="#17344A"/>
+    <rect x="255" y="285" width="70" height="70" rx="12" fill="#17344A"/>
+    <rect x="340" y="285" width="70" height="70" rx="12" fill="#17344A"/>
+    <rect x="425" y="285" width="70" height="70" rx="12" fill="#17344A"/>
+
+    <rect x="700" y="285" width="70" height="70" rx="12" fill="#483011"/>
+    <rect x="785" y="285" width="70" height="70" rx="12" fill="#483011"/>
+    <rect x="870" y="285" width="70" height="70" rx="12" fill="#483011"/>
+    <rect x="955" y="285" width="70" height="70" rx="12" fill="#483011"/>
+  </g>
+
+  <g>
+    <text x="185" y="330" fill="#D5F9FF" font-family="monospace" font-size="24">W</text>
+    <text x="270" y="330" fill="#D5F9FF" font-family="monospace" font-size="24">A</text>
+    <text x="355" y="330" fill="#D5F9FF" font-family="monospace" font-size="24">S</text>
+    <text x="440" y="330" fill="#D5F9FF" font-family="monospace" font-size="24">D</text>
+
+    <text x="718" y="330" fill="#FFF3CE" font-family="monospace" font-size="24">U</text>
+    <text x="803" y="330" fill="#FFF3CE" font-family="monospace" font-size="24">I</text>
+    <text x="888" y="330" fill="#FFF3CE" font-family="monospace" font-size="24">O</text>
+    <text x="973" y="330" fill="#FFF3CE" font-family="monospace" font-size="24">P</text>
+  </g>
+
+  <path d="M565 360H635" stroke="#9FB6CF" stroke-width="8" stroke-linecap="round"/>
+  <polygon points="635,360 617,348 617,372" fill="#9FB6CF"/>
+
+  <text x="420" y="560" fill="#9FB6CF" font-family="Verdana, sans-serif" font-size="22">Duelo arcade en tiempo real para validar la captura</text>
+</svg>

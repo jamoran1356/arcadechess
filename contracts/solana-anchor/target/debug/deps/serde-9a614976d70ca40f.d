@@ -1,0 +1,14 @@
+\\?\C:\wamp\www\proyectos\playchess\contracts\solana-anchor\target\debug\deps\serde-9a614976d70ca40f.d: C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs \\?\C:\wamp\www\proyectos\playchess\contracts\solana-anchor\target\debug\build\serde-af3a2ed9ea1c1323\out\private.rs
+
+\\?\C:\wamp\www\proyectos\playchess\contracts\solana-anchor\target\debug\deps\libserde-9a614976d70ca40f.rlib: C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs \\?\C:\wamp\www\proyectos\playchess\contracts\solana-anchor\target\debug\build\serde-af3a2ed9ea1c1323\out\private.rs
+
+\\?\C:\wamp\www\proyectos\playchess\contracts\solana-anchor\target\debug\deps\libserde-9a614976d70ca40f.rmeta: C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs \\?\C:\wamp\www\proyectos\playchess\contracts\solana-anchor\target\debug\build\serde-af3a2ed9ea1c1323\out\private.rs
+
+C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\lib.rs:
+C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\integer128.rs:
+C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\mod.rs:
+C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\de.rs:
+C:\Users\jesus\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.228\src\private\ser.rs:
+\\?\C:\wamp\www\proyectos\playchess\contracts\solana-anchor\target\debug\build\serde-af3a2ed9ea1c1323\out\private.rs:
+
+# env-dep:OUT_DIR=\\\\?\\C:\\wamp\\www\\proyectos\\playchess\\contracts\\solana-anchor\\target\\debug\\build\\serde-af3a2ed9ea1c1323\\out

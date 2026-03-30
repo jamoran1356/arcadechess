@@ -1,0 +1,118 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1626"/>
+      <stop offset="1" stop-color="#102238"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#FDE68A"/>
+      <stop offset="1" stop-color="#EAB308"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#0891B2"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="800" rx="36" fill="url(#bg)"/>
+
+  <g opacity="0.16">
+    <path d="M0 130C220 180 360 70 560 120C770 170 930 90 1200 155V0H0V130Z" fill="#67E8F9"/>
+    <path d="M0 760C230 690 390 780 560 720C770 645 940 760 1200 700V800H0V760Z" fill="#FDE68A"/>
+  </g>
+
+  <g transform="translate(190 120)">
+    <rect x="0" y="0" width="560" height="560" rx="18" fill="#0A111E" stroke="#67E8F9" stroke-opacity="0.3"/>
+    <g>
+      <rect x="0" y="0" width="70" height="70" fill="#19304A"/>
+      <rect x="70" y="0" width="70" height="70" fill="#E2C48C"/>
+      <rect x="140" y="0" width="70" height="70" fill="#19304A"/>
+      <rect x="210" y="0" width="70" height="70" fill="#E2C48C"/>
+      <rect x="280" y="0" width="70" height="70" fill="#19304A"/>
+      <rect x="350" y="0" width="70" height="70" fill="#E2C48C"/>
+      <rect x="420" y="0" width="70" height="70" fill="#19304A"/>
+      <rect x="490" y="0" width="70" height="70" fill="#E2C48C"/>
+
+      <rect x="0" y="70" width="70" height="70" fill="#E2C48C"/>
+      <rect x="70" y="70" width="70" height="70" fill="#19304A"/>
+      <rect x="140" y="70" width="70" height="70" fill="#E2C48C"/>
+      <rect x="210" y="70" width="70" height="70" fill="#19304A"/>
+      <rect x="280" y="70" width="70" height="70" fill="#E2C48C"/>
+      <rect x="350" y="70" width="70" height="70" fill="#19304A"/>
+      <rect x="420" y="70" width="70" height="70" fill="#E2C48C"/>
+      <rect x="490" y="70" width="70" height="70" fill="#19304A"/>
+
+      <rect x="0" y="140" width="70" height="70" fill="#19304A"/>
+      <rect x="70" y="140" width="70" height="70" fill="#E2C48C"/>
+      <rect x="140" y="140" width="70" height="70" fill="#19304A"/>
+      <rect x="210" y="140" width="70" height="70" fill="#E2C48C"/>
+      <rect x="280" y="140" width="70" height="70" fill="#19304A"/>
+      <rect x="350" y="140" width="70" height="70" fill="#E2C48C"/>
+      <rect x="420" y="140" width="70" height="70" fill="#19304A"/>
+      <rect x="490" y="140" width="70" height="70" fill="#E2C48C"/>
+
+      <rect x="0" y="210" width="70" height="70" fill="#E2C48C"/>
+      <rect x="70" y="210" width="70" height="70" fill="#19304A"/>
+      <rect x="140" y="210" width="70" height="70" fill="#E2C48C"/>
+      <rect x="210" y="210" width="70" height="70" fill="#19304A"/>
+      <rect x="280" y="210" width="70" height="70" fill="#E2C48C"/>
+      <rect x="350" y="210" width="70" height="70" fill="#19304A"/>
+      <rect x="420" y="210" width="70" height="70" fill="#E2C48C"/>
+      <rect x="490" y="210" width="70" height="70" fill="#19304A"/>
+
+      <rect x="0" y="280" width="70" height="70" fill="#19304A"/>
+      <rect x="70" y="280" width="70" height="70" fill="#E2C48C"/>
+      <rect x="140" y="280" width="70" height="70" fill="#19304A"/>
+      <rect x="210" y="280" width="70" height="70" fill="#E2C48C"/>
+      <rect x="280" y="280" width="70" height="70" fill="#19304A"/>
+      <rect x="350" y="280" width="70" height="70" fill="#E2C48C"/>
+      <rect x="420" y="280" width="70" height="70" fill="#19304A"/>
+      <rect x="490" y="280" width="70" height="70" fill="#E2C48C"/>
+
+      <rect x="0" y="350" width="70" height="70" fill="#E2C48C"/>
+      <rect x="70" y="350" width="70" height="70" fill="#19304A"/>
+      <rect x="140" y="350" width="70" height="70" fill="#E2C48C"/>
+      <rect x="210" y="350" width="70" height="70" fill="#19304A"/>
+      <rect x="280" y="350" width="70" height="70" fill="#E2C48C"/>
+      <rect x="350" y="350" width="70" height="70" fill="#19304A"/>
+      <rect x="420" y="350" width="70" height="70" fill="#E2C48C"/>
+      <rect x="490" y="350" width="70" height="70" fill="#19304A"/>
+
+      <rect x="0" y="420" width="70" height="70" fill="#19304A"/>
+      <rect x="70" y="420" width="70" height="70" fill="#E2C48C"/>
+      <rect x="140" y="420" width="70" height="70" fill="#19304A"/>
+      <rect x="210" y="420" width="70" height="70" fill="#E2C48C"/>
+      <rect x="280" y="420" width="70" height="70" fill="#19304A"/>
+      <rect x="350" y="420" width="70" height="70" fill="#E2C48C"/>
+      <rect x="420" y="420" width="70" height="70" fill="#19304A"/>
+      <rect x="490" y="420" width="70" height="70" fill="#E2C48C"/>
+
+      <rect x="0" y="490" width="70" height="70" fill="#E2C48C"/>
+      <rect x="70" y="490" width="70" height="70" fill="#19304A"/>
+      <rect x="140" y="490" width="70" height="70" fill="#E2C48C"/>
+      <rect x="210" y="490" width="70" height="70" fill="#19304A"/>
+      <rect x="280" y="490" width="70" height="70" fill="#E2C48C"/>
+      <rect x="350" y="490" width="70" height="70" fill="#19304A"/>
+      <rect x="420" y="490" width="70" height="70" fill="#E2C48C"/>
+      <rect x="490" y="490" width="70" height="70" fill="#19304A"/>
+    </g>
+
+    <g>
+      <circle cx="315" cy="245" r="30" fill="url(#gold)"/>
+      <path d="M305 190C322 190 337 205 337 222C337 240 322 255 305 255H278V235H295C306 235 314 227 314 216C314 205 306 197 295 197H275V176H305V190Z" fill="#FFECC1"/>
+      <rect x="255" y="255" width="105" height="16" rx="8" fill="#FFECC1"/>
+    </g>
+
+    <g>
+      <circle cx="455" cy="385" r="22" fill="url(#cyan)"/>
+      <path d="M432 350H475L462 387H422L432 350Z" fill="#BFF7FF"/>
+      <rect x="414" y="388" width="66" height="10" rx="5" fill="#BFF7FF"/>
+    </g>
+  </g>
+
+  <text x="820" y="220" fill="#E6FBFF" font-family="Verdana, sans-serif" font-size="42" font-weight="700">PlayChess Arena</text>
+  <text x="820" y="270" fill="#9FB6CF" font-family="Verdana, sans-serif" font-size="24">Ajedrez tactico + duelos arcade</text>
+  <text x="820" y="360" fill="#EBD9AE" font-family="Verdana, sans-serif" font-size="18">Captura una pieza</text>
+  <text x="820" y="392" fill="#EBD9AE" font-family="Verdana, sans-serif" font-size="18">Gana el minijuego</text>
+  <text x="820" y="424" fill="#EBD9AE" font-family="Verdana, sans-serif" font-size="18">Asegura el stake</text>
+</svg>

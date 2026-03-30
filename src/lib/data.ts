@@ -1,7 +1,65 @@
+import { randomUUID } from "node:crypto";
 import { Prisma, TransactionStatus, UserRole } from "@prisma/client";
 import { buildArcadeScenario, getArcadeDefinition, arcadeLibrary } from "@/lib/arcade";
 import { prisma } from "@/lib/db";
 import { getSupportedNetworks } from "@/lib/onchain/service";
+
+const AUTO_SOLO_TARGET = 4;
+const AUTO_SOLO_EMAIL = "arena-bot@playchess.local";
+
+async function ensureAutoSoloMatches() {
+  const openSoloCount = await prisma.match.count({
+    where: { status: "OPEN", isSolo: true, guestId: null },
+  });
+
+  if (openSoloCount >= AUTO_SOLO_TARGET) {
+    return;
+  }
+
+  let bot = await prisma.user.findUnique({ where: { email: AUTO_SOLO_EMAIL } });
+  if (!bot) {
+    bot = await prisma.user.create({
+      data: {
+        name: "Arena Bot",
+        email: AUTO_SOLO_EMAIL,
+        passwordHash: "bot-managed-account",
+        role: "USER",
+      },
+    });
+  }
+
+  const toCreate = AUTO_SOLO_TARGET - openSoloCount;
+  const presets = [
+    { title: "Solo Flash 1m", theme: "Ritmo extremo", clock: 60_000, stake: "0.000000", fee: "0.000000" },
+    { title: "Solo Blitz 5m", theme: "Capturas con arcade", clock: 300_000, stake: "0.250000", fee: "0.050000" },
+    { title: "Solo Rapid 10m", theme: "Control clasico", clock: 600_000, stake: "0.500000", fee: "0.050000" },
+    { title: "Solo Custom 3m", theme: "Partida gratuita para amigos", clock: 180_000, stake: "0.000000", fee: "0.000000" },
+  ];
+
+  for (let i = 0; i < toCreate; i += 1) {
+    const preset = presets[i % presets.length];
+    await prisma.match.create({
+      data: {
+        id: randomUUID(),
+        title: `${preset.title} #${Math.floor(Date.now() / 1000) % 10000}`,
+        theme: preset.theme,
+        boardTheme: "arena",
+        stakeAmount: preset.stake,
+        entryFee: preset.fee,
+        stakeToken: "INIT",
+        preferredNetwork: "INITIA",
+        fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        turn: "w",
+        moveHistory: [],
+        arcadeGamePool: ["TARGET_RUSH", "MEMORY_GRID"],
+        isSolo: true,
+        gameClockMs: preset.clock,
+        status: "OPEN",
+        hostId: bot.id,
+      },
+    });
+  }
+}
 
 function decimalToString(value: Prisma.Decimal) {
   return value.toString();
@@ -12,6 +70,7 @@ function asStringArray(value: Prisma.JsonValue | null | undefined) {
 }
 
 export async function getLandingSnapshot() {
+  await ensureAutoSoloMatches();
   const [openMatches, usersCount, transactionsCount] = await Promise.all([
     prisma.match.findMany({
       where: { status: { in: ["OPEN", "IN_PROGRESS", "ARCADE_PENDING"] } },
@@ -36,7 +95,9 @@ export async function getLandingSnapshot() {
       boardTheme: match.boardTheme,
       status: match.status,
       stakeAmount: decimalToString(match.stakeAmount),
+      entryFee: decimalToString(match.entryFee),
       stakeToken: match.stakeToken,
+      gameClockMs: match.gameClockMs,
       network: match.preferredNetwork,
       host: match.host.name,
       guest: match.guest?.name ?? null,
@@ -49,6 +110,7 @@ export async function getLandingSnapshot() {
 }
 
 export async function getLobbySnapshot(userId?: string) {
+  await ensureAutoSoloMatches();
   const [matches, me] = await Promise.all([
     prisma.match.findMany({
       where: { status: { in: ["OPEN", "IN_PROGRESS", "ARCADE_PENDING"] } },
@@ -68,7 +130,9 @@ export async function getLobbySnapshot(userId?: string) {
       status: match.status,
       isSolo: match.isSolo,
       stakeAmount: decimalToString(match.stakeAmount),
+      entryFee: decimalToString(match.entryFee),
       stakeToken: match.stakeToken,
+      gameClockMs: match.gameClockMs,
       network: match.preferredNetwork,
       host: match.host.name,
       guest: match.guest?.name ?? null,
@@ -286,7 +350,9 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
     isSolo: match.isSolo,
     network: match.preferredNetwork,
     stakeAmount: decimalToString(match.stakeAmount),
+    entryFee: decimalToString(match.entryFee),
     stakeToken: match.stakeToken,
+    gameClockMs: match.gameClockMs,
     host: match.host,
     guest: match.guest,
     winner: match.winner,

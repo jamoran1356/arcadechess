@@ -5,6 +5,7 @@ import { Chess } from "chess.js";
 import { MatchStatus, TransactionStatus, TransactionType, TransactionNetwork, UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createSession, clearSession, hashPassword, requireUser, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOnchainAdapter } from "@/lib/onchain/service";
@@ -30,6 +31,77 @@ function hasPositiveBalance(balance: string) {
 
 function defaultWalletAddress(network: TransactionNetwork, userId: string) {
   return `${network.toLowerCase()}_${userId}`;
+}
+
+const DEMO_AUTO_TOPUP_AMOUNT = Number(process.env.DEMO_AUTO_TOPUP_AMOUNT ?? "25");
+
+async function getOrCreateWalletForNetwork(userId: string, network: TransactionNetwork) {
+  const existing = await prisma.wallet.findFirst({
+    where: { userId, network },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  return prisma.wallet.create({
+    data: {
+      userId,
+      network,
+      address: defaultWalletAddress(network, randomUUID()),
+      balance: "0",
+    },
+  });
+}
+
+async function ensurePlayableWallet(userId: string, network: TransactionNetwork) {
+  const wallet = await getOrCreateWalletForNetwork(userId, network);
+
+  if (hasPositiveBalance(wallet.balance)) {
+    return { wallet, autoFunded: false };
+  }
+
+  const nextBalance = Number.isFinite(DEMO_AUTO_TOPUP_AMOUNT) && DEMO_AUTO_TOPUP_AMOUNT > 0
+    ? DEMO_AUTO_TOPUP_AMOUNT.toFixed(6)
+    : "25.000000";
+
+  const updated = await prisma.wallet.update({
+    where: { id: wallet.id },
+    data: { balance: nextBalance },
+  });
+
+  return { wallet: updated, autoFunded: true };
+}
+
+async function resolveSessionUser(session: { id: string; email: string; name: string; role: UserRole }) {
+  const byId = await prisma.user.findUnique({
+    where: { id: session.id },
+    select: { id: true, email: true, name: true, role: true },
+  });
+
+  if (byId) {
+    return byId;
+  }
+
+  const byEmail = await prisma.user.findUnique({
+    where: { email: session.email },
+    select: { id: true, email: true, name: true, role: true },
+  });
+
+  if (!byEmail) {
+    await clearSession();
+    throw new Error("Sesion invalida o expirada. Inicia sesion nuevamente.");
+  }
+
+  // Rehidrata la cookie con el id actual del usuario para evitar FK rotas.
+  await createSession({
+    id: byEmail.id,
+    email: byEmail.email,
+    name: byEmail.name,
+    role: byEmail.role,
+  });
+
+  return byEmail;
 }
 
 export async function registerAction(_: FormState | undefined, formData: FormData): Promise<FormState | void> {
@@ -101,37 +173,32 @@ export async function logoutAction() {
 
 export async function createMatchAction(formData: FormData) {
   const session = await requireUser();
+  const currentUser = await resolveSessionUser(session);
   const isSolo = parseBoolean(formData.get("isSolo"));
   const parsed = createMatchSchema.safeParse({
     title: formData.get("title"),
     theme: formData.get("theme"),
     stakeAmount: formData.get("stakeAmount"),
+    entryFee: formData.get("entryFee"),
+    gameClockMinutes: formData.get("gameClockMinutes"),
     stakeToken: formData.get("stakeToken"),
     network: formData.get("network"),
     arcadeGamePool: formData.getAll("arcadeGamePool"),
   });
 
   if (!parsed.success) {
-    throw new Error(parsed.error.errors[0]?.message ?? "No se pudo crear la partida.");
+    throw new Error(Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] ?? "No se pudo crear la partida.");
   }
 
-  const hostWallet = await prisma.wallet.findFirst({
-    where: {
-      userId: session.id,
-      network: parsed.data.network,
-    },
-  });
-
-  if (!hostWallet || !hasPositiveBalance(hostWallet.balance)) {
-    throw new Error("Necesitas una billetera activa con balance en la red elegida para crear partidas.");
-  }
+  const { autoFunded: hostAutoFunded } = await ensurePlayableWallet(currentUser.id, parsed.data.network);
 
   const matchId = randomUUID();
+  const hostTotalLock = (parsed.data.stakeAmount + parsed.data.entryFee).toFixed(6);
   const adapter = getOnchainAdapter(parsed.data.network);
   const receipt = await adapter.createEscrow({
     matchId,
-    actorId: session.id,
-    amount: parsed.data.stakeAmount.toFixed(6),
+    actorId: currentUser.id,
+    amount: hostTotalLock,
     token: parsed.data.stakeToken,
   });
 
@@ -141,12 +208,14 @@ export async function createMatchAction(formData: FormData) {
       title: parsed.data.title,
       theme: parsed.data.theme,
       stakeAmount: parsed.data.stakeAmount.toFixed(6),
+      entryFee: parsed.data.entryFee.toFixed(6),
       stakeToken: parsed.data.stakeToken.toUpperCase(),
       preferredNetwork: parsed.data.network,
+      gameClockMs: parsed.data.gameClockMinutes * 60_000,
       fen: new Chess().fen(),
       moveHistory: [],
-      arcadeGamePool: parsed.data.arcadeGamePool,
-      hostId: session.id,
+        arcadeGamePool: parsed.data.arcadeGamePool.length > 0 ? parsed.data.arcadeGamePool : (await prisma.arcadeGame.findMany({ where: { isEnabled: true }, select: { gameType: true } })).map(g => g.gameType),
+      hostId: currentUser.id,
       isSolo,
       status: isSolo ? MatchStatus.IN_PROGRESS : MatchStatus.OPEN,
     },
@@ -154,15 +223,21 @@ export async function createMatchAction(formData: FormData) {
 
   await prisma.transaction.create({
     data: {
-      userId: session.id,
+      userId: currentUser.id,
       matchId: match.id,
       network: parsed.data.network,
       type: TransactionType.ESCROW_LOCK,
       status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
-      amount: parsed.data.stakeAmount.toFixed(6),
+      amount: hostTotalLock,
       token: parsed.data.stakeToken.toUpperCase(),
       txHash: receipt.txHash,
-      metadata: { description: receipt.description, mode: receipt.mode },
+      metadata: {
+        description: receipt.description,
+        mode: receipt.mode,
+        stakeAmount: parsed.data.stakeAmount.toFixed(6),
+        entryFee: parsed.data.entryFee.toFixed(6),
+        autoFundedWallet: hostAutoFunded,
+      },
     },
   });
 
@@ -173,29 +248,22 @@ export async function createMatchAction(formData: FormData) {
 
 export async function joinMatchAction(formData: FormData) {
   const session = await requireUser();
+  const currentUser = await resolveSessionUser(session);
   const matchId = String(formData.get("matchId") ?? "");
 
   const match = await prisma.match.findUnique({ where: { id: matchId } });
-  if (!match || match.isSolo || match.hostId === session.id || match.guestId || match.status !== MatchStatus.OPEN) {
+  if (!match || match.isSolo || match.hostId === currentUser.id || match.guestId || match.status !== MatchStatus.OPEN) {
     throw new Error("La partida ya no esta disponible.");
   }
 
-  const guestWallet = await prisma.wallet.findFirst({
-    where: {
-      userId: session.id,
-      network: match.preferredNetwork,
-    },
-  });
-
-  if (!guestWallet || !hasPositiveBalance(guestWallet.balance)) {
-    throw new Error("Necesitas una billetera activa con balance en esta red para unirte.");
-  }
+  const { autoFunded: guestAutoFunded } = await ensurePlayableWallet(currentUser.id, match.preferredNetwork);
 
   const adapter = getOnchainAdapter(match.preferredNetwork);
+  const guestTotalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
   const receipt = await adapter.joinEscrow({
     matchId,
-    actorId: session.id,
-    amount: match.stakeAmount.toFixed(6),
+    actorId: currentUser.id,
+    amount: guestTotalLock,
     token: match.stakeToken,
   });
 
@@ -203,21 +271,27 @@ export async function joinMatchAction(formData: FormData) {
     prisma.match.update({
       where: { id: matchId },
       data: {
-        guestId: session.id,
+        guestId: currentUser.id,
         status: MatchStatus.IN_PROGRESS,
       },
     }),
     prisma.transaction.create({
       data: {
-        userId: session.id,
+        userId: currentUser.id,
         matchId,
         network: match.preferredNetwork,
         type: TransactionType.ENTRY_STAKE,
         status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
-        amount: match.stakeAmount.toFixed(6),
+        amount: guestTotalLock,
         token: match.stakeToken,
         txHash: receipt.txHash,
-        metadata: { description: receipt.description, mode: receipt.mode },
+        metadata: {
+          description: receipt.description,
+          mode: receipt.mode,
+          stakeAmount: match.stakeAmount.toFixed(6),
+          entryFee: match.entryFee.toFixed(6),
+          autoFundedWallet: guestAutoFunded,
+        },
       },
     }),
   ]);
@@ -227,8 +301,82 @@ export async function joinMatchAction(formData: FormData) {
   redirect(`/match/${matchId}`);
 }
 
+export async function startSoloMatchAction(formData: FormData) {
+  const session = await requireUser();
+  const currentUser = await resolveSessionUser(session);
+  const matchId = String(formData.get("matchId") ?? "");
+
+  const match = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!match || !match.isSolo || match.status !== MatchStatus.OPEN || match.guestId) {
+    throw new Error("La partida solo ya no esta disponible.");
+  }
+
+  const totalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
+  const requiresLock = Number(totalLock) > 0;
+
+  let receipt: Awaited<ReturnType<ReturnType<typeof getOnchainAdapter>["createEscrow"]>> | null = null;
+
+  if (requiresLock) {
+    await ensurePlayableWallet(currentUser.id, match.preferredNetwork);
+
+    const adapter = getOnchainAdapter(match.preferredNetwork);
+    receipt = await adapter.createEscrow({
+      matchId,
+      actorId: currentUser.id,
+      amount: totalLock,
+      token: match.stakeToken,
+    });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const claimed = await tx.match.updateMany({
+      where: {
+        id: matchId,
+        isSolo: true,
+        status: MatchStatus.OPEN,
+        guestId: null,
+      },
+      data: {
+        hostId: currentUser.id,
+        status: MatchStatus.IN_PROGRESS,
+      },
+    });
+
+    if (claimed.count === 0) {
+      throw new Error("La partida solo fue tomada por otro jugador. Refresca e intenta de nuevo.");
+    }
+
+    if (requiresLock && receipt) {
+      await tx.transaction.create({
+        data: {
+          userId: currentUser.id,
+          matchId,
+          network: match.preferredNetwork,
+          type: TransactionType.ESCROW_LOCK,
+          status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+          amount: totalLock,
+          token: match.stakeToken,
+          txHash: receipt.txHash,
+          metadata: {
+            description: receipt.description,
+            mode: receipt.mode,
+            stakeAmount: match.stakeAmount.toFixed(6),
+            entryFee: match.entryFee.toFixed(6),
+            source: "start-solo",
+          },
+        },
+      });
+    }
+  });
+
+  revalidatePath("/");
+  revalidatePath("/lobby");
+  redirect(`/match/${matchId}`);
+}
+
 export async function updateUserAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireUser();
+  if (session.role !== "ADMIN") throw new Error("Unauthorized");
   const userId = String(formData.get("userId") ?? "");
   const role = String(formData.get("role") ?? "USER");
 
@@ -246,7 +394,8 @@ export async function updateUserAction(formData: FormData) {
 }
 
 export async function deleteUserAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireUser();
+  if (session.role !== "ADMIN") throw new Error("Unauthorized");
   const userId = String(formData.get("userId") ?? "");
   if (!userId) {
     throw new Error("Usuario invalido.");
@@ -258,7 +407,8 @@ export async function deleteUserAction(formData: FormData) {
 }
 
 export async function updateTransactionAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireUser();
+  if (session.role !== "ADMIN") throw new Error("Unauthorized");
   const transactionId = String(formData.get("transactionId") ?? "");
   const status = String(formData.get("status") ?? "PENDING");
 
@@ -276,7 +426,8 @@ export async function updateTransactionAction(formData: FormData) {
 }
 
 export async function updateMatchStatusAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireUser();
+  if (session.role !== "ADMIN") throw new Error("Unauthorized");
   const matchId = String(formData.get("matchId") ?? "");
   const status = String(formData.get("status") ?? MatchStatus.OPEN);
 
@@ -294,7 +445,8 @@ export async function updateMatchStatusAction(formData: FormData) {
 }
 
 export async function updateWalletNetworkAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireUser();
+  if (session.role !== "ADMIN") throw new Error("Unauthorized");
   const walletId = String(formData.get("walletId") ?? "");
   const network = String(formData.get("network") ?? TransactionNetwork.INITIA);
   const balance = parseDecimal(formData.get("balance"), "0");
@@ -316,7 +468,8 @@ export async function updateWalletNetworkAction(formData: FormData) {
 }
 
 export async function upsertPlanAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireUser();
+  if (session.role !== "ADMIN") throw new Error("Unauthorized");
   const planId = String(formData.get("planId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -362,7 +515,8 @@ export async function upsertPlanAction(formData: FormData) {
 }
 
 export async function deletePlanAction(formData: FormData) {
-  await requireAdmin();
+  const session = await requireUser();
+  if (session.role !== "ADMIN") throw new Error("Unauthorized");
   const planId = String(formData.get("planId") ?? "");
   if (!planId) {
     throw new Error("Plan invalido.");
@@ -371,4 +525,15 @@ export async function deletePlanAction(formData: FormData) {
   await prisma.plan.delete({ where: { id: planId } });
   revalidatePath("/admin");
   revalidatePath("/admin/planes");
+}
+
+export async function setLocaleAction(locale: string) {
+  const validLocale = locale === "en" ? "en" : "es";
+  const store = await cookies();
+  store.set("NEXT_LOCALE", validLocale, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    httpOnly: false,
+    sameSite: "lax",
+  });
 }

@@ -52,9 +52,11 @@ async function settleWinner(match: {
   guestId: string | null;
   preferredNetwork: "INITIA" | "FLOW" | "SOLANA";
   stakeAmount: Prisma.Decimal;
+  entryFee: Prisma.Decimal;
   stakeToken: string;
 }, winnerId: string) {
-  const payout = match.stakeAmount.mul(match.guestId ? 2 : 1);
+  const multiplier = match.guestId ? 2 : 1;
+  const payout = match.stakeAmount.mul(multiplier).add(match.entryFee.mul(multiplier));
   const adapter = getOnchainAdapter(match.preferredNetwork);
   const receipt = await adapter.settleEscrow({
     matchId: match.id,
@@ -274,7 +276,9 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
 
   const updatedDuel = await prisma.arcadeDuel.update({
     where: { id: duelId },
-    data: isAttacker ? { attackerScore: score } : { defenderScore: score },
+    data: isAttacker
+      ? { attackerScore: score, attackerEnteredAt: duel.attackerEnteredAt ?? new Date() }
+      : { defenderScore: score, defenderEnteredAt: duel.defenderEnteredAt ?? new Date() },
   });
 
   if (updatedDuel.attackerScore === null || updatedDuel.defenderScore === null) {

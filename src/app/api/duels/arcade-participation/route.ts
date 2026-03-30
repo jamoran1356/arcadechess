@@ -1,0 +1,226 @@
+import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { getOnchainAdapter } from "@/lib/onchain/service";
+
+/**
+ * System endpoint que detecta y penaliza a jugadores que no participan en duelos arcade.
+ * Se ejecuta periódicamente (ej: cada 5 segundos) desde el cliente o un servicio.
+ *
+ * Lógica:
+ * - Si un duel arcade ha estado abierto >8s sin que ambos entren, se penaliza al no-participante
+ * - El participante recibe el pool completo
+ */
+export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session?.id) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json().catch(() => ({}));
+    const duelId = typeof body?.duelId === "string" ? body.duelId : undefined;
+
+    // Buscar dueles arcade sin resolver hace más de 8 segundos
+    const now = new Date();
+    const threshold = new Date(now.getTime() - 8000);
+
+    const unresolvedDuels = await prisma.arcadeDuel.findMany({
+      where: {
+        ...(duelId ? { id: duelId } : {}),
+        OR: [
+          { attackerId: session.id },
+          { defenderId: session.id },
+        ],
+        resolvedAt: null,
+        createdAt: { lt: threshold },
+        match: {
+          status: "ARCADE_PENDING",
+        },
+      },
+      include: { match: true },
+    });
+
+    const results = [];
+
+    for (const duel of unresolvedDuels) {
+      const match = duel.match;
+      const attackerParticipated = duel.attackerEnteredAt !== null;
+      const defenderParticipated = duel.defenderEnteredAt !== null;
+
+      // Caso 1: Ambos participaron - no hacer nada (esperar a que se resuelva naturalmente)
+      if (attackerParticipated && defenderParticipated) {
+        continue;
+      }
+
+      // Caso 2: Ninguno participó - el atacante gana por default
+      if (!attackerParticipated && !defenderParticipated) {
+        await resolveDuelWithPenalty(duel, duel.attackerId, "defender_no_show");
+        results.push({
+          duelId: duel.id,
+          reason: "both_no_show",
+          winner: duel.attackerId,
+        });
+        continue;
+      }
+
+      // Caso 3: Solo el atacante participó - gana
+      if (attackerParticipated && !defenderParticipated) {
+        await resolveDuelWithPenalty(duel, duel.attackerId, "defender_no_show");
+        results.push({
+          duelId: duel.id,
+          reason: "defender_no_show",
+          winner: duel.attackerId,
+        });
+        continue;
+      }
+
+      // Caso 4: Solo el defensor participó - el atacante pierde (defensor gana por defensa)
+      if (!attackerParticipated && defenderParticipated) {
+        await resolveDuelWithPenalty(duel, duel.defenderId, "attacker_no_show");
+        results.push({
+          duelId: duel.id,
+          reason: "attacker_no_show",
+          winner: duel.defenderId,
+        });
+      }
+    }
+
+    return NextResponse.json({
+      processed: results.length,
+      results,
+      timestamp: now.toISOString(),
+    });
+  } catch (error) {
+    console.error("Arena participación check error:", error);
+    return NextResponse.json(
+      { error: "Interno del servidor" },
+      { status: 500 },
+    );
+  }
+}
+
+async function resolveDuelWithPenalty(
+  duel: {
+    id: string;
+    attackerId: string;
+    defenderId: string;
+    boardMove: { from: string; to: string; promotion?: string | null };
+    match: {
+      id: string;
+      fen: string;
+      turn: string;
+      moveHistory: unknown;
+      preferredNetwork: "INITIA" | "FLOW" | "SOLANA";
+      stakeAmount: { toString(): string; mul(value: number): { toString(): string } };
+      entryFee: { toString(): string; mul(value: number): { toString(): string } };
+      guestId: string | null;
+      stakeToken: string;
+    };
+  },
+  winnerId: string,
+  penaltyReason: string,
+) {
+  const match = duel.match;
+  const fullScore = 10000;
+  const defenderWon = winnerId === duel.defenderId;
+
+  await prisma.$transaction(async (tx: typeof prisma) => {
+    // Registrar el duelo como resuelto
+    await tx.arcadeDuel.update({
+      where: { id: duel.id },
+      data: {
+        winnerId,
+        participationPenalty: penaltyReason,
+        resolvedAt: new Date(),
+        ...(winnerId === duel.attackerId && { attackerScore: fullScore }),
+        ...(winnerId === duel.defenderId && { defenderScore: fullScore }),
+      },
+    });
+
+    // Actualizar el tablero según resultado
+    let nextStatus: "IN_PROGRESS" | "FINISHED" = "IN_PROGRESS";
+    let nextFen = match.fen;
+    let nextTurn = match.turn;
+    let matchWinnerId = null;
+
+    const moveHistory = Array.isArray(match.moveHistory)
+      ? match.moveHistory
+      : [];
+
+    if (defenderWon) {
+      // El defensor ganó - el tablero no avanza, turno sigue al atacante
+      nextTurn = duel.boardMove?.from ? match.turn : match.turn;
+    } else {
+      // El atacante ganó - aplicar el movimiento
+      const Chess = (await import("chess.js")).Chess;
+      const chess = new Chess(match.fen);
+      const boardMove = duel.boardMove;
+      const applied = chess.move({
+        from: boardMove.from,
+        to: boardMove.to,
+        promotion: boardMove.promotion ?? undefined,
+      });
+
+      nextFen = chess.fen();
+      nextTurn = chess.turn();
+
+      if (chess.isGameOver()) {
+        nextStatus = "FINISHED";
+        if (chess.isCheckmate()) {
+          matchWinnerId = winnerId;
+        }
+      }
+    }
+
+    await tx.match.update({
+      where: { id: match.id },
+      data: {
+        status: nextStatus,
+        fen: nextFen,
+        turn: nextTurn,
+        winnerId: matchWinnerId,
+        moveHistory: [
+          ...moveHistory,
+          `Arcade penalty resolved (${penaltyReason})`,
+        ],
+      },
+    });
+
+    // Si hay ganador de la partida, procesar pago
+    if (matchWinnerId) {
+      const adapter = getOnchainAdapter(match.preferredNetwork);
+      const poolMultiplier = match.guestId ? 2 : 1;
+      const stakePool = match.stakeAmount.mul(poolMultiplier);
+      const feePool = match.entryFee.mul(poolMultiplier);
+      const payout = {
+        toString: () => String(Number(stakePool.toString()) + Number(feePool.toString())),
+      };
+
+      const receipt = await adapter.settleEscrow({
+        matchId: match.id,
+        winnerId: matchWinnerId,
+        amount: payout.toString(),
+        token: match.stakeToken,
+      });
+
+      await tx.transaction.create({
+        data: {
+          userId: matchWinnerId,
+          matchId: match.id,
+          network: match.preferredNetwork,
+          type: "PRIZE_PAYOUT",
+          status: receipt.mode === "configured" ? "PENDING" : "SETTLED",
+          amount: payout.toString(),
+          token: match.stakeToken,
+          txHash: receipt.txHash,
+          metadata: {
+            description: receipt.description,
+            mode: receipt.mode,
+            penaltyResolved: true,
+          },
+        },
+      });
+    }
+  });
+}
