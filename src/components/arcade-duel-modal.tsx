@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ArcadeAttempt, ArcadeScenario } from "@/lib/arcade";
+import { useDict } from "@/components/locale-provider";
 
 type ArcadeDuelModalProps = {
   duel: {
@@ -26,6 +27,8 @@ type ArcadeDuelModalProps = {
 
 export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
   const router = useRouter();
+  const dict = useDict();
+  const arc = dict.arcade;
   const [phase, setPhase] = useState<"intro" | "active" | "submitted">(
     duel.attackerScore !== null || duel.defenderScore !== null ? "submitted" : "intro",
   );
@@ -65,13 +68,13 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
         .then(async (response) => {
           const data = await response.json();
           if (!response.ok) {
-            throw new Error(data.error ?? "No se pudo enviar el resultado.");
+            throw new Error(data.error ?? arc.submitError);
           }
-          setMessage(data.message ?? "Resultado enviado.");
+            setMessage(data.message ?? arc.submitSuccess);
           router.refresh();
         })
         .catch((error: unknown) => {
-          setMessage(error instanceof Error ? error.message : "No se pudo enviar el resultado.");
+          setMessage(error instanceof Error ? error.message : arc.submitError);
           setPhase("intro");
         });
     });
@@ -273,9 +276,7 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
           <div className="space-y-4">
             <div className="rounded-lg border border-white/8 bg-white/5 p-4 text-sm text-slate-200">
               <p className="mb-2 font-semibold">
-                {playerRole === "attacker"
-                  ? "Ataques: Completa el juego para avanzar tu pieza."
-                  : "Defensa: Gana este juego para bloquear el ataque."}
+                {playerRole === "attacker" ? arc.attackerRole : arc.defenderRole}
               </p>
               <p>{duel.game.antiCheat}</p>
             </div>
@@ -284,7 +285,7 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
               disabled={isPending}
               className="w-full rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 py-3 font-bold text-slate-950 transition hover:from-amber-300 hover:to-amber-400 disabled:opacity-50"
             >
-              Comenzar
+              {arc.startBtn}
             </button>
           </div>
         )}
@@ -323,7 +324,7 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
             {duel.scenario.kind === "memory" ? (
               <div className="space-y-5">
                 <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-center text-sm text-slate-300">
-                  {memoryPreview ? `Memoriza: ${(duel.scenario as { sequence: string[] }).sequence.join(" • ")}` : "Repite la secuencia tocando la cuadrícula."}
+                  {memoryPreview ? `Memoriza: ${(duel.scenario as { sequence: string[] }).sequence.join(" • ")}` : arc.memorizeHint}
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {[
@@ -348,7 +349,7 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
             {duel.scenario.kind === "keys" ? (
               <div className="space-y-4">
                 <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 text-center text-sm text-slate-300">
-                  Presiona las teclas en orden: <span className="font-bold text-cyan-300">{(duel.scenario as { sequence: string[] }).sequence.slice(keyIndex, keyIndex + 3).join(" → ")}</span>
+                  {arc.keysHint}: <span className="font-bold text-cyan-300">{(duel.scenario as { sequence: string[] }).sequence.slice(keyIndex, keyIndex + 3).join(" → ")}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {["A", "S", "D", "J", "K", "L"].map((key) => (
@@ -373,12 +374,12 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
 
         {phase === "submitted" && (
           <div className="space-y-4 text-center">
-            <p className="text-lg font-semibold text-slate-300">Esperando al rival...</p>
+            <p className="text-lg font-semibold text-slate-300">{arc.waitingRival}</p>
             {message ? <p className="text-sm text-slate-400">{message}</p> : null}
           </div>
         )}
 
-        {isPending ? <p className="mt-4 text-sm text-slate-400">Validando intento y resolviendo tablero...</p> : null}
+        {isPending ? <p className="mt-4 text-sm text-slate-400">{arc.validating}</p> : null}
       </div>
     </div>
   );

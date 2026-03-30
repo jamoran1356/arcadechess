@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { getLocale } from "@/lib/i18n";
+import { getDictionary } from "@/dictionaries";
 import { ArcadeGameType, TransactionNetwork } from "@prisma/client";
 import { createMatchAction, joinMatchAction } from "@/lib/actions";
 import { requireUser } from "@/lib/auth";
@@ -10,38 +12,40 @@ export const dynamic = "force-dynamic";
 export default async function LobbyPage() {
   const session = await requireUser();
   const { me, matches } = await getLobbySnapshot(session.id);
+  const locale = await getLocale();
+  const { lobby: t } = getDictionary(locale);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
       <section className="panel rounded-[1.75rem] p-5">
-        <p className="eyebrow">Como jugar rapido</p>
         <div className="mt-3 grid gap-3 text-sm text-slate-300 lg:grid-cols-3">
-          <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">1. Crea una mesa con stake en esta misma pantalla.</p>
-          <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">2. Si es versus, espera o únete a una mesa activa del lobby.</p>
-          <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">3. En captura, gana el duelo arcade para validar tu jugada.</p>
+        <p className="eyebrow">{t.howEyebrow}</p>
+          <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">{t.howStep1}</p>
+          <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">{t.howStep2}</p>
+          <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">{t.howStep3}</p>
         </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div id="create-match" className="panel rounded-[2rem] p-6 lg:p-8">
-          <p className="eyebrow">Publicar partida</p>
-          <h1 className="mt-3 text-4xl font-semibold text-white">Crea una mesa con apuesta y biblioteca arcade.</h1>
+          <p className="eyebrow">{t.publishEyebrow}</p>
+          <h1 className="mt-3 text-4xl font-semibold text-white">{t.publishTitle}</h1>
           <form action={createMatchAction} className="mt-8 grid gap-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
                 <input type="radio" name="isSolo" value="false" defaultChecked />
-                Partida versus (publica)
+                {t.modeVersus}
               </label>
               <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
                 <input type="radio" name="isSolo" value="true" />
-                Partida individual (solo)
+                {t.modeSolo}
               </label>
             </div>
-            <input name="title" className="input" placeholder="Nombre de la partida" required />
-            <textarea name="theme" className="input min-h-28" placeholder="Describe la tematica visual y narrativa del match" required />
+            <input name="title" className="input" placeholder={t.matchName} required />
+            <textarea name="theme" className="input min-h-28" placeholder={t.themePlaceholder} required />
             <div className="grid gap-4 sm:grid-cols-4">
-              <input name="stakeAmount" type="number" min="0" step="0.01" className="input" placeholder="Stake" required />
-              <input name="entryFee" type="number" min="0" step="0.01" className="input" placeholder="Fee" defaultValue="0" required />
+              <input name="stakeAmount" type="number" min="0" step="0.01" className="input" placeholder={t.stakeLabel} required />
+              <input name="entryFee" type="number" min="0" step="0.01" className="input" placeholder={t.feeLabel} defaultValue="0" required />
               <input name="stakeToken" className="input" defaultValue="INIT" />
               <select name="network" className="input" defaultValue={TransactionNetwork.INITIA}>
                 {Object.values(TransactionNetwork).map((network) => (
@@ -54,7 +58,7 @@ export default async function LobbyPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2 text-sm text-slate-300">
-                Reloj principal (minutos por lado)
+                {t.clockLabel}
                 <input
                   name="gameClockMinutes"
                   type="number"
@@ -67,12 +71,12 @@ export default async function LobbyPage() {
                 />
               </label>
               <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-                El reloj solo cuenta durante jugadas de ajedrez; se pausa durante minijuegos arcade.
+                {t.clockNote}
               </p>
             </div>
 
             <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">Biblioteca arcade</p>
+              <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{t.arcadeLibrary}</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 {arcadeLibrary.map((game) => (
                   <label key={game.id} className="rounded-[1.25rem] border border-white/10 bg-slate-950/80 p-4 text-sm text-slate-200">
@@ -85,24 +89,24 @@ export default async function LobbyPage() {
             </div>
 
             <button type="submit" className="button-primary mt-2 px-6 py-3 text-sm">
-              Crear mesa con escrow
+              {t.createBtn}
             </button>
           </form>
         </div>
 
         <div className="panel rounded-[2rem] p-6 lg:p-8">
-          <p className="eyebrow">Jugador conectado</p>
+          <p className="eyebrow">{t.connectedEyebrow}</p>
           <h2 className="mt-3 text-3xl font-semibold text-white">{me?.name}</h2>
           <p className="mt-3 text-sm leading-7 text-slate-300">
-            Puedes crear mesas publicas o entrar como rival. Si una casilla ocupada es atacada, ambos jugadores reciben el mismo minijuego y el servidor valida el resultado.
+            {t.connectedDesc}
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             <Link href="/arcade-test" className="button-secondary px-4 py-2 text-white">
-              Probar arcade
+              {t.testArcade}
             </Link>
             {session.role === "ADMIN" ? (
               <Link href="/admin" className="button-secondary px-4 py-2 text-white">
-                Ir a admin
+                {t.goAdmin}
               </Link>
             ) : null}
           </div>
@@ -120,15 +124,15 @@ export default async function LobbyPage() {
 
       <section className="grid gap-4">
         <div>
-          <p className="eyebrow">Lobby activo</p>
-          <h2 className="mt-2 text-3xl font-semibold text-white">Partidas disponibles</h2>
+          <p className="eyebrow">{t.activeEyebrow}</p>
+          <h2 className="mt-2 text-3xl font-semibold text-white">{t.activeTitle}</h2>
         </div>
 
         {matches.length === 0 ? (
           <article className="panel rounded-[1.75rem] p-6">
-            <h3 className="text-2xl font-semibold text-white">Aun no hay partidas en el lobby</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">Crea la primera mesa y empieza una partida de inmediato. Si eliges modo solo, podrás jugar sin esperar rival.</p>
-            <a href="#create-match" className="button-primary mt-5 inline-flex px-5 py-2 text-sm">Crear mi primera partida</a>
+            <h3 className="text-2xl font-semibold text-white">{t.noMatchesTitle}</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-300">{t.noMatchesDesc}</p>
+            <a href="#create-match" className="button-primary mt-5 inline-flex px-5 py-2 text-sm">{t.noMatchesCta}</a>
           </article>
         ) : (
           <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
@@ -152,29 +156,29 @@ export default async function LobbyPage() {
                   ))}
                 </div>
                 <div className="mt-6 text-sm text-slate-300">
-                  Host: <span className="text-white">{match.host}</span>
+                  {t.hostLabel}: <span className="text-white">{match.host}</span>
                   <br />
-                  Rival: <span className="text-white">{match.guest ?? "Disponible"}</span>
+                  {t.rivalLabel}: <span className="text-white">{match.guest ?? t.available}</span>
                   <br />
-                  Modalidad: <span className="text-white">{match.isSolo ? "Solo" : "Versus"}</span>
+                  {t.modeLabel}: <span className="text-white">{match.isSolo ? t.soloMode : t.versusMode}</span>
                   <br />
-                  Stake/Fee: <span className="text-white">{match.stakeAmount} / {match.entryFee} {match.stakeToken}</span>
+                  {t.stakeFeeLabel}: <span className="text-white">{match.stakeAmount} / {match.entryFee} {match.stakeToken}</span>
                   <br />
-                  Reloj: <span className="text-white">{Math.max(1, Math.round(match.gameClockMs / 60000))} min</span>
+                  {t.relojLabel}: <span className="text-white">{Math.max(1, Math.round(match.gameClockMs / 60000))} {t.clockMin}</span>
                 </div>
                 <div className="mt-6 flex flex-wrap items-center gap-3">
                   <Link href={`/match/${match.id}`} className="button-secondary px-4 py-2 text-sm text-white">
-                    Ver mesa
+                    {t.viewBtn}
                   </Link>
                   {match.status === "OPEN" && !match.isSolo && match.host !== session.name ? (
                     <form action={joinMatchAction}>
                       <input type="hidden" name="matchId" value={match.id} />
                       <button type="submit" className="button-primary px-4 py-2 text-sm">
-                        Unirme
+                        {t.joinBtn}
                       </button>
                     </form>
                   ) : null}
-                  {match.hasPendingDuel ? <span className="text-xs text-amber-200">Captura en duelo</span> : null}
+                  {match.hasPendingDuel ? <span className="text-xs text-amber-200">{t.pendingDuel}</span> : null}
                 </div>
               </article>
             ))}
