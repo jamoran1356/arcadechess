@@ -1,0 +1,12 @@
+{
+  "project_name": "Arcade Chess Arena",
+  "repo_url": "https://github.com/jamoran1356/playchess",
+  "commit_sha": "01cc887ea573c7f2821372cea7d4a3097db98d3b",
+  "rollup_chain_id": "initia-testnet",
+  "deployed_address": "0xbcc2b6820b8f616d",
+  "vm": "move",
+  "native_feature": "auto-signing",
+  "core_logic_path": "contracts/initia/arcade_escrow.move",
+  "native_feature_frontend_path": "src/app/lobby/page.tsx",
+  "demo_video_url": "https://youtube.com/video/jbd6uLc1p00"
+}

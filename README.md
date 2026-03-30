@@ -5,6 +5,29 @@ Arcade Chess Arena is a next-generation competitive chess experience where every
 
 Built for **Initia, Flow, and Solana**, this project transforms traditional chess into a hybrid strategy + reflex game powered by onchain competition.
 
+## Initia Hackathon Submission
+
+- **Project Name**: Arcade Chess Arena
+- **Rollup Chain ID**: initia-testnet
+- **Deployment Reference**: https://testnet.flowscan.io/account/0xbcc2b6820b8f616d
+- **Txn Reference**: https://testnet.flowscan.io/transaction/f91ee5f49cd76004b431537bd4e27deed33ed724f2e5b7b151d966d8afe9f86c
+
+### Project Overview
+
+Arcade Chess Arena convierte una captura de ajedrez en un duelo arcade en tiempo real para decidir si la pieza realmente se toma. El producto apunta a jugadores competitivos y comunidades que quieren partidas con mayor tensión, más espectáculo y resultados verificables. La propuesta de valor es combinar estrategia clásica con ejecución bajo presión, creando una experiencia más dinámica y apta para torneos onchain.
+
+### Implementation Detail
+
+- **The Custom Implementation**: Implementamos una capa de resolución de capturas basada en minijuegos (targets, memory y key-clash), sincronizada entre atacante y defensor. El backend valida resultados, resuelve el estado de tablero y registra la actividad transaccional para stakes y flujo de partida.
+- **The Native Feature**: La entrega está preparada para el flujo de **auto-signing** en UX de transacciones dentro del lobby y acciones de partida, reduciendo fricción en operaciones repetitivas de match/stake para una experiencia de juego más fluida.
+
+### How to Run Locally
+
+1. Instala dependencias: `pnpm install`
+2. Configura entorno: copia `.env.example` a `.env.local` y ajusta variables de base de datos/red.
+3. Inicializa base de datos: `pnpm setup`
+4. Inicia frontend: `pnpm dev` y abre `http://localhost:3000`
+
 ---
 
 ## 🚀 Overview
