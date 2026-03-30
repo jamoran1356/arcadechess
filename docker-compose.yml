@@ -25,7 +25,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://playchess:playchess_dev_password@postgres:5432/playchess_db
+      DATABASE_URL: ${DATABASE_URL}
       NODE_ENV: production
     depends_on:
       migrate:
