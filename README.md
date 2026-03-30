@@ -1,250 +1,251 @@
 # ♟️ Arcade Chess Arena  
-**Every capture becomes a duel.**
-
-Arcade Chess Arena is a next-generation competitive chess experience where every capture is no longer automatic — it becomes a real-time skill duel.
-
-Built for **Initia, Flow, and Solana**, this project transforms traditional chess into a hybrid strategy + reflex game powered by onchain competition.
-
-## Initia Hackathon Submission
-
-- **Project Name**: Arcade Chess Arena
-- **Rollup Chain ID**: initia-testnet
-- **Deployment Reference**: https://testnet.flowscan.io/account/0xbcc2b6820b8f616d
-- **Txn Reference**: https://testnet.flowscan.io/transaction/f91ee5f49cd76004b431537bd4e27deed33ed724f2e5b7b151d966d8afe9f86c
-
-### Project Overview
-
-Arcade Chess Arena convierte una captura de ajedrez en un duelo arcade en tiempo real para decidir si la pieza realmente se toma. El producto apunta a jugadores competitivos y comunidades que quieren partidas con mayor tensión, más espectáculo y resultados verificables. La propuesta de valor es combinar estrategia clásica con ejecución bajo presión, creando una experiencia más dinámica y apta para torneos onchain.
-
-### Implementation Detail
-
-- **The Custom Implementation**: Implementamos una capa de resolución de capturas basada en minijuegos (targets, memory y key-clash), sincronizada entre atacante y defensor. El backend valida resultados, resuelve el estado de tablero y registra la actividad transaccional para stakes y flujo de partida.
-- **The Native Feature**: La entrega está preparada para el flujo de **auto-signing** en UX de transacciones dentro del lobby y acciones de partida, reduciendo fricción en operaciones repetitivas de match/stake para una experiencia de juego más fluida.
-
-### How to Run Locally
-
-1. Instala dependencias: `pnpm install`
-2. Configura entorno: copia `.env.example` a `.env.local` y ajusta variables de base de datos/red.
-3. Inicializa base de datos: `pnpm setup`
-4. Inicia frontend: `pnpm dev` y abre `http://localhost:3000`
+### *Where strategy meets reflex. Where every capture becomes a fight.*
 
 ---
 
-## 🚀 Overview
+## 🚀 The Idea
 
-In traditional chess, capturing a piece is purely based on position.
+**Arcade Chess Arena** reinvents one of the most iconic games ever created.
 
-In Arcade Chess Arena:
-- When a player enters an occupied square,
-- both players must complete a **real-time reflex mini-game**,
-- the fastest player wins the duel,
-- and earns control of the square.
+In traditional chess, a capture is automatic.
 
-This introduces a new dimension to chess:
-> Strategy decides the move. Skill decides the outcome.
+In Arcade Chess Arena, **a capture is a battle**.
 
----
+When a player attempts to take a piece:
+- both players are pulled into a **real-time skill duel**
+- speed, precision, and execution decide the outcome
+- the winner claims the square
 
-## 🎮 Core Gameplay
-
-- Classical chess rules still apply
-- Captures are replaced by **arcade duels**
-- Both players compete simultaneously
-- The best time wins the square
-- If you lose the duel, your move fails
-
-This creates:
-- higher tension
-- more interaction
-- real-time competitive moments
-- deeper gameplay
+> 🧠 Strategy chooses the move.  
+> ⚡ Skill determines the result.
 
 ---
 
-## ⚡ Why This Matters
+## 🧩 Why This Matters
 
-Chess is one of the most iconic games ever created — but its digital versions are often passive for modern audiences.
+Chess has survived centuries — but digital chess hasn’t evolved at the same pace.
+
+Modern players want:
+- interaction  
+- adrenaline  
+- skill expression  
+- spectacle  
 
 Arcade Chess Arena introduces:
-- **active engagement**
-- **skill-based resolution**
-- **spectator-friendly moments**
-- **competitive intensity**
+- **real-time tension inside turn-based gameplay**
+- **mechanical skill layered over pure strategy**
+- **highlight-worthy moments in every match**
 
-It turns chess into something:
-- more dynamic
-- more entertaining
-- more replayable
+This is not a variation of chess.  
+This is **a new competitive genre.**
 
 ---
 
-## ⛓️ Blockchain Integration
+## 🏗️ Hackathon Submission (Initia)
 
-This project uses blockchain **as competitive infrastructure**, not as decoration.
+- **Project Name**: Arcade Chess Arena  
+- **Rollup Chain ID**: `initia-testnet`  
+- **Deployment**: https://testnet.flowscan.io/account/0xbcc2b6820b8f616d  
+- **Transaction**: https://testnet.flowscan.io/transaction/f91ee5f49cd76004b431537bd4e27deed33ed724f2e5b7b151d966d8afe9f86c  
 
-Powered by **Initia, Flow, and Solana**, the system enables:
+---
 
+## 🎮 Core Gameplay Loop
+
+1. Players join or create a match  
+2. Game follows standard chess rules  
+3. A capture is attempted  
+4. ⚔️ Duel is triggered  
+5. Both players enter a **mini-game simultaneously**  
+6. Fastest / most precise player wins  
+7. Board state updates  
+8. Game continues  
+
+---
+
+## ⚔️ The Duel System
+
+Every capture transforms into a **micro-competition**.
+
+### Current Mini-Games (Prototype)
+- Reaction speed tests  
+- Timing challenges  
+- Target precision  
+
+### Future Expansions
+- Pattern recognition  
+- Memory-based duels  
+- Skill-based aim mechanics  
+- Adaptive difficulty systems  
+
+Designed to be:
+- fast (seconds, not minutes)  
+- fair  
+- repeatable  
+- competitive  
+
+---
+
+## ⛓️ Blockchain as Infrastructure
+
+This project doesn’t “add blockchain.”  
+It **uses blockchain where it actually matters**:
+
+### Powered by:
+- **Initia (primary)**
+- **Flow**
+- **Solana**
+
+### Enables:
 - 🏆 Onchain tournaments  
-- 💰 Paid matches and competitive lobbies  
-- 🧾 Verifiable match results  
-- 📊 Player progression and history  
-- 🌐 Decentralized competition hosting  
+- 💰 Entry-fee matches  
+- 📜 Verifiable match results  
+- 📊 Player history & progression  
+- 🌐 Decentralized competitive ecosystems  
 
 Players can:
-- create matches
-- set entry fees
-- compete for rewards
-- host tournaments
-- build communities around gameplay
+- create matches  
+- set stakes  
+- host tournaments  
+- earn rewards  
+- build competitive communities  
 
 ---
 
-## 🧠 Key Innovation
+## 🧠 Core Innovation
 
-The core innovation is simple but powerful:
+> **Every capture becomes a moment of real competition.**
 
-> Every capture becomes a moment of real competition.
+This single mechanic:
+- preserves chess fundamentals  
+- adds execution pressure  
+- rewards reflex + skill  
+- creates natural spectator highlights  
 
-This mechanic:
-- preserves chess fundamentals
-- adds real-time pressure
-- rewards execution, not just planning
-- creates natural highlight moments
+It turns passive gameplay into **active combat**.
 
 ---
 
 ## 🏗️ Architecture (MVP)
 
-The current MVP focuses on delivering a functional and demo-ready system.
+Built for speed, scalability, and iteration.
 
 ### Frontend
-- Next.js (App Router)
-- TypeScript
-- TailwindCSS
+- Next.js (App Router)  
+- TypeScript  
+- TailwindCSS  
 
 ### Backend
-- Server Actions / API Routes
-- Prisma ORM
+- Server Actions / API Routes  
+- Prisma ORM  
 
 ### Database
-- PostgreSQL
+- PostgreSQL  
 
 ### Blockchain Layer
-- Initia (primary integration target)
-- Flow / Solana (cross-ecosystem vision)
-
-### Features implemented
-- Basic chess interface
-- Match creation
-- Duel trigger system (capture logic)
-- Reflex-based mini-game (prototype)
-- Match flow orchestration
-- Onchain-ready architecture for tournaments
+- Initia (execution target)  
+- Flow / Solana (interoperability vision)  
 
 ---
 
-## 🧪 How It Works (Flow)
+## ⚙️ Features Implemented
 
-1. Player creates or joins a match  
-2. Game starts with standard chess rules  
-3. When a capture is attempted:
-   - duel is triggered  
-   - both players enter mini-game  
-   - timer starts  
-4. Fastest player wins  
-5. Board updates accordingly  
-6. Game continues  
+- Chessboard interface  
+- Match creation system  
+- Duel-trigger capture logic  
+- Reflex-based mini-game (prototype)  
+- Match orchestration engine  
+- Onchain-ready architecture  
 
 ---
 
-## 🧩 Mini-Game Concept
+## 🎯 Target Users
 
-The duel is a fast reflex challenge designed to:
-- be completed in seconds
-- require precision and speed
-- be fair and repeatable
-
-Examples (current and future):
-- click timing challenge
-- reaction speed test
-- pattern matching
-- aim-based interactions
-
----
-
-## 🧑‍🤝‍🧑 Target Users
-
-- Chess players looking for a new competitive format  
-- Casual gamers who want more interaction  
-- Web3 users interested in paid competition  
-- Streamers and content creators  
+- Competitive chess players  
+- Casual gamers seeking interaction  
+- Web3-native users  
+- Streamers & content creators  
 - Tournament organizers  
 
 ---
 
 ## 💡 Use Cases
 
-- Friendly matches with a twist  
-- Ranked competitive play  
+- Competitive ranked matches  
 - Paid 1v1 duels  
 - Community tournaments  
-- Creator-led events  
+- Creator-driven events  
 - Seasonal leagues  
 
 ---
 
 ## 🌍 Vision
 
-Arcade Chess Arena aims to redefine strategy games by introducing real-time skill layers into traditionally turn-based systems.
+Arcade Chess Arena is the first step toward a new category:
 
-This is not just chess on blockchain.
+> **Hybrid Strategy Games**
 
-It is:
-- more interactive  
-- more competitive  
+Where:
+- thinking meets execution  
+- turns meet real-time action  
+- players don’t just plan — they perform  
+
+This is not just chess onchain.
+
+It’s:
+- more intense  
 - more social  
+- more competitive  
 - more alive  
-
-We believe the future of strategy games lies in combining:
-- thinking
-- execution
-- ownership
-- community-driven competition
 
 ---
 
 ## 🧪 Current Status
 
-This project is an MVP built for hackathon submission.
+MVP built for hackathon demonstration.
 
-It demonstrates:
-- core gameplay innovation  
-- duel-based capture system  
-- functional match flow  
-- integration-ready blockchain architecture  
+✔ Core gameplay functional  
+✔ Duel system implemented  
+✔ Match flow operational  
+✔ Blockchain-ready architecture  
 
-Future iterations will expand:
-- tournament systems  
-- ranking and matchmaking  
-- onchain prize pools  
-- advanced mini-games  
-- spectator mode  
+### Next Steps
+- Ranking & matchmaking  
+- Tournament engine  
+- Prize pools onchain  
+- Advanced mini-games  
+- Spectator mode  
 
 ---
 
-## 🏆 Why This Project
+## 🏆 Why This Project Wins
 
-Arcade Chess Arena is designed to:
-- be instantly understandable  
-- be memorable after one demo  
-- introduce real gameplay innovation  
-- leverage blockchain meaningfully  
-- create strong competitive loops  
+- Instantly understandable  
+- Immediately engaging  
+- Visually demonstrable  
+- Mechanically innovative  
+- Built for competition  
+- Built for Web3 **with purpose**  
 
 ---
 
 ## 👤 Team
 
-Solo founder and senior full-stack engineer with 20+ years of experience, focused on rapid product development and building complete systems end-to-end.
+Solo founder.  
+Senior full-stack engineer.  
+20+ years building systems end-to-end.
+
+Focused on:
+- rapid execution  
+- product-first thinking  
+- scalable architecture  
 
 ---
+
+## 🔥 Final Thought
+
+Chess has always been about **who thinks better**.
+
+Arcade Chess Arena adds a new question:
+
+> **Who performs better under pressure?**
