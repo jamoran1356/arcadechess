@@ -21,14 +21,6 @@ Arcade Chess Arena convierte una captura de ajedrez en un duelo arcade en tiempo
 - **The Custom Implementation**: Implementamos una capa de resolución de capturas basada en minijuegos (targets, memory y key-clash), sincronizada entre atacante y defensor. El backend valida resultados, resuelve el estado de tablero y registra la actividad transaccional para stakes y flujo de partida.
 - **The Native Feature**: La entrega está preparada para el flujo de **auto-signing** en UX de transacciones dentro del lobby y acciones de partida, reduciendo fricción en operaciones repetitivas de match/stake para una experiencia de juego más fluida.
 
-### How to Run Locally
-
-1. Instala dependencias: `pnpm install`
-2. Configura entorno: copia `.env.example` a `.env.local` y ajusta variables de base de datos/red.
-3. Inicializa base de datos: `pnpm setup`
-4. Inicia frontend: `pnpm dev` y abre `http://localhost:3000`
-
----
 
 ## 🚀 Overview
 
