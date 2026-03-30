@@ -1,4 +1,31 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: playchess-app
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://playchess:playchess_dev_password@postgres:5432/playchess_db
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "3000"
+    restart: unless-stopped
+    networks:
+      - default
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.playchess.rule=Host(`playchess.pydti.com`)
+      - traefik.http.routers.playchess.entrypoints=websecure
+      - traefik.http.routers.playchess.tls=true
+      - traefik.http.services.playchess.loadbalancer.server.port=3000
+
   postgres:
     image: postgres:16-alpine
     container_name: playchess-postgres
@@ -18,3 +45,7 @@ services:
 
 volumes:
   postgres_data:
+
+networks:
+  proxy:
+    external: true
