@@ -134,7 +134,12 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
             options={{
               position: fen,
               boardOrientation: orientation,
-              onPieceDrop: ({ sourceSquare, targetSquare }) => onPieceDrop(sourceSquare, targetSquare),
+              onPieceDrop: ({ sourceSquare, targetSquare }) => {
+                if (!sourceSquare || !targetSquare) {
+                  return false;
+                }
+                return onPieceDrop(sourceSquare, targetSquare);
+              },
               darkSquareStyle: { backgroundColor: "#0f3857" },
               lightSquareStyle: { backgroundColor: "#d6f0ff" },
               boardStyle: { borderRadius: "1.25rem", overflow: "hidden" },
