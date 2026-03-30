@@ -209,6 +209,23 @@ export default async function Home() {
             <p className="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
               {network.status}
             </p>
+            {network.contractAddress && (
+              <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                <p className="font-mono text-[0.65rem] uppercase tracking-widest text-cyan-300/60">Contract</p>
+                {network.explorerUrl ? (
+                  <a
+                    href={network.explorerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 block break-all font-mono text-xs text-cyan-200 underline-offset-2 hover:underline"
+                  >
+                    {network.contractAddress}
+                  </a>
+                ) : (
+                  <p className="mt-1 break-all font-mono text-xs text-slate-300">{network.contractAddress}</p>
+                )}
+              </div>
+            )}
           </article>
         ))}
       </section>

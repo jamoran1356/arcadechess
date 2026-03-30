@@ -153,6 +153,40 @@ Built for speed, scalability, and iteration.
 
 ---
 
+## 🆕 Novedades Recientes
+
+### Contrato en Initia (Move)
+- Se estructuro el paquete Move en `contracts/initia/` con `Move.toml` y modulo `arcade_escrow.move`.
+- El contrato incorpora primitives para flujo competitivo y apuestas:
+  - creacion/gestion de partidas con fondos en escrow
+  - colocacion de apuestas
+  - resolucion y settlement de resultados
+- La integracion de frontend usa InterwovenKit con red de testnet compatible y wallet connect en la UI.
+
+### Apuestas de Espectadores
+- Se agrego soporte para que usuarios que no juegan la partida puedan apostar por un ganador.
+- Modelo persistente en base de datos:
+  - nueva entidad `MatchBet` en Prisma
+  - relacion con partida, usuario apostador y lado elegido
+- Flujo funcional en aplicacion:
+  - accion server-side para registrar apuesta
+  - visualizacion de pool total, cantidad de apostadores y apuesta del usuario
+  - panel de apuestas en la vista de partida
+
+### Settlement y Logica Economica
+- Se actualizo la logica de liquidacion para separar con claridad:
+  - resultado del duelo principal
+  - liquidacion de apuestas de espectadores
+  - comisiones/plataforma
+- El settlement contempla cierre consistente de partida y distribucion de payout segun resultado final.
+
+### Migraciones y Despliegue
+- Se migro a esquema de Prisma con migraciones versionadas (`prisma/migrations`).
+- El flujo de contenedores incluye etapa de migracion previa al inicio de la app (`migrate deploy`).
+- Configuracion orientada a entorno con variables para DB local y DB intra-contenedor.
+
+---
+
 ## ⚙️ Features Implemented
 
 - Chessboard interface  
@@ -160,7 +194,11 @@ Built for speed, scalability, and iteration.
 - Duel-trigger capture logic  
 - Reflex-based mini-game (prototype)  
 - Match orchestration engine  
-- Onchain-ready architecture  
+- Integracion wallet con InterwovenKit en testnet  
+- Apuestas de espectadores (modelo + UI + acciones)  
+- Settlement de apuestas y payouts post-partida  
+- Esquema Prisma con migraciones versionadas  
+- Flujo docker con migracion automatica previa al arranque  
 
 ---
 
@@ -207,19 +245,22 @@ It’s:
 
 ## 🧪 Current Status
 
-MVP built for hackathon demonstration.
+MVP funcional y extendido con economia competitiva.
 
 ✔ Core gameplay functional  
 ✔ Duel system implemented  
 ✔ Match flow operational  
-✔ Blockchain-ready architecture  
+✔ Apuestas de espectadores implementadas en app  
+✔ Settlement de payouts integrado  
+✔ Contrato Initia (Move) estructurado en repositorio  
+✔ Migraciones versionadas y flujo docker con migracion previa  
 
 ### Next Steps
 - Ranking & matchmaking  
 - Tournament engine  
-- Prize pools onchain  
+- Prize pools onchain en produccion  
 - Advanced mini-games  
-- Spectator mode  
+- Deployment y verificacion completa de contratos multi-chain  
 
 ---
 
