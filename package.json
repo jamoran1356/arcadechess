@@ -17,18 +17,22 @@
     "seed": "node prisma/seed.mjs"
   },
   "dependencies": {
+    "@initia/interwovenkit-react": "^2.5.1",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
+    "@tanstack/react-query": "^5.95.2",
     "bcryptjs": "^3.0.3",
     "chess.js": "^1.4.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "jose": "^6.2.2",
+    "nanoid": "^5.1.7",
     "next": "16.2.1",
     "pg": "^8.20.0",
     "react": "19.2.4",
     "react-chessboard": "^5.10.0",
     "react-dom": "19.2.4",
+    "wagmi": "^2.17.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

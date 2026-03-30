@@ -41,12 +41,25 @@ This is **a new competitive genre.**
 
 ---
 
-## 🏗️ Hackathon Submission (Initia)
+## Initia Hackathon Submission
 
-- **Project Name**: Arcade Chess Arena  
-- **Rollup Chain ID**: `initia-testnet`  
-- **Deployment**: https://testnet.flowscan.io/account/0xbcc2b6820b8f616d  
-- **Transaction**: https://testnet.flowscan.io/transaction/f91ee5f49cd76004b431537bd4e27deed33ed724f2e5b7b151d966d8afe9f86c  
+- **Project Name**: Arcade Chess Arena
+
+### Project Overview
+
+Arcade Chess Arena transforma una partida de ajedrez en una experiencia competitiva híbrida donde cada captura se resuelve con un duelo arcade en tiempo real. El producto está orientado a jugadores competitivos, creadores de torneos y comunidades Web3 que buscan partidas con más intensidad, resultados verificables y mayor retención. Su valor principal es unir estrategia clásica con ejecución mecánica bajo presión.
+
+### Implementation Detail
+
+- **The Custom Implementation**: Implementamos una capa de resolución de capturas basada en minijuegos sincronizados entre atacante y defensor, con validación de resultado y actualización del estado de partida en backend.
+- **The Native Feature**: Integramos InterwovenKit en la app con `InterwovenKitProvider`, conexión de wallet en la barra superior y `enableAutoSign={true}` para habilitar el flujo de auto-firma en la cadena por defecto. Esto reduce fricción en operaciones repetitivas dentro del flujo competitivo.
+
+### How to Run Locally
+
+1. Instala dependencias con `pnpm install`.
+2. Configura variables de entorno en `.env` o `.env.local`.
+3. Inicializa base de datos con `pnpm setup`.
+4. Ejecuta la app con `pnpm dev` y abre `http://localhost:3000`.
 
 ---
 

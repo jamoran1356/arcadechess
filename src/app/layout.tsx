@@ -8,6 +8,8 @@ import { getLocale } from "@/lib/i18n";
 import { getDictionary } from "@/dictionaries";
 import { LocaleProvider } from "@/components/locale-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { InterwovenKitProviders } from "@/components/interwovenkit-providers";
+import { InterwovenKitConnectButton } from "@/components/interwovenkit-connect-button";
 
 const display = Space_Grotesk({
   variable: "--font-display",
@@ -40,8 +42,9 @@ export default async function RootLayout({
       className={`${display.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-[radial-gradient(circle_at_top,_rgba(250,204,21,0.15),_transparent_24%),linear-gradient(180deg,_#07111f_0%,_#08131b_55%,_#02060a_100%)] text-stone-100">
-        <LocaleProvider locale={locale} dict={dict}>
-        <div className="relative min-h-screen overflow-hidden">
+        <InterwovenKitProviders>
+          <LocaleProvider locale={locale} dict={dict}>
+            <div className="relative min-h-screen overflow-hidden">
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:54px_54px] opacity-20" />
           <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
             <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
@@ -80,6 +83,7 @@ export default async function RootLayout({
               </nav>
 
               <div className="flex items-center gap-3">
+                <InterwovenKitConnectButton />
                 <LanguageSwitcher />
                 {session ? (
                   <>
@@ -140,8 +144,9 @@ export default async function RootLayout({
           </header>
 
           <main className="relative z-10">{children}</main>
-        </div>
-        </LocaleProvider>
+            </div>
+          </LocaleProvider>
+        </InterwovenKitProviders>
       </body>
     </html>
   );
