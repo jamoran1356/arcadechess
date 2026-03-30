@@ -206,9 +206,6 @@ export default async function Home() {
             <p className="eyebrow">{t.networkLabel}</p>
             <h3 className="mt-3 text-2xl font-semibold text-white">{network.name}</h3>
             <p className="mt-3 text-sm leading-7 text-slate-300">{network.summary}</p>
-            <p className="mt-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
-              {network.status}
-            </p>
             {network.contractAddress && (
               <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                 <p className="font-mono text-[0.65rem] uppercase tracking-widest text-cyan-300/60">Contract</p>
