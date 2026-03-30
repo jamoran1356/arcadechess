@@ -9,7 +9,14 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL_DOCKER}
       NODE_ENV: production
-    command: sh -c "pnpm prisma migrate deploy"
+      PRISMA_BASELINE_MIGRATION: 202603300001_init
+    command: >-
+      sh -c "
+      pnpm prisma migrate deploy ||
+      (echo 'Intentando baseline de migracion inicial...' &&
+      pnpm prisma migrate resolve --applied $${PRISMA_BASELINE_MIGRATION} &&
+      pnpm prisma migrate deploy)
+      "
     depends_on:
       postgres:
         condition: service_healthy
