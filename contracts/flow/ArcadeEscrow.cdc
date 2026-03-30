@@ -5,6 +5,8 @@ access(all) contract ArcadeEscrow {
     access(all) event MatchJoined(matchId: String, guest: Address, stakeAmount: UFix64)
     access(all) event MatchSettled(matchId: String, winner: Address, prizeAmount: UFix64)
     access(all) event MatchCancelled(matchId: String)
+    access(all) event BetPlaced(betId: UInt64, matchId: String, bettor: Address, predictedWinner: Address, amount: UFix64)
+    access(all) event BetSettled(betId: UInt64, matchId: String, winner: Address, payoutAmount: UFix64, won: Bool)
 
     // Match escrow resource
     access(all) resource Match {
@@ -56,13 +58,53 @@ access(all) contract ArcadeEscrow {
         }
     }
 
+    access(all) resource Bet {
+        access(all) let id: UInt64
+        access(all) let matchId: String
+        access(all) let bettor: Address
+        access(all) let predictedWinner: Address
+        access(all) let amount: UFix64
+        access(all) var payoutAmount: UFix64
+        access(all) var status: UInt8
+        access(all) var settledAt: UFix64
+
+        init(id: UInt64, matchId: String, bettor: Address, predictedWinner: Address, amount: UFix64) {
+            self.id = id
+            self.matchId = matchId
+            self.bettor = bettor
+            self.predictedWinner = predictedWinner
+            self.amount = amount
+            self.payoutAmount = 0.0
+            self.status = 10
+            self.settledAt = 0.0
+        }
+
+        access(all) fun settle(winner: Address, payoutAmount: UFix64) {
+            pre {
+                self.status == 10: "Bet is not open"
+            }
+            if self.predictedWinner == winner {
+                self.status = 11
+                self.payoutAmount = payoutAmount
+            } else {
+                self.status = 12
+                self.payoutAmount = 0.0
+            }
+            self.settledAt = getCurrentBlock().timestamp
+        }
+    }
+
     // Global storage
     access(self) let matches: @{String: Match}
+    access(self) let bets: @{UInt64: Bet}
+    access(self) var nextBetId: UInt64
     access(self) var nextMatchId: UInt64
     access(self) let adminAddress: Address
 
     init() {
         self.matches <- {}
+        self.bets <- {}
+        self.nextBetId = 1
         self.nextMatchId = 1
         self.adminAddress = self.account.address
     }
@@ -138,6 +180,65 @@ access(all) contract ArcadeEscrow {
         emit MatchCancelled(matchId: matchId)
 
         self.matches[matchId] <-! match
+    }
+
+    // Place a spectator bet for match winner
+    access(all) fun placeBet(
+        matchId: String,
+        bettor: Address,
+        predictedWinner: Address,
+        amount: UFix64
+    ): UInt64 {
+        pre {
+            self.matches.containsKey(matchId): "Match not found"
+        }
+
+        let betId = self.nextBetId
+        self.nextBetId = self.nextBetId + 1
+
+        let bet <- create Bet(
+            id: betId,
+            matchId: matchId,
+            bettor: bettor,
+            predictedWinner: predictedWinner,
+            amount: amount
+        )
+
+        self.bets[betId] <-! bet
+
+        emit BetPlaced(
+            betId: betId,
+            matchId: matchId,
+            bettor: bettor,
+            predictedWinner: predictedWinner,
+            amount: amount
+        )
+
+        return betId
+    }
+
+    // Settle an existing bet
+    access(all) fun settleBet(
+        betId: UInt64,
+        winner: Address,
+        payoutAmount: UFix64
+    ) {
+        pre {
+            self.bets.containsKey(betId): "Bet not found"
+        }
+
+        let bet <- self.bets.remove(key: betId)!!
+        bet.settle(winner: winner, payoutAmount: payoutAmount)
+
+        emit BetSettled(
+            betId: betId,
+            matchId: bet.matchId,
+            winner: winner,
+            payoutAmount: bet.payoutAmount,
+            won: bet.status == 11
+        )
+
+        self.bets[betId] <-! bet
     }
 
     // Get match details (summary only)

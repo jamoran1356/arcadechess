@@ -10,6 +10,9 @@ pub mod arcade_escrow {
     pub const STATUS_IN_PROGRESS: u8 = 1;
     pub const STATUS_SETTLED: u8 = 2;
     pub const STATUS_CANCELLED: u8 = 3;
+    pub const BET_STATUS_OPEN: u8 = 10;
+    pub const BET_STATUS_WON: u8 = 11;
+    pub const BET_STATUS_LOST: u8 = 12;
 
     pub fn create_match(
         ctx: Context<CreateMatch>,
@@ -85,6 +88,55 @@ pub mod arcade_escrow {
 
         Ok(())
     }
+
+    pub fn place_bet(
+        ctx: Context<PlaceBet>,
+        match_id: String,
+        predicted_winner: Pubkey,
+        amount: u64,
+    ) -> Result<()> {
+        let bet = &mut ctx.accounts.bet_escrow;
+        bet.match_id = match_id.clone();
+        bet.bettor = ctx.accounts.bettor.key();
+        bet.predicted_winner = predicted_winner;
+        bet.amount = amount;
+        bet.payout_amount = 0;
+        bet.status = BET_STATUS_OPEN;
+        bet.settled_at = 0;
+
+        emit!(BetPlaced {
+            match_id,
+            bettor: bet.bettor,
+            predicted_winner,
+            amount,
+        });
+
+        Ok(())
+    }
+
+    pub fn settle_bet(ctx: Context<SettleBet>, winner: Pubkey, payout_amount: u64) -> Result<()> {
+        let bet = &mut ctx.accounts.bet_escrow;
+        require!(bet.status == BET_STATUS_OPEN, ErrorCode::BetNotOpen);
+
+        if bet.predicted_winner == winner {
+            bet.status = BET_STATUS_WON;
+            bet.payout_amount = payout_amount;
+        } else {
+            bet.status = BET_STATUS_LOST;
+            bet.payout_amount = 0;
+        }
+        bet.settled_at = Clock::get()?.unix_timestamp as u64;
+
+        emit!(BetSettled {
+            match_id: bet.match_id.clone(),
+            bettor: bet.bettor,
+            winner,
+            payout_amount: bet.payout_amount,
+            status: bet.status,
+        });
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -127,6 +179,30 @@ pub struct CancelMatch<'info> {
     pub match_escrow: Account<'info, MatchEscrow>,
 }
 
+#[derive(Accounts)]
+#[instruction(match_id: String)]
+pub struct PlaceBet<'info> {
+    #[account(mut)]
+    pub bettor: Signer<'info>,
+    #[account(
+        init,
+        payer = bettor,
+        space = 8 + BetEscrow::INIT_SPACE,
+        seeds = [b"bet", match_id.as_bytes(), bettor.key().as_ref()],
+        bump
+    )]
+    pub bet_escrow: Account<'info, BetEscrow>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SettleBet<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    #[account(mut)]
+    pub bet_escrow: Account<'info, BetEscrow>,
+}
+
 #[account]
 pub struct MatchEscrow {
     pub host: Pubkey,
@@ -141,6 +217,21 @@ pub struct MatchEscrow {
 
 impl MatchEscrow {
     pub const INIT_SPACE: usize = 32 + 33 + 8 + 8 + 1 + 8 + 33 + 50;
+}
+
+#[account]
+pub struct BetEscrow {
+    pub match_id: String,
+    pub bettor: Pubkey,
+    pub predicted_winner: Pubkey,
+    pub amount: u64,
+    pub payout_amount: u64,
+    pub status: u8,
+    pub settled_at: u64,
+}
+
+impl BetEscrow {
+    pub const INIT_SPACE: usize = 50 + 32 + 32 + 8 + 8 + 1 + 8;
 }
 
 #[event]
@@ -168,6 +259,23 @@ pub struct MatchCancelled {
     pub match_id: String,
 }
 
+#[event]
+pub struct BetPlaced {
+    pub match_id: String,
+    pub bettor: Pubkey,
+    pub predicted_winner: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct BetSettled {
+    pub match_id: String,
+    pub bettor: Pubkey,
+    pub winner: Pubkey,
+    pub payout_amount: u64,
+    pub status: u8,
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Match not open")]
@@ -178,4 +286,6 @@ pub enum ErrorCode {
     InvalidStakeAmount,
     #[msg("Match not in progress")]
     MatchNotInProgress,
+    #[msg("Bet not open")]
+    BetNotOpen,
 }

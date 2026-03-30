@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { settleSpectatorBets } from "@/lib/match-engine";
 import { getOnchainAdapter } from "@/lib/onchain/service";
 
 /**
@@ -105,7 +106,7 @@ async function resolveDuelWithPenalty(
     id: string;
     attackerId: string;
     defenderId: string;
-    boardMove: { from: string; to: string; promotion?: string | null };
+    boardMove: unknown;
     match: {
       id: string;
       fen: string;
@@ -124,8 +125,10 @@ async function resolveDuelWithPenalty(
   const match = duel.match;
   const fullScore = 10000;
   const defenderWon = winnerId === duel.defenderId;
+  const boardMove = parseBoardMove(duel.boardMove);
+  let settledMatchWinnerId: string | null = null;
 
-  await prisma.$transaction(async (tx: typeof prisma) => {
+  await prisma.$transaction(async (tx) => {
     // Registrar el duelo como resuelto
     await tx.arcadeDuel.update({
       where: { id: duel.id },
@@ -150,12 +153,30 @@ async function resolveDuelWithPenalty(
 
     if (defenderWon) {
       // El defensor ganó - el tablero no avanza, turno sigue al atacante
-      nextTurn = duel.boardMove?.from ? match.turn : match.turn;
+      nextTurn = match.turn;
     } else {
+      if (!boardMove) {
+        // Fallback defensivo: si el payload del movimiento está corrupto, no mutamos tablero.
+        nextTurn = match.turn;
+        await tx.match.update({
+          where: { id: match.id },
+          data: {
+            status: nextStatus,
+            fen: nextFen,
+            turn: nextTurn,
+            winnerId: matchWinnerId,
+            moveHistory: [
+              ...moveHistory,
+              `Arcade penalty resolved (${penaltyReason}) - invalid boardMove payload`,
+            ],
+          },
+        });
+        return;
+      }
+
       // El atacante ganó - aplicar el movimiento
       const Chess = (await import("chess.js")).Chess;
       const chess = new Chess(match.fen);
-      const boardMove = duel.boardMove;
       const applied = chess.move({
         from: boardMove.from,
         to: boardMove.to,
@@ -189,18 +210,16 @@ async function resolveDuelWithPenalty(
 
     // Si hay ganador de la partida, procesar pago
     if (matchWinnerId) {
+      settledMatchWinnerId = matchWinnerId;
       const adapter = getOnchainAdapter(match.preferredNetwork);
-      const poolMultiplier = match.guestId ? 2 : 1;
-      const stakePool = match.stakeAmount.mul(poolMultiplier);
-      const feePool = match.entryFee.mul(poolMultiplier);
-      const payout = {
-        toString: () => String(Number(stakePool.toString()) + Number(feePool.toString())),
-      };
+      const participantCount = match.guestId ? 2 : 1;
+      const stakePool = match.stakeAmount.mul(participantCount);
+      const feePool = match.entryFee.mul(participantCount);
 
       const receipt = await adapter.settleEscrow({
         matchId: match.id,
         winnerId: matchWinnerId,
-        amount: payout.toString(),
+        amount: stakePool.toString(),
         token: match.stakeToken,
       });
 
@@ -211,16 +230,40 @@ async function resolveDuelWithPenalty(
           network: match.preferredNetwork,
           type: "PRIZE_PAYOUT",
           status: receipt.mode === "configured" ? "PENDING" : "SETTLED",
-          amount: payout.toString(),
+          amount: stakePool.toString(),
           token: match.stakeToken,
           txHash: receipt.txHash,
           metadata: {
             description: receipt.description,
             mode: receipt.mode,
             penaltyResolved: true,
+            participantCount,
+            grossStakePool: stakePool.toString(),
+            retainedFeePool: feePool.toString(),
           },
         },
       });
     }
   });
+
+  if (settledMatchWinnerId) {
+    await settleSpectatorBets(match.id, settledMatchWinnerId, match.preferredNetwork, match.stakeToken);
+  }
+}
+
+function parseBoardMove(value: unknown): { from: string; to: string; promotion?: string | null } | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate = value as { from?: unknown; to?: unknown; promotion?: unknown };
+  if (typeof candidate.from !== "string" || typeof candidate.to !== "string") {
+    return null;
+  }
+
+  return {
+    from: candidate.from,
+    to: candidate.to,
+    promotion: typeof candidate.promotion === "string" ? candidate.promotion : null,
+  };
 }

@@ -9,7 +9,7 @@ import { cookies } from "next/headers";
 import { createSession, clearSession, hashPassword, requireUser, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOnchainAdapter } from "@/lib/onchain/service";
-import { createMatchSchema, FormState, loginSchema, registerSchema } from "@/lib/validators";
+import { createMatchSchema, FormState, loginSchema, placeBetSchema, registerSchema } from "@/lib/validators";
 
 function parseBoolean(input: FormDataEntryValue | null | undefined) {
   return String(input ?? "").toLowerCase() === "true";
@@ -104,7 +104,7 @@ async function resolveSessionUser(session: { id: string; email: string; name: st
   return byEmail;
 }
 
-export async function registerAction(_: FormState | undefined, formData: FormData): Promise<FormState | void> {
+export async function registerAction(_: FormState | void | undefined, formData: FormData): Promise<FormState | void> {
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -143,7 +143,7 @@ export async function registerAction(_: FormState | undefined, formData: FormDat
   redirect("/dashboard");
 }
 
-export async function loginAction(_: FormState | undefined, formData: FormData): Promise<FormState | void> {
+export async function loginAction(_: FormState | void | undefined, formData: FormData): Promise<FormState | void> {
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -372,6 +372,104 @@ export async function startSoloMatchAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/lobby");
   redirect(`/match/${matchId}`);
+}
+
+export async function placeMatchBetAction(formData: FormData) {
+  const session = await requireUser();
+  const currentUser = await resolveSessionUser(session);
+  const parsed = placeBetSchema.safeParse({
+    matchId: formData.get("matchId"),
+    predictedWinnerId: formData.get("predictedWinnerId"),
+    amount: formData.get("amount"),
+  });
+
+  if (!parsed.success) {
+    throw new Error(Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] ?? "No se pudo registrar la apuesta.");
+  }
+
+  const match = await prisma.match.findUnique({
+    where: { id: parsed.data.matchId },
+    include: {
+      bets: {
+        where: { userId: currentUser.id },
+        take: 1,
+      },
+    },
+  });
+
+  if (!match) {
+    throw new Error("La partida no existe.");
+  }
+
+  if (
+    !match.guestId ||
+    (match.status !== MatchStatus.IN_PROGRESS && match.status !== MatchStatus.ARCADE_PENDING)
+  ) {
+    throw new Error("Las apuestas solo se abren cuando la partida ya tiene dos jugadores activos.");
+  }
+
+  if (currentUser.id === match.hostId || currentUser.id === match.guestId) {
+    throw new Error("Los jugadores de la partida no pueden apostar en su propio match.");
+  }
+
+  if (![match.hostId, match.guestId].includes(parsed.data.predictedWinnerId)) {
+    throw new Error("Debes apostar por uno de los dos jugadores de la partida.");
+  }
+
+  if (match.bets.length > 0) {
+    throw new Error("Ya registraste una apuesta para esta partida.");
+  }
+
+  const { autoFunded } = await ensurePlayableWallet(currentUser.id, match.preferredNetwork);
+  const adapter = getOnchainAdapter(match.preferredNetwork);
+  const amount = parsed.data.amount.toFixed(6);
+  const receipt = await adapter.placeBet({
+    matchId: match.id,
+    bettorId: currentUser.id,
+    predictedWinnerId: parsed.data.predictedWinnerId,
+    amount,
+    token: match.stakeToken,
+  });
+
+  await prisma.$transaction([
+    prisma.matchBet.create({
+      data: {
+        matchId: match.id,
+        userId: currentUser.id,
+        network: match.preferredNetwork,
+        predictedWinnerId: parsed.data.predictedWinnerId,
+        amount,
+        token: match.stakeToken,
+        txHash: receipt.txHash,
+        metadata: {
+          description: receipt.description,
+          mode: receipt.mode,
+          autoFundedWallet: autoFunded,
+        },
+      },
+    }),
+    prisma.transaction.create({
+      data: {
+        userId: currentUser.id,
+        matchId: match.id,
+        network: match.preferredNetwork,
+        type: TransactionType.ENTRY_STAKE,
+        status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+        amount,
+        token: match.stakeToken,
+        txHash: receipt.txHash,
+        metadata: {
+          description: receipt.description,
+          mode: receipt.mode,
+          category: "spectator-bet",
+          predictedWinnerId: parsed.data.predictedWinnerId,
+        },
+      },
+    }),
+  ]);
+
+  revalidatePath(`/match/${match.id}`);
+  revalidatePath("/dashboard");
 }
 
 export async function updateUserAction(formData: FormData) {

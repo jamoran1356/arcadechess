@@ -21,7 +21,7 @@ type MatchClientProps = {
     moveHistory: string[];
     host: { id: string; name: string };
     guest: { id: string; name: string } | null;
-    viewerRole: "host" | "guest" | "spectator";
+    viewerRole: string;
     pendingDuel: {
       id: string;
       attackerId: string;

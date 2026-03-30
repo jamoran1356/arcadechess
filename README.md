@@ -54,14 +54,6 @@ Arcade Chess Arena transforma una partida de ajedrez en una experiencia competit
 - **The Custom Implementation**: Implementamos una capa de resolución de capturas basada en minijuegos sincronizados entre atacante y defensor, con validación de resultado y actualización del estado de partida en backend.
 - **The Native Feature**: Integramos InterwovenKit en la app con `InterwovenKitProvider`, conexión de wallet en la barra superior y `enableAutoSign={true}` para habilitar el flujo de auto-firma en la cadena por defecto. Esto reduce fricción en operaciones repetitivas dentro del flujo competitivo.
 
-### How to Run Locally
-
-1. Instala dependencias con `pnpm install`.
-2. Configura variables de entorno en `.env` o `.env.local`.
-3. Inicializa base de datos con `pnpm setup`.
-4. Ejecuta la app con `pnpm dev` y abre `http://localhost:3000`.
-
----
 
 ## 🎮 Core Gameplay Loop
 

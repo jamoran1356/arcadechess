@@ -58,6 +58,7 @@ model User {
   wonMatches    Match[]      @relation("WinningMatches")
   wallets       Wallet[]
   transactions  Transaction[]
+  bets          MatchBet[]
   attackDuels   ArcadeDuel[] @relation("AttackerDuels")
   defendDuels   ArcadeDuel[] @relation("DefenderDuels")
   wonDuels      ArcadeDuel[] @relation("WinnerDuels")
@@ -111,10 +112,33 @@ model Match {
   host             User               @relation("HostMatches", fields: [hostId], references: [id], onDelete: Cascade)
   guest            User?              @relation("GuestMatches", fields: [guestId], references: [id], onDelete: SetNull)
   winner           User?              @relation("WinningMatches", fields: [winnerId], references: [id], onDelete: SetNull)
+  bets             MatchBet[]
   duels            ArcadeDuel[]
   transactions     Transaction[]
 
   @@index([status])
+}
+
+model MatchBet {
+  id                String             @id @default(cuid())
+  matchId           String
+  userId            String
+  network           TransactionNetwork
+  predictedWinnerId String
+  amount            Decimal            @db.Decimal(18, 6)
+  payoutAmount      Decimal?           @db.Decimal(18, 6)
+  token             String             @default("INIT")
+  status            String             @default("OPEN")
+  txHash            String?
+  payoutTxHash      String?
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  settledAt         DateTime?
+  match             Match              @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, userId])
+  @@index([matchId, status])
 }
 
 model ArcadeDuel {

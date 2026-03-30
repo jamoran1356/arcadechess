@@ -17,6 +17,23 @@ export type SettlementIntent = {
   token: string;
 };
 
+export type BetIntent = {
+  matchId: string;
+  bettorId: string;
+  predictedWinnerId: string;
+  amount: string;
+  token: string;
+};
+
+export type BetPayoutIntent = {
+  matchId: string;
+  bettorId: string;
+  winnerId: string;
+  predictedWinnerId: string;
+  amount: string;
+  token: string;
+};
+
 export type OnchainReceipt = {
   network: SupportedNetwork;
   txHash: string;
@@ -30,4 +47,6 @@ export interface OnchainAdapter {
   createEscrow(intent: EscrowIntent): Promise<OnchainReceipt>;
   joinEscrow(intent: EscrowIntent): Promise<OnchainReceipt>;
   settleEscrow(intent: SettlementIntent): Promise<OnchainReceipt>;
+  placeBet(intent: BetIntent): Promise<OnchainReceipt>;
+  settleBet(intent: BetPayoutIntent): Promise<OnchainReceipt>;
 }

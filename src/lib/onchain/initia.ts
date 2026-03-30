@@ -1,5 +1,5 @@
 import { TransactionNetwork } from "@prisma/client";
-import { EscrowIntent, OnchainAdapter, OnchainReceipt, SettlementIntent } from "./types";
+import { BetIntent, BetPayoutIntent, EscrowIntent, OnchainAdapter, OnchainReceipt, SettlementIntent } from "./types";
 
 const INITIA_CHAIN_ID = process.env.INITIA_CHAIN_ID || "initia-testnet-1";
 const INITIA_RPC_URL = process.env.INITIA_RPC_URL || "https://initia-rpc-testnet.allthatnode.com";
@@ -137,6 +137,46 @@ export const initiaAdapter: OnchainAdapter = {
       console.error("Initia settleEscrow error:", error);
       return buildReceipt(
         `Liquidación Initia preparada (modo mock) para partida ${intent.matchId}.`,
+      );
+    }
+  },
+
+  async placeBet(intent: BetIntent) {
+    try {
+      const txHash = await sendInitiaTransaction(
+        `${INITIA_MODULE_PUBLISHER}::arcade_escrow::place_bet`,
+        [intent.matchId, intent.bettorId, intent.predictedWinnerId, intent.amount],
+        intent.matchId,
+      );
+
+      return buildReceipt(
+        `Apuesta Initia registrada para partida ${intent.matchId} sobre ${intent.predictedWinnerId} por ${intent.amount} ${intent.token}.`,
+        txHash,
+      );
+    } catch (error) {
+      console.error("Initia placeBet error:", error);
+      return buildReceipt(
+        `Apuesta Initia preparada (modo mock) para partida ${intent.matchId}.`,
+      );
+    }
+  },
+
+  async settleBet(intent: BetPayoutIntent) {
+    try {
+      const txHash = await sendInitiaTransaction(
+        `${INITIA_MODULE_PUBLISHER}::arcade_escrow::settle_bet`,
+        [intent.matchId, intent.bettorId, intent.winnerId, intent.amount],
+        intent.matchId,
+      );
+
+      return buildReceipt(
+        `Payout Initia de apuesta para ${intent.bettorId} en partida ${intent.matchId}: ${intent.amount} ${intent.token}.`,
+        txHash,
+      );
+    } catch (error) {
+      console.error("Initia settleBet error:", error);
+      return buildReceipt(
+        `Payout Initia de apuesta preparado (modo mock) para partida ${intent.matchId}.`,
       );
     }
   },

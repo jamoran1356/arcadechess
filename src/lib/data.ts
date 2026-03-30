@@ -317,6 +317,10 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
       host: true,
       guest: true,
       winner: true,
+      bets: {
+        include: { user: true },
+        orderBy: { createdAt: "desc" },
+      },
       transactions: { orderBy: { createdAt: "desc" } },
       duels: {
         include: { attacker: true, defender: true, winner: true },
@@ -331,6 +335,14 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
   }
 
   const pendingDuel = match.duels.find((duel) => !duel.resolvedAt) ?? null;
+  const totalBetPool = match.bets.reduce((sum, bet) => sum + Number(bet.amount.toString()), 0);
+  const hostBetPool = match.bets
+    .filter((bet) => bet.predictedWinnerId === match.hostId)
+    .reduce((sum, bet) => sum + Number(bet.amount.toString()), 0);
+  const guestBetPool = match.bets
+    .filter((bet) => bet.predictedWinnerId === match.guestId)
+    .reduce((sum, bet) => sum + Number(bet.amount.toString()), 0);
+  const viewerBet = viewerId ? match.bets.find((bet) => bet.userId === viewerId) ?? null : null;
   const viewerRole = viewerId
     ? viewerId === match.hostId
       ? "host"
@@ -362,6 +374,32 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
       ...transaction,
       amount: transaction.amount.toString(),
     })),
+    bets: match.bets.map((bet) => ({
+      id: bet.id,
+      userId: bet.userId,
+      userName: bet.user.name,
+      predictedWinnerId: bet.predictedWinnerId,
+      amount: bet.amount.toString(),
+      payoutAmount: bet.payoutAmount?.toString() ?? null,
+      status: bet.status,
+      createdAt: bet.createdAt.toISOString(),
+    })),
+    betting: {
+      isOpen: Boolean(match.guestId && ["IN_PROGRESS", "ARCADE_PENDING"].includes(match.status)),
+      totalPool: totalBetPool.toFixed(6),
+      hostPool: hostBetPool.toFixed(6),
+      guestPool: guestBetPool.toFixed(6),
+      totalBettors: match.bets.length,
+      viewerBet: viewerBet
+        ? {
+            id: viewerBet.id,
+            predictedWinnerId: viewerBet.predictedWinnerId,
+            amount: viewerBet.amount.toString(),
+            payoutAmount: viewerBet.payoutAmount?.toString() ?? null,
+            status: viewerBet.status,
+          }
+        : null,
+    },
     viewerRole,
     pendingDuel: pendingDuel
       ? {

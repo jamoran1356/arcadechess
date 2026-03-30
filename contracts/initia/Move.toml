@@ -1,0 +1,10 @@
+[package]
+name = "playchess_arcade"
+version = "0.0.1"
+
+[dependencies]
+InitiaStdlib = { git = "https://github.com/initia-labs/move-natives.git", subdir = "initia_stdlib", rev = "v1.2.0" }
+
+[addresses]
+std = "0x1"
+playchess = "0x1"

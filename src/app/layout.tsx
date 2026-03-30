@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import { getSession } from "@/lib/auth";
@@ -48,10 +49,17 @@ export default async function RootLayout({
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:54px_54px] opacity-20" />
           <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
             <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-              <Link href="/" className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/30 bg-amber-300/10 font-mono text-sm font-semibold text-amber-200">
-                  PC
-                </span>
+              <Link href="/" className="flex items-center gap-3 rounded-full pr-3 transition hover:bg-white/5">
+                <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_12px_30px_rgba(8,19,27,0.35)]">
+                  <Image
+                    src="/assets/images/logo.webp"
+                    alt="PlayChess Arena"
+                    width={90}
+                    height={90}
+                    className="h-12 w-12 object-contain"
+                    priority
+                  />
+                </div>
                 <div>
                   <p className="font-mono text-xs uppercase tracking-[0.24em] text-cyan-200/70">
                     {dict.nav.brand}

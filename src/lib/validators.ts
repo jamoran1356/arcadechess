@@ -49,3 +49,9 @@ export const duelAttemptSchema = z.object({
     }),
   ),
 });
+
+export const placeBetSchema = z.object({
+  matchId: z.string().min(1, "La partida es obligatoria."),
+  predictedWinnerId: z.string().min(1, "Debes elegir un jugador."),
+  amount: z.coerce.number().positive("La apuesta debe ser mayor que cero.").max(999999, "La apuesta es demasiado alta."),
+});

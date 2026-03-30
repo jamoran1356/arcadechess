@@ -35,6 +35,22 @@ function flipTurn(turn: string) {
   return turn === "w" ? "b" : "w";
 }
 
+function calculateSettlementAmounts(match: {
+  guestId: string | null;
+  stakeAmount: Prisma.Decimal;
+  entryFee: Prisma.Decimal;
+}) {
+  const participantCount = match.guestId ? 2 : 1;
+  const prize = match.stakeAmount.mul(participantCount);
+  const retainedFee = match.entryFee.mul(participantCount);
+
+  return {
+    participantCount,
+    prize,
+    retainedFee,
+  };
+}
+
 function getPlayerColor(match: { hostId: string; guestId: string | null }, userId: string) {
   if (userId === match.hostId) {
     return "w";
@@ -55,13 +71,12 @@ async function settleWinner(match: {
   entryFee: Prisma.Decimal;
   stakeToken: string;
 }, winnerId: string) {
-  const multiplier = match.guestId ? 2 : 1;
-  const payout = match.stakeAmount.mul(multiplier).add(match.entryFee.mul(multiplier));
+  const settlement = calculateSettlementAmounts(match);
   const adapter = getOnchainAdapter(match.preferredNetwork);
   const receipt = await adapter.settleEscrow({
     matchId: match.id,
     winnerId,
-    amount: payout.toString(),
+    amount: settlement.prize.toString(),
     token: match.stakeToken,
   });
 
@@ -72,12 +87,120 @@ async function settleWinner(match: {
       network: match.preferredNetwork,
       type: TransactionType.PRIZE_PAYOUT,
       status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
-      amount: payout.toString(),
+      amount: settlement.prize.toString(),
       token: match.stakeToken,
       txHash: receipt.txHash,
-      metadata: { description: receipt.description, mode: receipt.mode },
+      metadata: {
+        description: receipt.description,
+        mode: receipt.mode,
+        participantCount: settlement.participantCount,
+        grossStakePool: settlement.prize.toString(),
+        retainedFeePool: settlement.retainedFee.toString(),
+      },
     },
   });
+
+  await settleSpectatorBets(match.id, winnerId, match.preferredNetwork, match.stakeToken);
+}
+
+export async function settleSpectatorBets(
+  matchId: string,
+  winnerId: string,
+  network: "INITIA" | "FLOW" | "SOLANA",
+  token: string,
+) {
+  const bets = await prisma.matchBet.findMany({
+    where: {
+      matchId,
+      status: "OPEN",
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (bets.length === 0) {
+    return;
+  }
+
+  const winningBets = bets.filter((bet) => bet.predictedWinnerId === winnerId);
+  const losingBets = bets.filter((bet) => bet.predictedWinnerId !== winnerId);
+  const totalWinning = winningBets.reduce((sum, bet) => sum + Number(bet.amount.toString()), 0);
+  const totalLosing = losingBets.reduce((sum, bet) => sum + Number(bet.amount.toString()), 0);
+  const settledAt = new Date();
+
+  if (winningBets.length === 0) {
+    await prisma.matchBet.updateMany({
+      where: { matchId, status: "OPEN" },
+      data: { status: "LOST", settledAt },
+    });
+    return;
+  }
+
+  const adapter = getOnchainAdapter(network);
+
+  for (const bet of winningBets) {
+    const stake = Number(bet.amount.toString());
+    const share = totalWinning > 0 ? (stake / totalWinning) * totalLosing : 0;
+    const payout = (stake + share).toFixed(6);
+    const receipt = await adapter.settleBet({
+      matchId,
+      bettorId: bet.userId,
+      winnerId,
+      predictedWinnerId: bet.predictedWinnerId,
+      amount: payout,
+      token,
+    });
+
+    await prisma.$transaction([
+      prisma.matchBet.update({
+        where: { id: bet.id },
+        data: {
+          status: "WON",
+          payoutAmount: payout,
+          payoutTxHash: receipt.txHash,
+          settledAt,
+          metadata: {
+            ...(bet.metadata && typeof bet.metadata === "object" ? bet.metadata as Prisma.InputJsonObject : {}),
+            payoutMode: receipt.mode,
+            payoutDescription: receipt.description,
+            winnerId,
+          },
+        },
+      }),
+      prisma.transaction.create({
+        data: {
+          userId: bet.userId,
+          matchId,
+          network,
+          type: TransactionType.PRIZE_PAYOUT,
+          status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+          amount: payout,
+          token,
+          txHash: receipt.txHash,
+          metadata: {
+            description: receipt.description,
+            mode: receipt.mode,
+            category: "spectator-bet-payout",
+            predictedWinnerId: bet.predictedWinnerId,
+            winnerId,
+          },
+        },
+      }),
+    ]);
+  }
+
+  if (losingBets.length > 0) {
+    await prisma.matchBet.updateMany({
+      where: {
+        matchId,
+        status: "OPEN",
+        predictedWinnerId: { not: winnerId },
+      },
+      data: {
+        status: "LOST",
+        settledAt,
+      },
+    });
+  }
 }
 
 export async function performMatchMove(matchId: string, userId: string, moveInput: MoveInput) {
@@ -127,7 +250,7 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
 
   const isCapture = legalMove.flags.includes("c") || legalMove.flags.includes("e");
   if (isCapture) {
-    const defenderId = userId === match.hostId ? match.guestId : match.hostId;
+    const defenderId = (userId === match.hostId ? match.guestId : match.hostId) ?? userId;
     const gamePool = asGameTypes(match.arcadeGamePool);
     const gameType = gamePool[Math.floor(Math.random() * gamePool.length)] ?? ArcadeGameType.TARGET_RUSH;
 
@@ -171,7 +294,7 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
 
   const moveHistory = [...asMoveHistory(match.moveHistory), appliedMove.san];
   let winnerId: string | null = null;
-  let status = MatchStatus.IN_PROGRESS;
+  let status: MatchStatus = MatchStatus.IN_PROGRESS;
 
   if (chess.isGameOver()) {
     status = MatchStatus.FINISHED;
@@ -208,7 +331,7 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
       });
 
       const botHistory = [...moveHistory, `${appliedBot.san} [solo-bot]`];
-      let botStatus = MatchStatus.IN_PROGRESS;
+      let botStatus: MatchStatus = MatchStatus.IN_PROGRESS;
       const botWinnerId: string | null = null;
 
       if (botChess.isGameOver()) {
@@ -298,7 +421,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   const result = await prisma.$transaction(async (tx) => {
     let nextFen = match.fen;
     let nextTurn = match.turn;
-    let nextStatus = MatchStatus.IN_PROGRESS;
+    let nextStatus: MatchStatus = MatchStatus.IN_PROGRESS;
     let matchWinnerId: string | null = null;
     let nextMoveHistory = [...moveHistory];
 

@@ -1,4 +1,22 @@
 services:
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: playchess-migrate
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://playchess:playchess_dev_password@postgres:5432/playchess_db
+      NODE_ENV: production
+    command: sh -c "pnpm prisma migrate deploy"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - default
+
   app:
     build:
       context: .
@@ -10,6 +28,8 @@ services:
       DATABASE_URL: postgresql://playchess:playchess_dev_password@postgres:5432/playchess_db
       NODE_ENV: production
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     expose:
