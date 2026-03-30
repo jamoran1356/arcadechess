@@ -7,7 +7,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://playchess:playchess_dev_password@postgres:5432/playchess_db
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
       NODE_ENV: production
     command: sh -c "pnpm prisma migrate deploy"
     depends_on:
@@ -25,7 +25,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL_DOCKER}
       NODE_ENV: production
     depends_on:
       migrate:
@@ -50,9 +50,9 @@ services:
     image: postgres:16-alpine
     container_name: playchess-postgres
     environment:
-      POSTGRES_USER: playchess
-      POSTGRES_PASSWORD: playchess_dev_password
-      POSTGRES_DB: playchess_db
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
     ports:
       - "5433:5432"
     volumes:
