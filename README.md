@@ -225,12 +225,3 @@ Arcade Chess Arena is designed to:
 Solo founder and senior full-stack engineer with 20+ years of experience, focused on rapid product development and building complete systems end-to-end.
 
 ---
-
-## ⚙️ Getting Started
-
-```bash
-git clone <repo-url>
-cd arcade-chess-arena
-npm install
-npx prisma migrate dev
-npm run dev
