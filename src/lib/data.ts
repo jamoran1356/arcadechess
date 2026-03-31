@@ -461,6 +461,8 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
           id: pendingDuel.id,
           attackerId: pendingDuel.attackerId,
           defenderId: pendingDuel.defenderId,
+          attackerEnteredAt: pendingDuel.attackerEnteredAt?.toISOString() ?? null,
+          defenderEnteredAt: pendingDuel.defenderEnteredAt?.toISOString() ?? null,
           attackerName: pendingDuel.attacker.name,
           defenderName: match.isSolo ? "Arena Bot" : pendingDuel.defender.name,
           gameType: pendingDuel.gameType,

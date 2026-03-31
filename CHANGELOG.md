@@ -37,6 +37,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Arcade loss capture consistency** — when the attacker loses an arcade duel (including penalty/no-show path), the attacker piece is now removed from the board instead of reverting state.
 - **Prisma client drift during build** — added `prebuild: prisma generate` to keep generated types in sync before every Next.js build.
 - **Pending duel typing mismatch** — ensured `pendingDuel.game` is always populated in match snapshot to satisfy strict TypeScript expectations.
+- **Arcade replay loop** — the duel modal now preserves local state for the active duel and no longer depends on full page refreshes, preventing the minigame from restarting in a loop.
+- **Multiplayer arcade start sync** — pending duel snapshot now includes `attackerEnteredAt`/`defenderEnteredAt`, and when one player enters the minigame the opponent auto-enters/auto-starts from intro without page reload.
 
 ### Changed
 
@@ -44,6 +46,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Resign UX** — replaced native `window.confirm` with a full in-app confirmation dialog in match screen.
 - **Admin arcade UX** — replaced all `alert/confirm` calls with in-app dialog windows for success, error, warning and delete confirmation.
 - **Dashboard redesign** — rebuilt `/dashboard` with sticky left navigation, section anchors, improved visual hierarchy, and cleaner grouped content blocks.
+- **Versus match sync** — added `GET /api/matches/[id]/state` and client polling in match screen so opponent moves and duel resolution propagate fluidly without manual refresh.
 
 ---
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useEffect, useMemo, useState, useTransition } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
@@ -33,6 +33,8 @@ type MatchClientProps = {
       id: string;
       attackerId: string;
       defenderId: string;
+      attackerEnteredAt: string | null;
+      defenderEnteredAt: string | null;
       attackerName: string;
       defenderName: string;
       attackerScore: number | null;
@@ -49,6 +51,8 @@ type MatchClientProps = {
   currentUserId?: string;
 };
 
+type PendingDuelState = NonNullable<MatchClientProps["match"]["pendingDuel"]>;
+
 export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const router = useRouter();
   const ch = useDict().chess;
@@ -59,11 +63,30 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [blackClockMs, setBlackClockMs] = useState(match.blackClockMs);
   const [turnStartedAt, setTurnStartedAt] = useState<string | null>(match.turnStartedAt);
   const [moveHistory, setMoveHistory] = useState(match.moveHistory);
+  const [pendingDuel, setPendingDuel] = useState<PendingDuelState | null>(match.pendingDuel);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [timeoutMessage, setTimeoutMessage] = useState<string | null>(null);
   const [isResigning, startResignTransition] = useTransition();
   const [showResignDialog, setShowResignDialog] = useState(false);
+
+  const syncMatchState = useCallback(async () => {
+    const response = await fetch(`/api/matches/${match.id}/state`, { cache: "no-store" });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error ?? ch.moveError);
+    }
+
+    setFen(data.fen);
+    setTurn(data.turn);
+    setStatus(data.status);
+    setMoveHistory(data.moveHistory);
+    setWhiteClockMs(data.whiteClockMs);
+    setBlackClockMs(data.blackClockMs);
+    setTurnStartedAt(data.turnStartedAt);
+    setPendingDuel(data.pendingDuel ?? null);
+  }, [ch.moveError, match.id]);
 
   const isActiveParticipant =
     currentUserId &&
@@ -84,6 +107,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     setBlackClockMs(match.blackClockMs);
     setTurnStartedAt(match.turnStartedAt);
     setMoveHistory(match.moveHistory);
+    setPendingDuel(match.pendingDuel ?? null);
   }, [match]);
 
   const isMyTurn =
@@ -93,7 +117,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const canMove = Boolean(
     currentUserId &&
       (match.guest || match.isSolo) &&
-      match.pendingDuel === null &&
+        pendingDuel === null &&
       status !== "OPEN" &&
       status !== "FINISHED" &&
       isMyTurn,
@@ -184,6 +208,22 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     return () => clearTimeout(timer);
   }, [match.isSolo, match.id, turn, status, router]);
 
+  useEffect(() => {
+    if (match.isSolo || status === "FINISHED") {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void syncMatchState().catch(() => {
+        // best-effort sync for versus matches
+      });
+    }, 1500);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [match.isSolo, status, syncMatchState]);
+
   function formatClock(clockMs: number) {
     const totalSeconds = Math.max(0, Math.ceil(clockMs / 1000));
     const minutes = Math.floor(totalSeconds / 60);
@@ -212,7 +252,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
           }
 
           if (data.pendingDuel) {
-            router.refresh();
+            await syncMatchState();
             return;
           }
 
@@ -223,8 +263,9 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
           setWhiteClockMs(data.whiteClockMs);
           setBlackClockMs(data.blackClockMs);
           setTurnStartedAt(data.turnStartedAt);
+          setPendingDuel(null);
           if (data.refresh) {
-            router.refresh();
+            await syncMatchState();
           }
         })
         .catch((requestError: unknown) => {
@@ -357,8 +398,8 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
         </div>
       </aside>
 
-      {match.pendingDuel && currentUserId ? (
-        <ArcadeDuelModal duel={match.pendingDuel} currentUserId={currentUserId} />
+      {pendingDuel && currentUserId ? (
+        <ArcadeDuelModal duel={pendingDuel} currentUserId={currentUserId} onStateRefresh={syncMatchState} />
       ) : null}
 
       <DialogModal

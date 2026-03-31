@@ -10,6 +10,8 @@ type ArcadeDuelModalProps = {
     id: string;
     attackerId: string;
     defenderId: string;
+    attackerEnteredAt: string | null;
+    defenderEnteredAt: string | null;
     attackerName: string;
     defenderName: string;
     attackerScore: number | null;
@@ -23,10 +25,10 @@ type ArcadeDuelModalProps = {
     scenario: ArcadeScenario;
   };
   currentUserId: string;
+  onStateRefresh?: () => Promise<void>;
 };
 
-export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
-  const router = useRouter();
+export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeDuelModalProps) {
   const dict = useDict();
   const arc = dict.arcade;
   const [phase, setPhase] = useState<"intro" | "active" | "submitted">(
@@ -43,6 +45,8 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
   const previewTimeoutRef = useRef<number | null>(null);
   const actionsRef = useRef<Array<{ at: number; value: string }>>([]);
   const submitAttemptRef = useRef<(() => Promise<void>) | null>(null);
+  const duelIdRef = useRef<string | null>(null);
+  const enteringRef = useRef(false);
 
   const playerRole =
     currentUserId === duel.attackerId ? "attacker" : currentUserId === duel.defenderId ? "defender" : "spectator";
@@ -70,15 +74,37 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
           if (!response.ok) {
             throw new Error(data.error ?? arc.submitError);
           }
-            setMessage(data.message ?? arc.submitSuccess);
-          router.refresh();
+          setMessage(data.message ?? arc.submitSuccess);
+          await onStateRefresh?.();
         })
         .catch((error: unknown) => {
           setMessage(error instanceof Error ? error.message : arc.submitError);
           setPhase("intro");
         });
     });
-  }, [phase, duel.id, router]);
+  }, [arc.submitError, arc.submitSuccess, duel.id, onStateRefresh, phase]);
+
+  useEffect(() => {
+    const isResolvedLocally = duel.attackerScore !== null || duel.defenderScore !== null;
+
+    if (duelIdRef.current !== duel.id) {
+      duelIdRef.current = duel.id;
+      setMessage(null);
+      setTimeLeft(duel.game.timeLimitMs);
+      setMemoryPreview(false);
+      setTargetIndex(0);
+      setMemoryIndex(0);
+      setKeyIndex(0);
+      actionsRef.current = [];
+      startTimeRef.current = null;
+      setPhase(isResolvedLocally ? "submitted" : "intro");
+      return;
+    }
+
+    if (isResolvedLocally) {
+      setPhase("submitted");
+    }
+  }, [duel.attackerScore, duel.defenderScore, duel.game.timeLimitMs, duel.id]);
 
   useEffect(() => {
     submitAttemptRef.current = submitAttempt;
@@ -145,7 +171,12 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
     return "";
   }, [duel.scenario, keyIndex, memoryIndex, targetIndex]);
 
-  function startGame() {
+  async function startGame() {
+    if (phase === "active" || phase === "submitted" || enteringRef.current) {
+      return;
+    }
+
+    enteringRef.current = true;
     setMessage(null);
     setPhase("active");
     setTargetIndex(0);
@@ -159,12 +190,25 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
     }
 
     // Registrar participación en segundo plano
-    fetch(`/api/duels/${duel.id}/enter-arcade`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    }).catch((error) => {
+    try {
+      const response = await fetch(`/api/duels/${duel.id}/enter-arcade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? arc.submitError);
+      }
+      await onStateRefresh?.();
+    } catch (error) {
       console.error("Error registering arcade participation:", error);
-    });
+      setMessage(error instanceof Error ? error.message : arc.submitError);
+      setPhase("intro");
+      return;
+    } finally {
+      enteringRef.current = false;
+    }
 
     if (duel.scenario.kind === "memory") {
       setMemoryPreview(true);
@@ -173,6 +217,31 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
       }, 3000);
     }
   }
+
+  useEffect(() => {
+    if (phase !== "intro") {
+      return;
+    }
+
+    const isMultiplayer = duel.attackerId !== duel.defenderId;
+    if (!isMultiplayer) {
+      return;
+    }
+
+    const currentEntered = playerRole === "attacker" ? Boolean(duel.attackerEnteredAt) : Boolean(duel.defenderEnteredAt);
+    const otherEntered = playerRole === "attacker" ? Boolean(duel.defenderEnteredAt) : Boolean(duel.attackerEnteredAt);
+
+    if (!currentEntered && otherEntered) {
+      void startGame();
+    }
+  }, [
+    duel.attackerEnteredAt,
+    duel.attackerId,
+    duel.defenderEnteredAt,
+    duel.defenderId,
+    phase,
+    playerRole,
+  ]);
 
   function recordTarget(event: React.MouseEvent<HTMLButtonElement>, value: string) {
     if (phase !== "active" || duel.scenario.kind !== "targets") {
@@ -237,7 +306,7 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
             return;
           }
           if (Number(data.processed ?? 0) > 0) {
-            router.refresh();
+            await onStateRefresh?.();
           }
         })
         .catch(() => {
@@ -246,7 +315,7 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
     }, 5000);
 
     return () => window.clearInterval(interval);
-  }, [duel.id, phase, router]);
+  }, [duel.id, onStateRefresh, phase]);
 
   if (playerRole === "spectator") {
     return null;
@@ -281,7 +350,9 @@ export function ArcadeDuelModal({ duel, currentUserId }: ArcadeDuelModalProps) {
               <p>{duel.game.antiCheat}</p>
             </div>
             <button
-              onClick={startGame}
+              onClick={() => {
+                void startGame();
+              }}
               disabled={isPending}
               className="w-full rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 py-3 font-bold text-slate-950 transition hover:from-amber-300 hover:to-amber-400 disabled:opacity-50"
             >
