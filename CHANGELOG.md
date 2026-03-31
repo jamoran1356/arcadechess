@@ -9,6 +9,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Real wallet fund flow** — Wallet balances are now debited when creating, joining, or betting on a match, and credited upon winning. Replaced the auto-topup mock (`ensurePlayableWallet` with 25-token auto-fund) with actual balance validation via `getWalletOrFail`.
+  - New shared module `src/lib/wallet.ts` with `getWalletOrFail`, `debitWallet`, `creditWallet`.
+  - `createMatchAction`, `joinMatchAction`, `startSoloMatchAction`, `placeMatchBetAction` all validate sufficient funds and debit the wallet.
+  - `settleWinner()` and `settleSpectatorBets()` now credit the winner's and winning bettors' wallet balances.
+
+- **Stake confirmation panel** — Match page now shows stake amount, entry fee, and total cost before the join/start button so players know exactly what will be locked.
+
+- **Blockchain explorer links** — `getExplorerTxUrl()` and `getExplorerAddressUrl()` helpers in `src/lib/onchain/service.ts` generate testnet explorer URLs for Initia, Flow, and Solana.
+  - Dashboard transaction table includes an "Explorer" column with tx links (hidden for mock hashes).
+  - Dashboard wallet cards link addresses to the corresponding network explorer.
+
+- **Wallet balance in lobby** — Match creation form now shows current balances for all networks below the stake input fields.
+
 - **Friendships (DB-persistent)** — New `Friendship` model in Prisma with `PENDING` / `ACCEPTED` states.
   - Migration `202603300003_add_friendships` creates the table with FK constraints and indexes.
   - Server actions: `addFriendAction` (search by email or wallet), `acceptFriendAction`, `removeFriendAction`.
@@ -32,6 +45,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Arcade modal double-open** — Duel modal now tracks only the current player's score (`myScore`) to determine resolved state, preventing the modal from jumping to "submitted" when the opponent submits first.
+- **Clock stops after arcade duel** — All 6 `tx.match.update` calls in `resolveDuelWithPenalty()` and `resolveDuelByScores()` now set `turnStartedAt: new Date()`, restarting the clock after duel resolution.
+- **PrivyWalletProvider polling spam** — Polling interval increased to 4s during `ARCADE_PENDING` status (from 1.5s) to reduce re-render frequency.
 - **TypeScript `Square` type error** in `match-engine.ts` — `chess.remove()` requires type `Square`, not `string`. Added `isSquare()` type guard with regex `[a-h][1-8]`.
 - **`displayClocks` used before declaration** in `chess-match-client.tsx` — clock timeout `useEffect` was referencing a `useState` value declared later in the file; reordered to fix.
 - **Arcade loss capture consistency** — when the attacker loses an arcade duel (including penalty/no-show path), the attacker piece is now removed from the board instead of reverting state.

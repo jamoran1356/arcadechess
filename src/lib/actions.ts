@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 import { getOnchainAdapter } from "@/lib/onchain/service";
 import { calculateMatchEntryFee, getPlatformConfig } from "@/lib/platform-config";
 import { createMatchSchema, FormState, loginSchema, placeBetSchema, registerSchema } from "@/lib/validators";
+import { creditWallet, debitWallet, getOrCreateWalletForNetwork, getWalletOrFail } from "@/lib/wallet";
 
 function parseBoolean(input: FormDataEntryValue | null | undefined) {
   return String(input ?? "").toLowerCase() === "true";
@@ -39,46 +40,6 @@ function generateMatchTitle(network: TransactionNetwork, isSolo: boolean) {
   const hh = String(now.getHours()).padStart(2, "0");
   const mm = String(now.getMinutes()).padStart(2, "0");
   return `${isSolo ? "Solo" : "Versus"} ${network} ${hh}:${mm}`;
-}
-
-const DEMO_AUTO_TOPUP_AMOUNT = Number(process.env.DEMO_AUTO_TOPUP_AMOUNT ?? "25");
-
-async function getOrCreateWalletForNetwork(userId: string, network: TransactionNetwork) {
-  const existing = await prisma.wallet.findFirst({
-    where: { userId, network },
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  return prisma.wallet.create({
-    data: {
-      userId,
-      network,
-      address: defaultWalletAddress(network, randomUUID()),
-      balance: "0",
-    },
-  });
-}
-
-async function ensurePlayableWallet(userId: string, network: TransactionNetwork) {
-  const wallet = await getOrCreateWalletForNetwork(userId, network);
-
-  if (hasPositiveBalance(wallet.balance)) {
-    return { wallet, autoFunded: false };
-  }
-
-  const nextBalance = Number.isFinite(DEMO_AUTO_TOPUP_AMOUNT) && DEMO_AUTO_TOPUP_AMOUNT > 0
-    ? DEMO_AUTO_TOPUP_AMOUNT.toFixed(6)
-    : "25.000000";
-
-  const updated = await prisma.wallet.update({
-    where: { id: wallet.id },
-    data: { balance: nextBalance },
-  });
-
-  return { wallet: updated, autoFunded: true };
 }
 
 async function resolveSessionUser(session: { id: string; email: string; name: string; role: UserRole }) {
@@ -200,10 +161,9 @@ export async function createMatchAction(formData: FormData) {
   const computedEntryFee = calculateMatchEntryFee(parsed.data.stakeAmount, platformConfig);
   const effectiveEntryFee = Math.max(parsed.data.entryFee, computedEntryFee);
 
-  const { autoFunded: hostAutoFunded } = await ensurePlayableWallet(currentUser.id, parsed.data.network);
-
   const matchId = randomUUID();
   const hostTotalLock = (parsed.data.stakeAmount + effectiveEntryFee).toFixed(6);
+  const hostWallet = await getWalletOrFail(currentUser.id, parsed.data.network, Number(hostTotalLock));
   const adapter = getOnchainAdapter(parsed.data.network);
   const receipt = await adapter.createEscrow({
     matchId,
@@ -257,10 +217,11 @@ export async function createMatchAction(formData: FormData) {
           arcadeFeeFixed: platformConfig.arcadeFeeFixed.toString(),
           minEntryFee: platformConfig.minEntryFee.toString(),
         },
-        autoFundedWallet: hostAutoFunded,
       },
     },
   });
+
+  await debitWallet(hostWallet.id, Number(hostTotalLock));
 
   revalidatePath("/");
   revalidatePath("/lobby");
@@ -277,10 +238,10 @@ export async function joinMatchAction(formData: FormData) {
     throw new Error("La partida ya no esta disponible.");
   }
 
-  const { autoFunded: guestAutoFunded } = await ensurePlayableWallet(currentUser.id, match.preferredNetwork);
+  const guestTotalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
+  const guestWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, Number(guestTotalLock));
 
   const adapter = getOnchainAdapter(match.preferredNetwork);
-  const guestTotalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
   const receipt = await adapter.joinEscrow({
     matchId,
     actorId: currentUser.id,
@@ -314,11 +275,12 @@ export async function joinMatchAction(formData: FormData) {
           mode: receipt.mode,
           stakeAmount: match.stakeAmount.toFixed(6),
           entryFee: match.entryFee.toFixed(6),
-          autoFundedWallet: guestAutoFunded,
         },
       },
     }),
   ]);
+
+  await debitWallet(guestWallet.id, Number(guestTotalLock));
 
   revalidatePath("/");
   revalidatePath("/lobby");
@@ -339,9 +301,10 @@ export async function startSoloMatchAction(formData: FormData) {
   const requiresLock = Number(totalLock) > 0;
 
   let receipt: Awaited<ReturnType<ReturnType<typeof getOnchainAdapter>["createEscrow"]>> | null = null;
+  let soloWallet: Awaited<ReturnType<typeof getWalletOrFail>> | null = null;
 
   if (requiresLock) {
-    await ensurePlayableWallet(currentUser.id, match.preferredNetwork);
+    soloWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, Number(totalLock));
 
     const adapter = getOnchainAdapter(match.preferredNetwork);
     receipt = await adapter.createEscrow({
@@ -396,6 +359,10 @@ export async function startSoloMatchAction(formData: FormData) {
     }
   });
 
+  if (requiresLock && soloWallet) {
+    await debitWallet(soloWallet.id, Number(totalLock));
+  }
+
   revalidatePath("/");
   revalidatePath("/lobby");
   redirect(`/match/${matchId}`);
@@ -447,9 +414,10 @@ export async function placeMatchBetAction(formData: FormData) {
     throw new Error("Ya registraste una apuesta para esta partida.");
   }
 
-  const { autoFunded } = await ensurePlayableWallet(currentUser.id, match.preferredNetwork);
+  const betAmount = parsed.data.amount;
+  const betWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, betAmount);
   const adapter = getOnchainAdapter(match.preferredNetwork);
-  const amount = parsed.data.amount.toFixed(6);
+  const amount = betAmount.toFixed(6);
   const receipt = await adapter.placeBet({
     matchId: match.id,
     bettorId: currentUser.id,
@@ -457,6 +425,8 @@ export async function placeMatchBetAction(formData: FormData) {
     amount,
     token: match.stakeToken,
   });
+
+  await debitWallet(betWallet.id, betAmount);
 
   await prisma.$transaction([
     prisma.matchBet.create({
@@ -471,7 +441,6 @@ export async function placeMatchBetAction(formData: FormData) {
         metadata: {
           description: receipt.description,
           mode: receipt.mode,
-          autoFundedWallet: autoFunded,
         },
       },
     }),

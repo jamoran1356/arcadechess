@@ -93,7 +93,11 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     setTurnStartedAt(data.turnStartedAt);
     setGuest(data.guest ?? null);
     setWinnerId(data.winner?.id ?? null);
-    setPendingDuel(data.status === "ARCADE_PENDING" ? (data.pendingDuel ?? null) : null);
+    if (data.status === "ARCADE_PENDING") {
+      setPendingDuel(data.pendingDuel ?? null);
+    } else {
+      setPendingDuel(null);
+    }
   }, [ch.moveError, match.id]);
 
   const isActiveParticipant =
@@ -117,7 +121,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     setMoveHistory(match.moveHistory);
     setGuest(match.guest);
     setWinnerId(match.winner?.id ?? null);
-    setPendingDuel(match.pendingDuel ?? null);
+    setPendingDuel(match.status === "ARCADE_PENDING" ? (match.pendingDuel ?? null) : null);
   }, [match]);
 
   useEffect(() => {
@@ -242,11 +246,12 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
       return;
     }
 
+    const intervalMs = status === "ARCADE_PENDING" ? 4000 : 1500;
     const intervalId = window.setInterval(() => {
       void syncMatchState().catch(() => {
         // best-effort sync for versus matches
       });
-    }, 1500);
+    }, intervalMs);
 
     return () => {
       window.clearInterval(intervalId);

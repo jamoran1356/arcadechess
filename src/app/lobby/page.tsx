@@ -64,6 +64,16 @@ export default async function LobbyPage({
               </select>
             </div>
 
+            {me?.wallets && me.wallets.length > 0 ? (
+              <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+                {me.wallets.map((w) => (
+                  <span key={w.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1">
+                    {w.network}: <span className="font-semibold text-slate-200">{Number(w.balance).toFixed(2)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2 text-sm text-slate-300">
                 {t.clockLabel}

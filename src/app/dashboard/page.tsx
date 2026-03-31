@@ -7,6 +7,7 @@ import { linkWalletAddressAction } from "@/lib/actions";
 import { FriendInvitePanel, type FriendData } from "@/components/friend-invite-panel";
 import { getDashboardSnapshot } from "@/lib/data";
 import { prisma } from "@/lib/db";
+import { getExplorerTxUrl, getExplorerAddressUrl } from "@/lib/onchain/service";
 
 export const dynamic = "force-dynamic";
 
@@ -178,16 +179,27 @@ export default async function DashboardPage() {
 
             <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
               {user.wallets.length > 0 ? (
-                user.wallets.map((wallet) => (
-                  <article key={wallet.id} className={`rounded-[1.75rem] border p-5 shadow-[0_20px_60px_rgba(2,6,23,0.25)] ${getWalletAccent(wallet.network)}`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="font-mono text-xs uppercase tracking-[0.18em] opacity-80">{wallet.network}</p>
-                      <span className="rounded-full border border-current/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] opacity-80">Live</span>
-                    </div>
-                    <p className="mt-4 text-3xl font-semibold">{formatAmount(wallet.balance)}</p>
-                    <p className="mt-3 break-all text-xs opacity-75">{wallet.address}</p>
-                  </article>
-                ))
+                user.wallets.map((wallet) => {
+                  const addrUrl = getExplorerAddressUrl(wallet.network, wallet.address);
+                  return (
+                    <article key={wallet.id} className={`rounded-[1.75rem] border p-5 shadow-[0_20px_60px_rgba(2,6,23,0.25)] ${getWalletAccent(wallet.network)}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-mono text-xs uppercase tracking-[0.18em] opacity-80">{wallet.network}</p>
+                        <span className="rounded-full border border-current/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] opacity-80">Live</span>
+                      </div>
+                      <p className="mt-4 text-3xl font-semibold">{formatAmount(wallet.balance)}</p>
+                      <p className="mt-3 break-all text-xs opacity-75">
+                        {addrUrl ? (
+                          <a href={addrUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:opacity-100">
+                            {wallet.address}
+                          </a>
+                        ) : (
+                          wallet.address
+                        )}
+                      </p>
+                    </article>
+                  );
+                })
               ) : (
                 <article className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 md:col-span-2 2xl:col-span-3">
                   <p className="text-sm text-slate-300">{t.noWallets}</p>
@@ -302,25 +314,40 @@ export default async function DashboardPage() {
                     <th className="px-4 py-3">{t.ledgerAmount}</th>
                     <th className="px-4 py-3">{t.ledgerNetwork}</th>
                     <th className="px-4 py-3">{t.ledgerStatus}</th>
+                    <th className="px-4 py-3">Explorer</th>
                   </tr>
                 </thead>
                 <tbody>
                   {user.transactions.length > 0 ? (
-                    user.transactions.map((transaction) => (
-                      <tr key={transaction.id} className="border-t border-white/10">
-                        <td className="px-4 py-3 text-white">{formatStatusLabel(transaction.type)}</td>
-                        <td className="px-4 py-3 font-medium text-amber-200">{formatAmount(transaction.amount.toString())}</td>
-                        <td className="px-4 py-3">{transaction.network}</td>
-                        <td className="px-4 py-3">
-                          <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-200">
-                            {transaction.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                    user.transactions.map((transaction) => {
+                      const explorerUrl = transaction.txHash
+                        ? getExplorerTxUrl(transaction.network, transaction.txHash)
+                        : null;
+                      return (
+                        <tr key={transaction.id} className="border-t border-white/10">
+                          <td className="px-4 py-3 text-white">{formatStatusLabel(transaction.type)}</td>
+                          <td className="px-4 py-3 font-medium text-amber-200">{formatAmount(transaction.amount.toString())}</td>
+                          <td className="px-4 py-3">{transaction.network}</td>
+                          <td className="px-4 py-3">
+                            <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-200">
+                              {transaction.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {explorerUrl ? (
+                              <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline underline-offset-2 text-xs hover:text-cyan-100">
+                                Ver tx
+                              </a>
+                            ) : (
+                              <span className="text-xs text-slate-500">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr className="border-t border-white/10">
-                      <td className="px-4 py-6 text-slate-400" colSpan={4}>{t.noTransactions}</td>
+                      <td className="px-4 py-6 text-slate-400" colSpan={5}>{t.noTransactions}</td>
                     </tr>
                   )}
                 </tbody>

@@ -13,6 +13,32 @@ export function getOnchainAdapter(network: TransactionNetwork) {
   return adapters[network];
 }
 
+const explorerTxBaseUrls: Record<TransactionNetwork, string> = {
+  [TransactionNetwork.INITIA]: `https://scan.testnet.initia.xyz/${process.env.NEXT_PUBLIC_INITIA_CHAIN_ID ?? "initiation-2"}/txs`,
+  [TransactionNetwork.FLOW]: "https://testnet.flowscan.io/tx",
+  [TransactionNetwork.SOLANA]: "https://explorer.solana.com/tx",
+};
+
+const explorerAddrBaseUrls: Record<TransactionNetwork, string> = {
+  [TransactionNetwork.INITIA]: `https://scan.testnet.initia.xyz/${process.env.NEXT_PUBLIC_INITIA_CHAIN_ID ?? "initiation-2"}/accounts`,
+  [TransactionNetwork.FLOW]: "https://testnet.flowscan.io/account",
+  [TransactionNetwork.SOLANA]: "https://explorer.solana.com/address",
+};
+
+export function getExplorerTxUrl(network: TransactionNetwork, txHash: string): string | null {
+  if (!txHash || txHash.startsWith("mock-") || txHash.startsWith("demo-")) return null;
+  const base = explorerTxBaseUrls[network];
+  const suffix = network === TransactionNetwork.SOLANA ? "?cluster=devnet" : "";
+  return `${base}/${txHash}${suffix}`;
+}
+
+export function getExplorerAddressUrl(network: TransactionNetwork, address: string): string | null {
+  if (!address) return null;
+  const base = explorerAddrBaseUrls[network];
+  const suffix = network === TransactionNetwork.SOLANA ? "?cluster=devnet" : "";
+  return `${base}/${address}${suffix}`;
+}
+
 export function getSupportedNetworks() {
   const initiaContract = process.env.NEXT_PUBLIC_INITIA_CONTRACT_ADDRESS ?? null;
   const flowContract = process.env.NEXT_PUBLIC_FLOW_CONTRACT_ADDRESS ?? null;

@@ -175,6 +175,7 @@ async function resolveDuelWithPenalty(
             fen: nextFen,
             turn: nextTurn,
             winnerId: matchWinnerId,
+            turnStartedAt: new Date(),
             moveHistory: [
               ...moveHistory,
               `Arcade penalty resolved (${penaltyReason}) - invalid boardMove payload`,
@@ -201,6 +202,7 @@ async function resolveDuelWithPenalty(
             fen: nextFen,
             turn: nextTurn,
             winnerId: matchWinnerId,
+            turnStartedAt: new Date(),
             moveHistory: [
               ...moveHistory,
               `Arcade penalty resolved (${penaltyReason}) - invalid boardMove payload`,
@@ -237,6 +239,7 @@ async function resolveDuelWithPenalty(
         fen: nextFen,
         turn: nextTurn,
         winnerId: matchWinnerId,
+        turnStartedAt: nextStatus === "FINISHED" ? null : new Date(),
         moveHistory: [
           ...moveHistory,
           defenderWon
@@ -343,6 +346,7 @@ async function resolveDuelByScores(
           fen: nextFen,
           turn: nextTurn,
           winnerId: matchWinnerId,
+          turnStartedAt: new Date(),
           moveHistory: [...moveHistory, `Arcade resolved (${reason}) - invalid boardMove payload`],
         },
       });
@@ -374,6 +378,7 @@ async function resolveDuelByScores(
           fen: nextFen,
           turn: nextTurn,
           winnerId: matchWinnerId,
+          turnStartedAt: nextStatus === "FINISHED" ? null : new Date(),
           moveHistory: [...moveHistory, `${applied.san} [arcade]`],
         },
       });
@@ -391,6 +396,7 @@ async function resolveDuelByScores(
           fen: nextFen,
           turn: nextTurn,
           winnerId: matchWinnerId,
+          turnStartedAt: new Date(),
           moveHistory: [...moveHistory, `${boardMove.san ?? "move"} [arcade-loss]`],
         },
       });

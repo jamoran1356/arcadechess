@@ -31,8 +31,9 @@ type ArcadeDuelModalProps = {
 export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeDuelModalProps) {
   const dict = useDict();
   const arc = dict.arcade;
+  const myScore = currentUserId === duel.attackerId ? duel.attackerScore : duel.defenderScore;
   const [phase, setPhase] = useState<"intro" | "active" | "submitted">(
-    duel.attackerScore !== null || duel.defenderScore !== null ? "submitted" : "intro",
+    myScore !== null ? "submitted" : "intro",
   );
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -85,7 +86,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
   }, [arc.submitError, arc.submitSuccess, duel.id, onStateRefresh, phase]);
 
   useEffect(() => {
-    const isResolvedLocally = duel.attackerScore !== null || duel.defenderScore !== null;
+    const myScoreResolved = (currentUserId === duel.attackerId ? duel.attackerScore : duel.defenderScore) !== null;
 
     if (duelIdRef.current !== duel.id) {
       duelIdRef.current = duel.id;
@@ -97,14 +98,14 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
       setKeyIndex(0);
       actionsRef.current = [];
       startTimeRef.current = null;
-      setPhase(isResolvedLocally ? "submitted" : "intro");
+      setPhase(myScoreResolved ? "submitted" : "intro");
       return;
     }
 
-    if (isResolvedLocally) {
+    if (myScoreResolved) {
       setPhase("submitted");
     }
-  }, [duel.attackerScore, duel.defenderScore, duel.game.timeLimitMs, duel.id]);
+  }, [currentUserId, duel.attackerId, duel.attackerScore, duel.defenderScore, duel.game.timeLimitMs, duel.id]);
 
   useEffect(() => {
     submitAttemptRef.current = submitAttempt;
@@ -290,10 +291,6 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
   }, []);
 
   useEffect(() => {
-    if (phase === "submitted") {
-      return;
-    }
-
     const interval = window.setInterval(() => {
       void fetch("/api/duels/arcade-participation", {
         method: "POST",
@@ -315,7 +312,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
     }, 5000);
 
     return () => window.clearInterval(interval);
-  }, [duel.id, onStateRefresh, phase]);
+  }, [duel.id, onStateRefresh]);
 
   if (playerRole === "spectator") {
     return null;

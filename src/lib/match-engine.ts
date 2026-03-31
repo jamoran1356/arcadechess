@@ -12,6 +12,7 @@ import { evaluateArcadeAttempt, getSoloArcadeTimeLimitMs, type ArcadeAttempt } f
 import { prisma } from "@/lib/db";
 import { getOnchainAdapter } from "@/lib/onchain/service";
 import { getPlatformConfig } from "@/lib/platform-config";
+import { creditWallet } from "@/lib/wallet";
 
 type MoveInput = {
   from: string;
@@ -284,6 +285,8 @@ async function settleWinner(match: {
     },
   });
 
+  await creditWallet(winnerId, match.preferredNetwork, Number(settlement.prize.toString()));
+
   await settleSpectatorBets(match.id, winnerId, match.preferredNetwork, match.stakeToken);
 }
 
@@ -377,6 +380,8 @@ export async function settleSpectatorBets(
         },
       }),
     ]);
+
+    await creditWallet(bet.userId, network, Number(payout));
   }
 
   if (losingBets.length > 0) {
