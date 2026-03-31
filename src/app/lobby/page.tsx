@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { getLocale } from "@/lib/i18n";
 import { getDictionary } from "@/dictionaries";
-import { TransactionNetwork } from "@prisma/client";
-import { joinMatchAction } from "@/lib/actions";
 import { requireUser } from "@/lib/auth";
+import { joinMatchAction } from "@/lib/actions";
 import { arcadeLibrary } from "@/lib/arcade";
 import { getLobbySnapshot } from "@/lib/data";
+import { getEnabledNetworks } from "@/lib/networks";
 import { MatchShareControls } from "@/components/match-share-controls";
 import { CreateMatchForm } from "@/components/create-match-form";
 
@@ -17,7 +17,11 @@ export default async function LobbyPage({
   searchParams?: Promise<{ network?: string }>;
 }) {
   const session = await requireUser();
-  const { me, matches } = await getLobbySnapshot(session.id);
+  const [{ me, matches }, enabledNetworks] = await Promise.all([
+    getLobbySnapshot(session.id),
+    getEnabledNetworks(),
+  ]);
+  const enabledSet = new Set(enabledNetworks);
   const params = (await searchParams) ?? {};
   const selectedNetwork = String(params.network ?? "ALL").toUpperCase();
   const filteredMatches = selectedNetwork === "ALL"
@@ -42,7 +46,8 @@ export default async function LobbyPage({
           <p className="eyebrow">{t.publishEyebrow}</p>
           <h1 className="mt-3 text-4xl font-semibold text-white">{t.publishTitle}</h1>
           <CreateMatchForm
-            wallets={(me?.wallets ?? []).map((w) => ({ id: w.id, network: w.network, balance: String(w.balance) }))}
+            wallets={(me?.wallets ?? []).filter((w) => enabledSet.has(w.network)).map((w) => ({ id: w.id, network: w.network, balance: String(w.balance) }))}
+            enabledNetworks={enabledNetworks}
             arcadeLibrary={arcadeLibrary.map((g) => ({ id: g.id, name: g.name, blurb: g.blurb }))}
             labels={{
               publishEyebrow: t.publishEyebrow,
@@ -76,7 +81,7 @@ export default async function LobbyPage({
             ) : null}
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            {me?.wallets.map((wallet) => (
+            {me?.wallets.filter((w) => enabledSet.has(w.network)).map((wallet) => (
               <article key={wallet.id} className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
                 <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">{wallet.network}</p>
                 <p className="mt-2 text-xl font-semibold text-white">{wallet.balance}</p>
@@ -92,7 +97,7 @@ export default async function LobbyPage({
           <p className="eyebrow">{t.activeEyebrow}</p>
           <h2 className="mt-2 text-3xl font-semibold text-white">{t.activeTitle}</h2>
           <div className="mt-4 flex flex-wrap gap-2">
-            {(["ALL", ...Object.values(TransactionNetwork)] as const).map((network) => (
+            {(["ALL", ...enabledNetworks] as const).map((network) => (
               <Link
                 key={network}
                 href={network === "ALL" ? "/lobby" : `/lobby?network=${network}`}

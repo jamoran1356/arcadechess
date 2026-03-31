@@ -12,6 +12,7 @@ import { getOnchainAdapter } from "@/lib/onchain/service";
 import { calculateMatchEntryFee, getPlatformConfig } from "@/lib/platform-config";
 import { createMatchSchema, FormState, loginSchema, placeBetSchema, registerSchema } from "@/lib/validators";
 import { creditWallet, debitWallet, getOrCreateWalletForNetwork, getWalletOrFail } from "@/lib/wallet";
+import { getEnabledNetworks } from "@/lib/networks";
 
 function parseBoolean(input: FormDataEntryValue | null | undefined) {
   return String(input ?? "").toLowerCase() === "true";
@@ -93,17 +94,19 @@ export async function registerAction(_: FormState | void | undefined, formData: 
     };
   }
 
+  const enabledNets = await getEnabledNetworks();
+
   const user = await prisma.user.create({
     data: {
       name: parsed.data.name,
       email: parsed.data.email,
       passwordHash: await hashPassword(parsed.data.password),
       wallets: {
-        create: [
-          { network: TransactionNetwork.INITIA, address: defaultWalletAddress(TransactionNetwork.INITIA, randomUUID()), balance: "0" },
-          { network: TransactionNetwork.FLOW, address: defaultWalletAddress(TransactionNetwork.FLOW, randomUUID()), balance: "0" },
-          { network: TransactionNetwork.SOLANA, address: defaultWalletAddress(TransactionNetwork.SOLANA, randomUUID()), balance: "0" },
-        ],
+        create: enabledNets.map((network) => ({
+          network,
+          address: defaultWalletAddress(network, randomUUID()),
+          balance: "0",
+        })),
       },
     },
   });
@@ -155,6 +158,11 @@ export async function createMatchAction(formData: FormData) {
 
   if (!parsed.success) {
     throw new Error(Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] ?? "No se pudo crear la partida.");
+  }
+
+  const enabledNetsForMatch = await getEnabledNetworks();
+  if (!enabledNetsForMatch.includes(parsed.data.network)) {
+    throw new Error("Esta red no está habilitada actualmente.");
   }
 
   const platformConfig = await getPlatformConfig();
@@ -657,6 +665,39 @@ export async function updateWalletNetworkAction(formData: FormData) {
   revalidatePath("/admin/redes");
 }
 
+export async function toggleNetworkAction(formData: FormData) {
+  const session = await requireUser();
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
+
+  const network = String(formData.get("network") ?? "");
+  if (!Object.values(TransactionNetwork).includes(network as TransactionNetwork)) {
+    throw new Error("Red invalida.");
+  }
+
+  const config = await prisma.platformConfig.findUnique({ where: { key: "default" } });
+  const current: string[] = Array.isArray(config?.enabledNetworks) ? (config.enabledNetworks as string[]) : ["INITIA"];
+
+  let next: string[];
+  if (current.includes(network)) {
+    next = current.filter((n) => n !== network);
+    if (next.length === 0) throw new Error("Debe haber al menos una red habilitada.");
+  } else {
+    next = [...current, network];
+  }
+
+  await prisma.platformConfig.upsert({
+    where: { key: "default" },
+    update: { enabledNetworks: next },
+    create: { key: "default", enabledNetworks: next },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/redes");
+  revalidatePath("/lobby");
+  revalidatePath("/dashboard");
+  revalidatePath("/");
+}
+
 export async function linkWalletAddressAction(formData: FormData) {
   const session = await requireUser();
   const currentUser = await resolveSessionUser(session);
@@ -665,6 +706,11 @@ export async function linkWalletAddressAction(formData: FormData) {
 
   if (!Object.values(TransactionNetwork).includes(network as TransactionNetwork)) {
     throw new Error("Red invalida.");
+  }
+
+  const enabledNets = await getEnabledNetworks();
+  if (!enabledNets.includes(network as TransactionNetwork)) {
+    throw new Error("Esta red no está habilitada actualmente.");
   }
 
   if (address.length < 6) {

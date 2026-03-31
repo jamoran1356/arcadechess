@@ -39,13 +39,13 @@ export function getExplorerAddressUrl(network: TransactionNetwork, address: stri
   return `${base}/${address}${suffix}`;
 }
 
-export function getSupportedNetworks() {
+export function getSupportedNetworks(enabledList?: TransactionNetwork[]) {
   const initiaContract = process.env.NEXT_PUBLIC_INITIA_CONTRACT_ADDRESS ?? null;
   const flowContract = process.env.NEXT_PUBLIC_FLOW_CONTRACT_ADDRESS ?? null;
   const solanaContract = process.env.NEXT_PUBLIC_SOLANA_PROGRAM_ID ?? null;
   const initiaChainId = process.env.NEXT_PUBLIC_INITIA_CHAIN_ID ?? "initiation-2";
 
-  return [
+  const all = [
     {
       id: TransactionNetwork.INITIA,
       name: "Initia",
@@ -77,4 +77,9 @@ export function getSupportedNetworks() {
         : null,
     },
   ];
+
+  return all.map((n) => ({
+    ...n,
+    enabled: !enabledList || enabledList.includes(n.id),
+  }));
 }

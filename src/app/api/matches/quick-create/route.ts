@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       stakeAmount = "0",
       entryFee = "0",
       gameClockMs = 300000, // 5 min por default
-      network = "SOLANA",
+      network = "INITIA",
       title,
       hostId,
     } = body;

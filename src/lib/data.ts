@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { Prisma, TransactionStatus, UserRole } from "@prisma/client";
+import { Prisma, TransactionNetwork, TransactionStatus, UserRole } from "@prisma/client";
 import { buildArcadeScenario, getArcadeDefinition, getSoloArcadeTimeLimitMs, arcadeLibrary } from "@/lib/arcade";
 import { prisma } from "@/lib/db";
+import { getEnabledNetworks } from "@/lib/networks";
 import { getSupportedNetworks } from "@/lib/onchain/service";
 import { getPlatformConfig } from "@/lib/platform-config";
 
@@ -108,7 +109,7 @@ export async function getLandingSnapshot() {
       createdAt: match.createdAt.toISOString(),
       arcadeGamePool: asStringArray(match.arcadeGamePool),
     })),
-    networks: getSupportedNetworks(),
+    networks: getSupportedNetworks(await getEnabledNetworks()),
     arcadeLibrary,
   };
 }

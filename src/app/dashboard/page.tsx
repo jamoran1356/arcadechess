@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { getLocale } from "@/lib/i18n";
 import { getDictionary } from "@/dictionaries";
-import { TransactionNetwork } from "@prisma/client";
 import { hasAdminAccess, requireUser } from "@/lib/auth";
 import { linkWalletAddressAction } from "@/lib/actions";
 import { FriendInvitePanel, type FriendData } from "@/components/friend-invite-panel";
 import { getDashboardSnapshot } from "@/lib/data";
+import { getEnabledNetworks } from "@/lib/networks";
 import { prisma } from "@/lib/db";
 import { getExplorerTxUrl, getExplorerAddressUrl } from "@/lib/onchain/service";
 
@@ -38,7 +38,7 @@ function formatStatusLabel(status: string) {
 
 export default async function DashboardPage() {
   const session = await requireUser();
-  const [user, rawFriendships] = await Promise.all([
+  const [user, rawFriendships, enabledNetworks] = await Promise.all([
     getDashboardSnapshot(session.id),
     prisma.friendship.findMany({
       where: { OR: [{ userId: session.id }, { friendId: session.id }] },
@@ -48,6 +48,7 @@ export default async function DashboardPage() {
       },
       orderBy: { createdAt: "desc" },
     }),
+    getEnabledNetworks(),
   ]);
   const locale = await getLocale();
   const { dashboard: t } = getDictionary(locale);
@@ -179,7 +180,7 @@ export default async function DashboardPage() {
 
             <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
               {user.wallets.length > 0 ? (
-                user.wallets.map((wallet) => {
+                user.wallets.filter((w) => enabledNetworks.includes(w.network)).map((wallet) => {
                   const addrUrl = getExplorerAddressUrl(wallet.network, wallet.address);
                   return (
                     <article key={wallet.id} className={`rounded-[1.75rem] border p-5 shadow-[0_20px_60px_rgba(2,6,23,0.25)] ${getWalletAccent(wallet.network)}`}>
@@ -209,15 +210,19 @@ export default async function DashboardPage() {
 
             <div className="mt-6 rounded-[1.6rem] border border-white/10 bg-white/5 p-4">
               <form action={linkWalletAddressAction} className="grid gap-3 sm:grid-cols-[180px_1fr_auto]">
-                <select name="network" className="input" defaultValue={TransactionNetwork.FLOW}>
-                  {Object.values(TransactionNetwork).map((network) => (
-                    <option key={network} value={network}>{network}</option>
-                  ))}
-                </select>
+                {enabledNetworks.length === 1 ? (
+                  <input type="hidden" name="network" value={enabledNetworks[0]} />
+                ) : (
+                  <select name="network" className="input" defaultValue={enabledNetworks[0]}>
+                    {enabledNetworks.map((network) => (
+                      <option key={network} value={network}>{network}</option>
+                    ))}
+                  </select>
+                )}
                 <input name="address" className="input" placeholder="Wallet address to link" required />
                 <button type="submit" className="button-primary px-4 py-2 text-sm">Vincular</button>
               </form>
-              <p className="mt-3 text-xs text-slate-400">Vincula tus billeteras de Flow y Solana para jugar y recibir pagos en esa red.</p>
+              <p className="mt-3 text-xs text-slate-400">Vincula tu billetera para jugar y recibir pagos.</p>
             </div>
           </section>
 

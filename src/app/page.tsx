@@ -201,7 +201,7 @@ export default async function Home() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-3">
-        {networks.map((network) => (
+        {networks.filter((n) => n.enabled).map((network) => (
           <article key={network.id} className="panel rounded-[1.75rem] p-6">
             <p className="eyebrow">{t.networkLabel}</p>
             <h3 className="mt-3 text-2xl font-semibold text-white">{network.name}</h3>
