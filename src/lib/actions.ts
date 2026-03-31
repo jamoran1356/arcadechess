@@ -543,6 +543,54 @@ export async function updateTransactionAction(formData: FormData) {
   revalidatePath("/admin/transacciones");
 }
 
+export async function resignMatchAction(formData: FormData) {
+  const session = await requireUser();
+  const matchId = String(formData.get("matchId") ?? "").trim();
+
+  if (!matchId) {
+    throw new Error("ID de partida inválido.");
+  }
+
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { id: true, hostId: true, guestId: true, status: true },
+  });
+
+  if (!match) {
+    throw new Error("Partida no encontrada.");
+  }
+
+  const isParticipant = match.hostId === session.id || match.guestId === session.id;
+  if (!isParticipant) {
+    throw new Error("No sos participante de esta partida.");
+  }
+
+  const isActive =
+    match.status === MatchStatus.IN_PROGRESS ||
+    match.status === MatchStatus.OPEN ||
+    match.status === MatchStatus.ARCADE_PENDING;
+
+  if (!isActive) {
+    throw new Error("La partida ya terminó.");
+  }
+
+  // If there is an opponent, they win; otherwise just cancel
+  const opponentId =
+    match.hostId === session.id ? match.guestId : match.hostId;
+
+  await prisma.match.update({
+    where: { id: matchId },
+    data: {
+      status: MatchStatus.FINISHED,
+      winnerId: opponentId ?? null,
+    },
+  });
+
+  revalidatePath(`/match/${matchId}`);
+  revalidatePath("/lobby");
+  redirect("/lobby");
+}
+
 export async function updateMatchStatusAction(formData: FormData) {
   const session = await requireUser();
   if (!hasAdminAccess(session)) throw new Error("Unauthorized");

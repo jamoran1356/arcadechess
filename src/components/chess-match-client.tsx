@@ -1,12 +1,13 @@
 'use client';
 
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
 import { ArcadeDuelModal } from "@/components/arcade-duel-modal";
 import { MatchShareControls } from "@/components/match-share-controls";
 import { useDict } from "@/components/locale-provider";
+import { resignMatchAction } from "@/lib/actions";
 
 type MatchClientProps = {
   match: {
@@ -60,6 +61,19 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [timeoutMessage, setTimeoutMessage] = useState<string | null>(null);
+  const [isResigning, startResignTransition] = useTransition();
+
+  const isActiveParticipant =
+    currentUserId &&
+    (match.host.id === currentUserId || match.guest?.id === currentUserId) &&
+    (status === "IN_PROGRESS" || status === "OPEN" || status === "ARCADE_PENDING");
+
+  function handleResign() {
+    if (!window.confirm("¿Seguro que querés rendirte? Tu oponente ganará la partida.")) return;
+    const fd = new FormData();
+    fd.set("matchId", match.id);
+    startResignTransition(() => resignMatchAction(fd));
+  }
 
   useEffect(() => {
     setFen(match.fen);
@@ -142,6 +156,32 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
 
   const activeTurnClockMs = turn === "w" ? displayClocks.white : displayClocks.black;
   const totalRemainingClockMs = displayClocks.white + displayClocks.black;
+
+  // Solo mode: when it's the bot's turn, wait 3 s then trigger its move
+  useEffect(() => {
+    if (!match.isSolo || turn !== "b" || status !== "IN_PROGRESS") return;
+
+    const timer = setTimeout(() => {
+      void fetch(`/api/matches/${match.id}/bot-move`, { method: "POST" })
+        .then(async (response) => {
+          const data = await response.json();
+          if (!response.ok || data.skipped) return;
+          setFen(data.fen);
+          setTurn(data.turn);
+          setStatus(data.status);
+          setMoveHistory(data.moveHistory);
+          setWhiteClockMs(data.whiteClockMs);
+          setBlackClockMs(data.blackClockMs);
+          setTurnStartedAt(data.turnStartedAt);
+          if (data.refresh) {
+            router.refresh();
+          }
+        })
+        .catch(() => {/* silent — next move will retry */});
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [match.isSolo, match.id, turn, status, router]);
 
   function formatClock(clockMs: number) {
     const totalSeconds = Math.max(0, Math.ceil(clockMs / 1000));
@@ -279,6 +319,16 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
           <Link href="/lobby" className="mt-5 inline-flex text-sm text-cyan-200 hover:text-cyan-100">
             {ch.backToLobby}
           </Link>
+          {isActiveParticipant ? (
+            <button
+              type="button"
+              onClick={handleResign}
+              disabled={isResigning}
+              className="mt-3 w-full rounded-full border border-rose-400/30 bg-rose-400/10 px-4 py-2 text-sm text-rose-200 transition hover:border-rose-300/60 hover:bg-rose-400/20 disabled:opacity-50"
+            >
+              {isResigning ? "Rindiendo…" : "Rendirse"}
+            </button>
+          ) : null}
         </div>
 
         <div className="panel rounded-[2rem] p-6">

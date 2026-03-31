@@ -472,7 +472,7 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
     promotion: moveInput.promotion,
   });
 
-  const clocks = consumeActiveTurnClock(match);
+  // clocks already computed above for the timeout check
   let nextState: MatchProgressState = {
     fen: chess.fen(),
     turn: chess.turn(),
@@ -498,9 +498,7 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
     }
   }
 
-  if (match.isSolo) {
-    nextState = advanceSoloBotTurn(nextState);
-  }
+  // Solo: do NOT advance the bot here — the client waits 3 s then calls /bot-move
 
   await prisma.match.update({
     where: { id: matchId },
@@ -522,6 +520,7 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
 
   return {
     pendingDuel: false,
+    botPending: match.isSolo && nextState.status === MatchStatus.IN_PROGRESS,
     fen: nextState.fen,
     turn: nextState.turn,
     status: nextState.status,
@@ -642,8 +641,10 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       }
     } else {
       const chess = new Chess(match.fen);
-      const removedPiece = isSquare(boardMove.from) ? chess.remove(boardMove.from) : null;
-      const attackerLostKing = removedPiece?.type === "k";
+      // Attacker lost the duel — remove their piece from the starting square.
+      // boardMove.from is guaranteed to be a valid chess square (validated upstream).
+      chess.remove(boardMove.from as Square);
+      const attackerLostKing = boardMove.san.includes("K") || boardMove.san.startsWith("K");
 
       nextState = {
         ...nextState,
@@ -662,9 +663,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       }
     }
 
-    if (match.isSolo) {
-      nextState = advanceSoloBotTurn(nextState);
-    }
+    // Solo: do NOT advance the bot here — the client waits 3 s then calls /bot-move
 
     await tx.arcadeDuel.update({
       where: { id: duelId },
@@ -702,10 +701,99 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
 
   return {
     resolved: true,
+    botPending: match.isSolo && result.status === MatchStatus.IN_PROGRESS,
     message: result.attackerWins
       ? "El atacante gano el duelo y conquista la casilla."
       : "El defensor sostuvo la casilla y el tablero continua.",
     winnerId: result.duelWinnerId,
     matchStatus: result.status,
+  };
+}
+
+export async function performBotMove(matchId: string) {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      id: true,
+      fen: true,
+      turn: true,
+      status: true,
+      isSolo: true,
+      moveHistory: true,
+      whiteClockMs: true,
+      blackClockMs: true,
+      turnStartedAt: true,
+      hostId: true,
+      guestId: true,
+      winnerId: true,
+    },
+  });
+
+  if (!match) {
+    throw new Error("La partida no existe.");
+  }
+
+  if (!match.isSolo) {
+    throw new Error("No es una partida en solitario.");
+  }
+
+  if (match.status !== MatchStatus.IN_PROGRESS || match.turn !== "b") {
+    return {
+      skipped: true,
+      fen: match.fen,
+      turn: match.turn,
+      status: match.status,
+      moveHistory: asMoveHistory(match.moveHistory),
+      whiteClockMs: match.whiteClockMs,
+      blackClockMs: match.blackClockMs,
+      turnStartedAt: match.turnStartedAt?.toISOString() ?? null,
+    };
+  }
+
+  const currentState: MatchProgressState = {
+    fen: match.fen,
+    turn: match.turn,
+    status: match.status,
+    winnerId: null,
+    moveHistory: asMoveHistory(match.moveHistory),
+    whiteClockMs: match.whiteClockMs,
+    blackClockMs: match.blackClockMs,
+    turnStartedAt: match.turnStartedAt ?? null,
+  };
+
+  const nextState = advanceSoloBotTurn(currentState);
+
+  await prisma.match.update({
+    where: { id: matchId },
+    data: {
+      fen: nextState.fen,
+      turn: nextState.turn,
+      status: nextState.status,
+      winnerId: nextState.winnerId,
+      moveHistory: nextState.moveHistory,
+      whiteClockMs: nextState.whiteClockMs,
+      blackClockMs: nextState.blackClockMs,
+      turnStartedAt: nextState.turnStartedAt,
+    },
+  });
+
+  if (nextState.winnerId) {
+    const fullMatch = await prisma.match.findUniqueOrThrow({
+      where: { id: matchId },
+      select: { id: true, guestId: true, preferredNetwork: true, stakeAmount: true, entryFee: true, stakeToken: true },
+    });
+    await settleWinner(fullMatch, nextState.winnerId);
+  }
+
+  return {
+    skipped: false,
+    fen: nextState.fen,
+    turn: nextState.turn,
+    status: nextState.status,
+    moveHistory: nextState.moveHistory,
+    whiteClockMs: nextState.whiteClockMs,
+    blackClockMs: nextState.blackClockMs,
+    turnStartedAt: nextState.turnStartedAt?.toISOString() ?? null,
+    refresh: nextState.status === MatchStatus.FINISHED,
   };
 }
