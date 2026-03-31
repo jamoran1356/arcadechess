@@ -27,11 +27,23 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Solo arcade dynamic timer** — `getSoloArcadeTimeLimitMs()` in `arcade.ts` computes a time limit between 3 s and 10 s based on the Manhattan distance from the capture square to the enemy king. Applied to solo-duel `ArcadeDuel` in both `data.ts` (snapshot) and `match-engine.ts` (evaluation).
 
 - **Deploy script** — `scripts/deploy-server.sh` automates the full server deployment sequence: start postgres → run migrate service → rebuild and restart app container.
+- **Bot move endpoint for solo matches** — Added `POST /api/matches/[id]/bot-move` to execute the computer move server-side.
+- **Reusable dialog system** — Added `DialogModal` component and integrated it into match resign flow and arcade-games admin actions.
 
 ### Fixed
 
 - **TypeScript `Square` type error** in `match-engine.ts` — `chess.remove()` requires type `Square`, not `string`. Added `isSquare()` type guard with regex `[a-h][1-8]`.
 - **`displayClocks` used before declaration** in `chess-match-client.tsx` — clock timeout `useEffect` was referencing a `useState` value declared later in the file; reordered to fix.
+- **Arcade loss capture consistency** — when the attacker loses an arcade duel (including penalty/no-show path), the attacker piece is now removed from the board instead of reverting state.
+- **Prisma client drift during build** — added `prebuild: prisma generate` to keep generated types in sync before every Next.js build.
+- **Pending duel typing mismatch** — ensured `pendingDuel.game` is always populated in match snapshot to satisfy strict TypeScript expectations.
+
+### Changed
+
+- **Solo vs computer pacing** — bot move no longer executes immediately after the human move; client now waits 3 seconds then triggers `/api/matches/[id]/bot-move`.
+- **Resign UX** — replaced native `window.confirm` with a full in-app confirmation dialog in match screen.
+- **Admin arcade UX** — replaced all `alert/confirm` calls with in-app dialog windows for success, error, warning and delete confirmation.
+- **Dashboard redesign** — rebuilt `/dashboard` with sticky left navigation, section anchors, improved visual hierarchy, and cleaner grouped content blocks.
 
 ---
 

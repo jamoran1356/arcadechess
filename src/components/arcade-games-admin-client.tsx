@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ArcadeGameType } from "@prisma/client";
+import { DialogModal } from "@/components/dialog-modal";
 
 interface ArcadeGame {
   id: string;
@@ -22,6 +23,13 @@ export function ArcadeGamesAdminClient() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ArcadeGame | null>(null);
+  const [feedbackDialog, setFeedbackDialog] = useState<{
+    title: string;
+    description: string;
+    tone: "default" | "success" | "danger" | "warning";
+  } | null>(null);
   const [formData, setFormData] = useState<Partial<ArcadeGame>>({
     name: "",
     description: "",
@@ -50,7 +58,11 @@ export function ArcadeGamesAdminClient() {
       setGames(data);
     } catch (error) {
       console.error("Error fetching games:", error);
-      alert("Failed to load arcade games");
+      setFeedbackDialog({
+        title: "No se pudieron cargar los juegos",
+        description: "El backend respondió con error al pedir el catálogo arcade.",
+        tone: "danger",
+      });
     } finally {
       setLoading(false);
     }
@@ -59,7 +71,11 @@ export function ArcadeGamesAdminClient() {
   async function handleSave() {
     try {
       if (!formData.name || !formData.description) {
-        alert("Name and description are required");
+        setFeedbackDialog({
+          title: "Datos incompletos",
+          description: "El nombre y la descripción son obligatorios antes de guardar.",
+          tone: "warning",
+        });
         return;
       }
 
@@ -84,23 +100,34 @@ export function ArcadeGamesAdminClient() {
       
       if (editingId) {
         setGames(games.map((g) => (g.id === editingId ? savedGame : g)));
-        alert("Game updated successfully");
+        setFeedbackDialog({
+          title: "Juego actualizado",
+          description: "Los cambios quedaron guardados correctamente.",
+          tone: "success",
+        });
       } else {
         setGames([savedGame, ...games]);
-        alert("Game created successfully");
+        setFeedbackDialog({
+          title: "Juego creado",
+          description: "El nuevo minijuego ya forma parte del catálogo.",
+          tone: "success",
+        });
       }
 
       resetForm();
     } catch (error) {
       console.error("Error saving game:", error);
-      alert(error instanceof Error ? error.message : "Failed to save game");
+      setFeedbackDialog({
+        title: "No se pudo guardar",
+        description: error instanceof Error ? error.message : "El servidor rechazó la operación.",
+        tone: "danger",
+      });
     }
   }
 
   async function handleDelete(gameId: string) {
-    if (!confirm("Are you sure you want to delete this game?")) return;
-
     try {
+      setIsDeleting(true);
       const res = await fetch(`/api/admin/arcade-games?id=${gameId}`, {
         method: "DELETE",
       });
@@ -108,10 +135,21 @@ export function ArcadeGamesAdminClient() {
       if (!res.ok) throw new Error("Failed to delete game");
 
       setGames(games.filter((g) => g.id !== gameId));
-      alert("Game deleted successfully");
+      setDeleteTarget(null);
+      setFeedbackDialog({
+        title: "Juego eliminado",
+        description: "El minijuego se eliminó del panel de administración.",
+        tone: "success",
+      });
     } catch (error) {
       console.error("Error deleting game:", error);
-      alert("Failed to delete game");
+      setFeedbackDialog({
+        title: "No se pudo eliminar",
+        description: error instanceof Error ? error.message : "La eliminación falló.",
+        tone: "danger",
+      });
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -374,7 +412,7 @@ export function ArcadeGamesAdminClient() {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(game.id)}
+                          onClick={() => setDeleteTarget(game)}
                           className="text-sm text-red-500 hover:text-red-400 transition-colors"
                         >
                           Delete
@@ -388,6 +426,28 @@ export function ArcadeGamesAdminClient() {
           </div>
         )}
       </div>
+
+      <DialogModal
+        open={Boolean(deleteTarget)}
+        title="Eliminar minijuego"
+        description={deleteTarget ? `Vas a borrar ${deleteTarget.name}. Esta acción no se puede deshacer.` : ""}
+        tone="danger"
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        isBusy={isDeleting}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget ? handleDelete(deleteTarget.id) : undefined}
+      />
+
+      <DialogModal
+        open={Boolean(feedbackDialog)}
+        title={feedbackDialog?.title ?? "Mensaje"}
+        description={feedbackDialog?.description}
+        tone={feedbackDialog?.tone ?? "default"}
+        confirmLabel="Entendido"
+        hideCancel
+        onClose={() => setFeedbackDialog(null)}
+      />
     </div>
   );
 }

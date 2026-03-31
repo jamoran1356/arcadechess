@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
 import { ArcadeDuelModal } from "@/components/arcade-duel-modal";
+import { DialogModal } from "@/components/dialog-modal";
 import { MatchShareControls } from "@/components/match-share-controls";
 import { useDict } from "@/components/locale-provider";
 import { resignMatchAction } from "@/lib/actions";
@@ -62,6 +63,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [isPending, setIsPending] = useState(false);
   const [timeoutMessage, setTimeoutMessage] = useState<string | null>(null);
   const [isResigning, startResignTransition] = useTransition();
+  const [showResignDialog, setShowResignDialog] = useState(false);
 
   const isActiveParticipant =
     currentUserId &&
@@ -69,7 +71,6 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     (status === "IN_PROGRESS" || status === "OPEN" || status === "ARCADE_PENDING");
 
   function handleResign() {
-    if (!window.confirm("¿Seguro que querés rendirte? Tu oponente ganará la partida.")) return;
     const fd = new FormData();
     fd.set("matchId", match.id);
     startResignTransition(() => resignMatchAction(fd));
@@ -322,7 +323,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
           {isActiveParticipant ? (
             <button
               type="button"
-              onClick={handleResign}
+              onClick={() => setShowResignDialog(true)}
               disabled={isResigning}
               className="mt-3 w-full rounded-full border border-rose-400/30 bg-rose-400/10 px-4 py-2 text-sm text-rose-200 transition hover:border-rose-300/60 hover:bg-rose-400/20 disabled:opacity-50"
             >
@@ -359,6 +360,18 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
       {match.pendingDuel && currentUserId ? (
         <ArcadeDuelModal duel={match.pendingDuel} currentUserId={currentUserId} />
       ) : null}
+
+      <DialogModal
+        open={showResignDialog}
+        title="Rendirse en la partida"
+        description="Si confirmás, la partida se cierra y tu rival queda como ganador."
+        tone="danger"
+        confirmLabel="Sí, rendirme"
+        cancelLabel="Seguir jugando"
+        isBusy={isResigning}
+        onClose={() => setShowResignDialog(false)}
+        onConfirm={handleResign}
+      />
     </div>
   );
 }

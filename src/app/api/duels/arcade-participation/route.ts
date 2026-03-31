@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Square } from "chess.js";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { settleSpectatorBets } from "@/lib/match-engine";
@@ -152,8 +153,30 @@ async function resolveDuelWithPenalty(
       : [];
 
     if (defenderWon) {
-      // El defensor ganó - el tablero no avanza, turno sigue al atacante
-      nextTurn = match.turn;
+      if (!boardMove) {
+        nextTurn = match.turn;
+        await tx.match.update({
+          where: { id: match.id },
+          data: {
+            status: nextStatus,
+            fen: nextFen,
+            turn: nextTurn,
+            winnerId: matchWinnerId,
+            moveHistory: [
+              ...moveHistory,
+              `Arcade penalty resolved (${penaltyReason}) - invalid boardMove payload`,
+            ],
+          },
+        });
+        return;
+      }
+
+      // El defensor ganó: el atacante pierde la pieza que intentó mover.
+      const Chess = (await import("chess.js")).Chess;
+      const chess = new Chess(match.fen);
+      chess.remove(boardMove.from as Square);
+      nextFen = chess.fen();
+      nextTurn = match.turn === "w" ? "b" : "w";
     } else {
       if (!boardMove) {
         // Fallback defensivo: si el payload del movimiento está corrupto, no mutamos tablero.
@@ -203,7 +226,9 @@ async function resolveDuelWithPenalty(
         winnerId: matchWinnerId,
         moveHistory: [
           ...moveHistory,
-          `Arcade penalty resolved (${penaltyReason})`,
+          defenderWon
+            ? `${boardMove?.san ?? "move"} [arcade-loss-penalty]`
+            : `Arcade penalty resolved (${penaltyReason})`,
         ],
       },
     });
@@ -251,12 +276,12 @@ async function resolveDuelWithPenalty(
   }
 }
 
-function parseBoardMove(value: unknown): { from: string; to: string; promotion?: string | null } | null {
+function parseBoardMove(value: unknown): { from: string; to: string; promotion?: string | null; san?: string | null } | null {
   if (!value || typeof value !== "object") {
     return null;
   }
 
-  const candidate = value as { from?: unknown; to?: unknown; promotion?: unknown };
+  const candidate = value as { from?: unknown; to?: unknown; promotion?: unknown; san?: unknown };
   if (typeof candidate.from !== "string" || typeof candidate.to !== "string") {
     return null;
   }
@@ -265,5 +290,6 @@ function parseBoardMove(value: unknown): { from: string; to: string; promotion?:
     from: candidate.from,
     to: candidate.to,
     promotion: typeof candidate.promotion === "string" ? candidate.promotion : null,
+    san: typeof candidate.san === "string" ? candidate.san : null,
   };
 }
