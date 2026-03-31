@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { ArcadeGameType, TransactionNetwork } from "@prisma/client";
 import { createMatchAction } from "@/lib/actions";
 import { DialogModal } from "@/components/dialog-modal";
+import { useEscrowTx } from "@/hooks/use-escrow-tx";
 
 type WalletInfo = { id: string; network: string; balance: string };
 
@@ -30,6 +31,7 @@ export function CreateMatchForm({ wallets, arcadeLibrary, labels: t }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [preview, setPreview] = useState({ stake: "0", fee: "0", total: "0", token: "INIT", network: "INITIA", walletBalance: "0" });
+  const { sendToEscrow, isWalletConnected } = useEscrowTx();
 
   function handleSubmitClick(e: React.FormEvent) {
     e.preventDefault();
@@ -70,6 +72,15 @@ export function CreateMatchForm({ wallets, arcadeLibrary, labels: t }: Props) {
     startTransition(async () => {
       try {
         const fd = new FormData(form);
+        const network = String(fd.get("network") ?? "INITIA");
+
+        // Sign real on-chain tx for INITIA network
+        if (network === "INITIA" && isWalletConnected) {
+          const total = Number(preview.total);
+          const txHash = await sendToEscrow(total, `playchess:create`);
+          fd.set("escrowTxHash", txHash);
+        }
+
         await createMatchAction(fd);
       } catch (err: unknown) {
         setShowConfirm(false);

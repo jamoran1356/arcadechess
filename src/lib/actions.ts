@@ -164,13 +164,29 @@ export async function createMatchAction(formData: FormData) {
   const matchId = randomUUID();
   const hostTotalLock = (parsed.data.stakeAmount + effectiveEntryFee).toFixed(6);
   const hostWallet = await getWalletOrFail(currentUser.id, parsed.data.network, Number(hostTotalLock));
-  const adapter = getOnchainAdapter(parsed.data.network);
-  const receipt = await adapter.createEscrow({
-    matchId,
-    actorId: currentUser.id,
-    amount: hostTotalLock,
-    token: parsed.data.stakeToken,
-  });
+
+  // Use client-signed tx hash if provided, otherwise fall back to server adapter
+  const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
+  let receiptTxHash: string;
+  let receiptMode: "mock" | "configured";
+  let receiptDescription: string;
+
+  if (clientTxHash) {
+    receiptTxHash = clientTxHash;
+    receiptMode = "configured";
+    receiptDescription = `Escrow ${parsed.data.network} creado on-chain para partida ${matchId}. Monto: ${hostTotalLock} ${parsed.data.stakeToken}.`;
+  } else {
+    const adapter = getOnchainAdapter(parsed.data.network);
+    const receipt = await adapter.createEscrow({
+      matchId,
+      actorId: currentUser.id,
+      amount: hostTotalLock,
+      token: parsed.data.stakeToken,
+    });
+    receiptTxHash = receipt.txHash;
+    receiptMode = receipt.mode;
+    receiptDescription = receipt.description;
+  }
 
   const match = await prisma.match.create({
     data: {
@@ -202,13 +218,13 @@ export async function createMatchAction(formData: FormData) {
       matchId: match.id,
       network: parsed.data.network,
       type: TransactionType.ESCROW_LOCK,
-      status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+      status: receiptMode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
       amount: hostTotalLock,
       token: parsed.data.stakeToken.toUpperCase(),
-      txHash: receipt.txHash,
+      txHash: receiptTxHash,
       metadata: {
-        description: receipt.description,
-        mode: receipt.mode,
+        description: receiptDescription,
+        mode: receiptMode,
         stakeAmount: parsed.data.stakeAmount.toFixed(6),
         entryFee: effectiveEntryFee.toFixed(6),
         feePolicy: {
@@ -241,13 +257,28 @@ export async function joinMatchAction(formData: FormData) {
   const guestTotalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
   const guestWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, Number(guestTotalLock));
 
-  const adapter = getOnchainAdapter(match.preferredNetwork);
-  const receipt = await adapter.joinEscrow({
-    matchId,
-    actorId: currentUser.id,
-    amount: guestTotalLock,
-    token: match.stakeToken,
-  });
+  // Use client-signed tx hash if provided, otherwise fall back to server adapter
+  const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
+  let receiptTxHash: string;
+  let receiptMode: "mock" | "configured";
+  let receiptDescription: string;
+
+  if (clientTxHash) {
+    receiptTxHash = clientTxHash;
+    receiptMode = "configured";
+    receiptDescription = `Join escrow ${match.preferredNetwork} on-chain para partida ${matchId}. Monto: ${guestTotalLock} ${match.stakeToken}.`;
+  } else {
+    const adapter = getOnchainAdapter(match.preferredNetwork);
+    const receipt = await adapter.joinEscrow({
+      matchId,
+      actorId: currentUser.id,
+      amount: guestTotalLock,
+      token: match.stakeToken,
+    });
+    receiptTxHash = receipt.txHash;
+    receiptMode = receipt.mode;
+    receiptDescription = receipt.description;
+  }
 
   await prisma.$transaction([
     prisma.match.update({
@@ -266,13 +297,13 @@ export async function joinMatchAction(formData: FormData) {
         matchId,
         network: match.preferredNetwork,
         type: TransactionType.ENTRY_STAKE,
-        status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+        status: receiptMode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
         amount: guestTotalLock,
         token: match.stakeToken,
-        txHash: receipt.txHash,
+        txHash: receiptTxHash,
         metadata: {
-          description: receipt.description,
-          mode: receipt.mode,
+          description: receiptDescription,
+          mode: receiptMode,
           stakeAmount: match.stakeAmount.toFixed(6),
           entryFee: match.entryFee.toFixed(6),
         },
@@ -300,19 +331,32 @@ export async function startSoloMatchAction(formData: FormData) {
   const totalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
   const requiresLock = Number(totalLock) > 0;
 
-  let receipt: Awaited<ReturnType<ReturnType<typeof getOnchainAdapter>["createEscrow"]>> | null = null;
+  // Use client-signed tx hash if provided, otherwise fall back to server adapter
+  const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
+  let receiptTxHash: string | null = null;
+  let receiptMode: "mock" | "configured" = "mock";
+  let receiptDescription = "";
   let soloWallet: Awaited<ReturnType<typeof getWalletOrFail>> | null = null;
 
   if (requiresLock) {
     soloWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, Number(totalLock));
 
-    const adapter = getOnchainAdapter(match.preferredNetwork);
-    receipt = await adapter.createEscrow({
-      matchId,
-      actorId: currentUser.id,
-      amount: totalLock,
-      token: match.stakeToken,
-    });
+    if (clientTxHash) {
+      receiptTxHash = clientTxHash;
+      receiptMode = "configured";
+      receiptDescription = `Escrow solo ${match.preferredNetwork} on-chain para partida ${matchId}. Monto: ${totalLock} ${match.stakeToken}.`;
+    } else {
+      const adapter = getOnchainAdapter(match.preferredNetwork);
+      const receipt = await adapter.createEscrow({
+        matchId,
+        actorId: currentUser.id,
+        amount: totalLock,
+        token: match.stakeToken,
+      });
+      receiptTxHash = receipt.txHash;
+      receiptMode = receipt.mode;
+      receiptDescription = receipt.description;
+    }
   }
 
   await prisma.$transaction(async (tx) => {
@@ -336,20 +380,20 @@ export async function startSoloMatchAction(formData: FormData) {
       throw new Error("La partida solo fue tomada por otro jugador. Refresca e intenta de nuevo.");
     }
 
-    if (requiresLock && receipt) {
+    if (requiresLock && receiptTxHash) {
       await tx.transaction.create({
         data: {
           userId: currentUser.id,
           matchId,
           network: match.preferredNetwork,
           type: TransactionType.ESCROW_LOCK,
-          status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+          status: receiptMode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
           amount: totalLock,
           token: match.stakeToken,
-          txHash: receipt.txHash,
+          txHash: receiptTxHash,
           metadata: {
-            description: receipt.description,
-            mode: receipt.mode,
+            description: receiptDescription,
+            mode: receiptMode,
             stakeAmount: match.stakeAmount.toFixed(6),
             entryFee: match.entryFee.toFixed(6),
             source: "start-solo",

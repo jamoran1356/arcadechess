@@ -143,6 +143,10 @@ async function resolveDuelWithPenalty(
   let settledMatchWinnerId: string | null = null;
 
   await prisma.$transaction(async (tx) => {
+    // Guard against race with submitArcadeAttempt — if it already resolved, bail.
+    const freshDuel = await tx.arcadeDuel.findUnique({ where: { id: duel.id }, select: { resolvedAt: true } });
+    if (freshDuel?.resolvedAt) return;
+
     // Registrar el duelo como resuelto
     await tx.arcadeDuel.update({
       where: { id: duel.id },
@@ -324,6 +328,10 @@ async function resolveDuelByScores(
   let settledMatchWinnerId: string | null = null;
 
   await prisma.$transaction(async (tx) => {
+    // Guard against race with submitArcadeAttempt — if it already resolved, bail.
+    const freshDuel = await tx.arcadeDuel.findUnique({ where: { id: duel.id }, select: { resolvedAt: true } });
+    if (freshDuel?.resolvedAt) return;
+
     await tx.arcadeDuel.update({
       where: { id: duel.id },
       data: {

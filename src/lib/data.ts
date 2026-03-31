@@ -468,7 +468,12 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
           gameType: pendingDuel.gameType,
           game: pendingDuelDefinition ?? getArcadeDefinition(pendingDuel.gameType),
           seed: pendingDuel.seed,
-          scenario: buildArcadeScenario(pendingDuel.gameType, pendingDuel.seed),
+          scenario: buildArcadeScenario(
+            pendingDuel.gameType,
+            viewerId === pendingDuel.attackerId
+              ? `${pendingDuel.seed}:attacker`
+              : `${pendingDuel.seed}:defender`,
+          ),
           attackerScore: pendingDuel.attackerScore,
           defenderScore: pendingDuel.defenderScore,
           winnerId: pendingDuel.winnerId,

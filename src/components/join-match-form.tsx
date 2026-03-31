@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { joinMatchAction, startSoloMatchAction } from "@/lib/actions";
 import { DialogModal } from "@/components/dialog-modal";
+import { useEscrowTx } from "@/hooks/use-escrow-tx";
 
 type Props = {
   matchId: string;
@@ -28,6 +29,7 @@ export function JoinMatchForm({
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { sendToEscrow, isWalletConnected } = useEscrowTx();
 
   const stake = Number(stakeAmount);
   const fee = Number(entryFee);
@@ -43,6 +45,13 @@ export function JoinMatchForm({
       try {
         const fd = new FormData();
         fd.set("matchId", matchId);
+
+        // Sign real on-chain tx for INITIA network
+        if (network === "INITIA" && isWalletConnected) {
+          const txHash = await sendToEscrow(Number(total), `playchess:${isSolo ? "solo" : "join"}:${matchId}`);
+          fd.set("escrowTxHash", txHash);
+        }
+
         if (isSolo) {
           await startSoloMatchAction(fd);
         } else {

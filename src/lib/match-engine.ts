@@ -596,6 +596,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   }
 
   const boardMove = duel.boardMove as { from: string; to: string; promotion?: string | null; san: string };
+  const playerSeed = isAttacker ? `${duel.seed}:attacker` : `${duel.seed}:defender`;
   const soloTimeLimitMs = duel.match.isSolo
     ? getSoloArcadeTimeLimitMs({
         fen: duel.match.fen,
@@ -603,7 +604,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
         attackerTurn: duel.match.turn === "b" ? "b" : "w",
       })
     : undefined;
-  const evaluation = evaluateArcadeAttempt(duel.gameType, duel.seed, attempt, { timeLimitMs: soloTimeLimitMs });
+  const evaluation = evaluateArcadeAttempt(duel.gameType, playerSeed, attempt, { timeLimitMs: soloTimeLimitMs });
   const score = evaluation.valid ? Math.max(0, Math.round(evaluation.score)) : 0;
 
   let updatedDuel = await prisma.arcadeDuel.update({
@@ -617,7 +618,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
     updatedDuel = await prisma.arcadeDuel.update({
       where: { id: duelId },
       data: {
-        defenderScore: buildSoloDefenderScore(duel.gameType, duel.seed),
+        defenderScore: buildSoloDefenderScore(duel.gameType, `${duel.seed}:defender`),
         defenderEnteredAt: updatedDuel.defenderEnteredAt ?? new Date(),
       },
     });
@@ -639,6 +640,12 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   
 
   const result = await prisma.$transaction(async (tx) => {
+    // Guard against race with arcade-participation polling
+    const freshDuel = await tx.arcadeDuel.findUnique({ where: { id: duelId }, select: { resolvedAt: true } });
+    if (freshDuel?.resolvedAt) {
+      return { attackerWins: false, duelWinnerId: null, matchWinnerId: null, status: MatchStatus.IN_PROGRESS, alreadyResolved: true };
+    }
+
     let nextState: MatchProgressState = {
       fen: match.fen,
       turn: match.turn,
@@ -685,10 +692,15 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       chess.remove(boardMove.from as Square);
       const attackerLostKing = boardMove.san.includes("K") || boardMove.san.startsWith("K");
 
+      // chess.remove() doesn't flip the turn in the FEN string — patch it manually.
+      const newTurn = flipTurn(match.turn);
+      const fenParts = chess.fen().split(" ");
+      fenParts[1] = newTurn;
+
       nextState = {
         ...nextState,
-        fen: chess.fen(),
-        turn: flipTurn(match.turn),
+        fen: fenParts.join(" "),
+        turn: newTurn,
         moveHistory: [...moveHistory, `${boardMove.san} [arcade-loss]`],
       };
 
@@ -733,6 +745,15 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       status: nextState.status,
     };
   });
+
+  if ("alreadyResolved" in result && result.alreadyResolved) {
+    return {
+      resolved: true,
+      message: "El duelo ya fue resuelto.",
+      winnerId: null,
+      matchStatus: MatchStatus.IN_PROGRESS,
+    };
+  }
 
   if (result.matchWinnerId) {
     await settleWinner(match, result.matchWinnerId);
