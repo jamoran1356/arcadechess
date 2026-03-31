@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Chess } from "chess.js";
+import type { Square } from "chess.js";
 import {
   ArcadeGameType,
   MatchStatus,
@@ -17,6 +18,10 @@ type MoveInput = {
   to: string;
   promotion?: string;
 };
+
+function isSquare(value: string): value is Square {
+  return /^[a-h][1-8]$/.test(value);
+}
 
 function asGameTypes(value: Prisma.JsonValue | null | undefined) {
   if (!Array.isArray(value)) {
@@ -570,7 +575,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       }
     } else {
       const chess = new Chess(match.fen);
-      const removedPiece = chess.remove(boardMove.from);
+      const removedPiece = isSquare(boardMove.from) ? chess.remove(boardMove.from) : null;
       const attackerLostKing = removedPiece?.type === "k";
 
       nextState = {
