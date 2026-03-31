@@ -155,6 +155,22 @@ Built for speed, scalability, and iteration.
 
 ## 🆕 Recent Updates
 
+### Deployed Contracts (Testnets)
+- **Initia (testnet `initiation-2`)**
+  - Deployed account/module address: `init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5`
+  - Publish tx hash: `29FE63D33A838FAA660A0AB827D0CECE3B850A772290D2513137F94019C4F7C6`
+  - Explorer: `https://scan.testnet.initia.xyz/initiation-2/accounts/init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5`
+
+- **Flow (testnet)**
+  - Contract address: `0xbcc2b6820b8f616d`
+  - Deploy tx hash: `f91ee5f49cd76004b431537bd4e27deed33ed724f2e5b7b151d966d8afe9f86c`
+  - Explorer: `https://testnet.flowscan.io/account/0xbcc2b6820b8f616d`
+
+- **Solana (devnet)**
+  - Program ID: `PMCjtbjN15YvMxPoXdsrmr35RRDV5W5ASVdVEbF6PX6`
+  - Deploy signature: `5xDokgfhecfBYoxQMCXxxujro3LUUKJJQFJ81aj7V38UtJDzomKyGNoUeyVgU9XuA4yZcxCx7TvnZ7EwX2VJRH1r`
+  - Explorer: `https://explorer.solana.com/address/PMCjtbjN15YvMxPoXdsrmr35RRDV5W5ASVdVEbF6PX6?cluster=devnet`
+
 ### Initia Contract (Move)
 - The Move package was structured in `contracts/initia/` with `Move.toml` and the `arcade_escrow.move` module.
 - The contract includes primitives for competitive flow and betting:
@@ -252,7 +268,7 @@ Functional MVP extended with a competitive economy.
 ✔ Match flow operational  
 ✔ Spectator betting implemented in the app  
 ✔ Payout settlement integrated  
-✔ Initia (Move) contract structured in the repository  
+✔ Initia / Flow / Solana contracts deployed on testnets  
 ✔ Versioned migrations and Docker flow with pre-start migration  
 
 ### Next Steps
@@ -260,7 +276,7 @@ Functional MVP extended with a competitive economy.
 - Tournament engine  
 - Onchain prize pools in production  
 - Advanced mini-games  
-- Full deployment and verification of multi-chain contracts  
+- Expanded production hardening and full multi-chain verification  
 
 ---
 
