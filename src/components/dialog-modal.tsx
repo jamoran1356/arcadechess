@@ -15,6 +15,7 @@ type DialogModalProps = {
   isBusy?: boolean;
   onClose: () => void;
   onConfirm?: () => void;
+  children?: React.ReactNode;
 };
 
 function getToneStyles(tone: DialogTone) {
@@ -57,6 +58,7 @@ export function DialogModal({
   isBusy = false,
   onClose,
   onConfirm,
+  children,
 }: DialogModalProps) {
   const styles = getToneStyles(tone);
 
@@ -99,6 +101,8 @@ export function DialogModal({
             Cerrar
           </button>
         </div>
+
+        {children}
 
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           {!hideCancel ? (

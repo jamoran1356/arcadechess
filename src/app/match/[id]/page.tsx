@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { getLocale } from "@/lib/i18n";
 import { getDictionary } from "@/dictionaries";
-import { joinMatchAction, placeMatchBetAction, startSoloMatchAction } from "@/lib/actions";
+import { placeMatchBetAction } from "@/lib/actions";
 import { getSession } from "@/lib/auth";
 import { getMatchSnapshot } from "@/lib/data";
 import { ChessMatchClient } from "@/components/chess-match-client";
+import { JoinMatchForm } from "@/components/join-match-form";
 
 export const dynamic = "force-dynamic";
 
@@ -76,30 +77,27 @@ export default async function MatchPage({ params }: MatchPageProps) {
         </div>
 
         {canJoin ? (
-          <form action={joinMatchAction} className="flex flex-col items-end gap-2">
-            <input type="hidden" name="matchId" value={match.id} />
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-right text-sm text-slate-300">
-              <p>Stake: <span className="font-semibold text-amber-200">{match.stakeAmount} {match.stakeToken}</span></p>
-              <p>Fee: <span className="font-semibold text-amber-200">{match.entryFee} {match.stakeToken}</span></p>
-              <p className="mt-1 text-xs text-slate-400">
-                Total a bloquear: {(Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6)} {match.stakeToken}
-              </p>
-            </div>
-            <button type="submit" className="button-primary px-6 py-3 text-sm">
-              {t.joinBtn}
-            </button>
-          </form>
+          <JoinMatchForm
+            matchId={match.id}
+            stakeAmount={match.stakeAmount}
+            entryFee={match.entryFee}
+            stakeToken={match.stakeToken}
+            network={match.network}
+            isSolo={false}
+            joinLabel={t.joinBtn}
+            startSoloLabel={t.startSoloBtn}
+          />
         ) : canStartSolo ? (
-          <form action={startSoloMatchAction} className="flex flex-col items-end gap-2">
-            <input type="hidden" name="matchId" value={match.id} />
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-right text-sm text-slate-300">
-              <p>Stake: <span className="font-semibold text-amber-200">{match.stakeAmount} {match.stakeToken}</span></p>
-              <p>Fee: <span className="font-semibold text-amber-200">{match.entryFee} {match.stakeToken}</span></p>
-            </div>
-            <button type="submit" className="button-primary px-6 py-3 text-sm">
-              {t.startSoloBtn}
-            </button>
-          </form>
+          <JoinMatchForm
+            matchId={match.id}
+            stakeAmount={match.stakeAmount}
+            entryFee={match.entryFee}
+            stakeToken={match.stakeToken}
+            network={match.network}
+            isSolo={true}
+            joinLabel={t.joinBtn}
+            startSoloLabel={t.startSoloBtn}
+          />
         ) : null}
       </section>
 

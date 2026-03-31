@@ -189,8 +189,11 @@ async function resolveDuelWithPenalty(
       const Chess = (await import("chess.js")).Chess;
       const chess = new Chess(match.fen);
       chess.remove(boardMove.from as Square);
-      nextFen = chess.fen();
       nextTurn = match.turn === "w" ? "b" : "w";
+      // chess.remove() no cambia el turno en el FEN, parchamos manualmente
+      const fenParts = chess.fen().split(" ");
+      fenParts[1] = nextTurn;
+      nextFen = fenParts.join(" ");
     } else {
       if (!boardMove) {
         // Fallback defensivo: si el payload del movimiento está corrupto, no mutamos tablero.
@@ -386,8 +389,11 @@ async function resolveDuelByScores(
       const Chess = (await import("chess.js")).Chess;
       const chess = new Chess(match.fen);
       chess.remove(boardMove.from as Square);
-      nextFen = chess.fen();
       nextTurn = match.turn === "w" ? "b" : "w";
+      // chess.remove() no cambia el turno en el FEN, parchamos manualmente
+      const fenParts = chess.fen().split(" ");
+      fenParts[1] = nextTurn;
+      nextFen = fenParts.join(" ");
 
       await tx.match.update({
         where: { id: match.id },

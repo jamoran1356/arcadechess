@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { getLocale } from "@/lib/i18n";
 import { getDictionary } from "@/dictionaries";
-import { ArcadeGameType, TransactionNetwork } from "@prisma/client";
-import { createMatchAction, joinMatchAction } from "@/lib/actions";
+import { TransactionNetwork } from "@prisma/client";
+import { joinMatchAction } from "@/lib/actions";
 import { requireUser } from "@/lib/auth";
 import { arcadeLibrary } from "@/lib/arcade";
 import { getLobbySnapshot } from "@/lib/data";
 import { MatchShareControls } from "@/components/match-share-controls";
+import { CreateMatchForm } from "@/components/create-match-form";
 
 export const dynamic = "force-dynamic";
 
@@ -40,76 +41,22 @@ export default async function LobbyPage({
         <div id="create-match" className="panel rounded-[2rem] p-6 lg:p-8">
           <p className="eyebrow">{t.publishEyebrow}</p>
           <h1 className="mt-3 text-4xl font-semibold text-white">{t.publishTitle}</h1>
-          <form action={createMatchAction} className="mt-8 grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
-                <input type="radio" name="isSolo" value="false" defaultChecked />
-                {t.modeVersus}
-              </label>
-              <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
-                <input type="radio" name="isSolo" value="true" />
-                {t.modeSolo}
-              </label>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-4">
-              <input name="stakeAmount" type="number" min="0" step="0.01" className="input" placeholder={t.stakeLabel} required />
-              <input name="entryFee" type="number" min="0" step="0.01" className="input" placeholder={t.feeLabel} defaultValue="0" required />
-              <input name="stakeToken" className="input" defaultValue="INIT" />
-              <select name="network" className="input" defaultValue={TransactionNetwork.INITIA}>
-                {Object.values(TransactionNetwork).map((network) => (
-                  <option key={network} value={network}>
-                    {network}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {me?.wallets && me.wallets.length > 0 ? (
-              <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-                {me.wallets.map((w) => (
-                  <span key={w.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1">
-                    {w.network}: <span className="font-semibold text-slate-200">{Number(w.balance).toFixed(2)}</span>
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-2 text-sm text-slate-300">
-                {t.clockLabel}
-                <input
-                  name="gameClockMinutes"
-                  type="number"
-                  min="1"
-                  max="30"
-                  step="1"
-                  className="input"
-                  defaultValue="5"
-                  required
-                />
-              </label>
-              <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-                {t.clockNote}
-              </p>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{t.arcadeLibrary}</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                {arcadeLibrary.map((game) => (
-                  <label key={game.id} className="rounded-[1.25rem] border border-white/10 bg-slate-950/80 p-4 text-sm text-slate-200">
-                    <input type="checkbox" name="arcadeGamePool" value={game.id as ArcadeGameType} defaultChecked={game.id !== ArcadeGameType.KEY_CLASH} className="mr-2" />
-                    {game.name}
-                    <p className="mt-2 text-xs leading-6 text-slate-400">{game.blurb}</p>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <button type="submit" className="button-primary mt-2 px-6 py-3 text-sm">
-              {t.createBtn}
-            </button>
-          </form>
+          <CreateMatchForm
+            wallets={(me?.wallets ?? []).map((w) => ({ id: w.id, network: w.network, balance: String(w.balance) }))}
+            arcadeLibrary={arcadeLibrary.map((g) => ({ id: g.id, name: g.name, blurb: g.blurb }))}
+            labels={{
+              publishEyebrow: t.publishEyebrow,
+              publishTitle: t.publishTitle,
+              modeVersus: t.modeVersus,
+              modeSolo: t.modeSolo,
+              stakeLabel: t.stakeLabel,
+              feeLabel: t.feeLabel,
+              clockLabel: t.clockLabel,
+              clockNote: t.clockNote,
+              arcadeLibrary: t.arcadeLibrary,
+              createBtn: t.createBtn,
+            }}
+          />
         </div>
 
         <div className="panel rounded-[2rem] p-6 lg:p-8">
