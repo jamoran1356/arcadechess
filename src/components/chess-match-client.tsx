@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
@@ -25,6 +25,7 @@ type MatchClientProps = {
     stakeAmount: string;
     stakeToken: string;
     isSolo?: boolean;
+    winner?: { id: string; name: string } | null;
     moveHistory: string[];
     host: { id: string; name: string };
     guest: { id: string; name: string } | null;
@@ -64,12 +65,16 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [turnStartedAt, setTurnStartedAt] = useState<string | null>(match.turnStartedAt);
   const [moveHistory, setMoveHistory] = useState(match.moveHistory);
   const [guest, setGuest] = useState(match.guest);
+  const [winnerId, setWinnerId] = useState<string | null>(match.winner?.id ?? null);
   const [pendingDuel, setPendingDuel] = useState<PendingDuelState | null>(match.pendingDuel);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [timeoutMessage, setTimeoutMessage] = useState<string | null>(null);
   const [isResigning, startResignTransition] = useTransition();
   const [showResignDialog, setShowResignDialog] = useState(false);
+  const [showWinDialog, setShowWinDialog] = useState(false);
+  const [winDialogText, setWinDialogText] = useState("Ganaste la partida.");
+  const previousStatusRef = useRef(status);
 
   const syncMatchState = useCallback(async () => {
     const response = await fetch(`/api/matches/${match.id}/state`, { cache: "no-store" });
@@ -87,7 +92,8 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     setBlackClockMs(data.blackClockMs);
     setTurnStartedAt(data.turnStartedAt);
     setGuest(data.guest ?? null);
-    setPendingDuel(data.pendingDuel ?? null);
+    setWinnerId(data.winner?.id ?? null);
+    setPendingDuel(data.status === "ARCADE_PENDING" ? (data.pendingDuel ?? null) : null);
   }, [ch.moveError, match.id]);
 
   const isActiveParticipant =
@@ -110,8 +116,28 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     setTurnStartedAt(match.turnStartedAt);
     setMoveHistory(match.moveHistory);
     setGuest(match.guest);
+    setWinnerId(match.winner?.id ?? null);
     setPendingDuel(match.pendingDuel ?? null);
   }, [match]);
+
+  useEffect(() => {
+    const wasFinished = previousStatusRef.current === "FINISHED";
+    const justFinished = !wasFinished && status === "FINISHED";
+
+    if (justFinished && currentUserId && winnerId === currentUserId) {
+      const lastEvent = moveHistory[moveHistory.length - 1] ?? "";
+      if (lastEvent.includes("[resign]")) {
+        setWinDialogText("Tu oponente se rindió. Ganaste la partida.");
+      } else if (lastEvent.includes("timeout")) {
+        setWinDialogText("Ganaste por tiempo. El reloj del rival llegó a 0.");
+      } else {
+        setWinDialogText("Ganaste la partida.");
+      }
+      setShowWinDialog(true);
+    }
+
+    previousStatusRef.current = status;
+  }, [currentUserId, moveHistory, status, winnerId]);
 
   const isMyTurn =
     (match.viewerRole === "host" && turn === "w") ||
@@ -120,7 +146,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const canMove = Boolean(
     currentUserId &&
       (guest || match.isSolo) &&
-      pendingDuel === null &&
+      status !== "ARCADE_PENDING" &&
       status !== "OPEN" &&
       status !== "FINISHED" &&
       isMyTurn,
@@ -415,6 +441,16 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
         isBusy={isResigning}
         onClose={() => setShowResignDialog(false)}
         onConfirm={handleResign}
+      />
+
+      <DialogModal
+        open={showWinDialog}
+        title="Victoria"
+        description={winDialogText}
+        tone="success"
+        confirmLabel="Entendido"
+        hideCancel
+        onClose={() => setShowWinDialog(false)}
       />
     </div>
   );

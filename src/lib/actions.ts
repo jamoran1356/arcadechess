@@ -34,6 +34,13 @@ function defaultWalletAddress(network: TransactionNetwork, userId: string) {
   return `${network.toLowerCase()}_${userId}`;
 }
 
+function generateMatchTitle(network: TransactionNetwork, isSolo: boolean) {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  return `${isSolo ? "Solo" : "Versus"} ${network} ${hh}:${mm}`;
+}
+
 const DEMO_AUTO_TOPUP_AMOUNT = Number(process.env.DEMO_AUTO_TOPUP_AMOUNT ?? "25");
 
 async function getOrCreateWalletForNetwork(userId: string, network: TransactionNetwork) {
@@ -177,8 +184,6 @@ export async function createMatchAction(formData: FormData) {
   const currentUser = await resolveSessionUser(session);
   const isSolo = parseBoolean(formData.get("isSolo"));
   const parsed = createMatchSchema.safeParse({
-    title: formData.get("title"),
-    theme: formData.get("theme"),
     stakeAmount: formData.get("stakeAmount"),
     entryFee: formData.get("entryFee"),
     gameClockMinutes: formData.get("gameClockMinutes"),
@@ -210,8 +215,10 @@ export async function createMatchAction(formData: FormData) {
   const match = await prisma.match.create({
     data: {
       id: matchId,
-      title: parsed.data.title,
-      theme: parsed.data.theme,
+      title: generateMatchTitle(parsed.data.network, isSolo),
+      theme: isSolo
+        ? "Partida rápida en solitario"
+        : "Partida rápida contra rival",
       stakeAmount: parsed.data.stakeAmount.toFixed(6),
       entryFee: effectiveEntryFee.toFixed(6),
       stakeToken: parsed.data.stakeToken.toUpperCase(),
@@ -553,7 +560,7 @@ export async function resignMatchAction(formData: FormData) {
 
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { id: true, hostId: true, guestId: true, status: true },
+    select: { id: true, hostId: true, guestId: true, status: true, moveHistory: true },
   });
 
   if (!match) {
@@ -583,6 +590,10 @@ export async function resignMatchAction(formData: FormData) {
     data: {
       status: MatchStatus.FINISHED,
       winnerId: opponentId ?? null,
+      moveHistory: [
+        ...(Array.isArray(match.moveHistory) ? match.moveHistory.map(String) : []),
+        `${session.name} [resign]`,
+      ],
     },
   });
 

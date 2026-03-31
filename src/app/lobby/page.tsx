@@ -51,8 +51,6 @@ export default async function LobbyPage({
                 {t.modeSolo}
               </label>
             </div>
-            <input name="title" className="input" placeholder={t.matchName} required />
-            <textarea name="theme" className="input min-h-28" placeholder={t.themePlaceholder} required />
             <div className="grid gap-4 sm:grid-cols-4">
               <input name="stakeAmount" type="number" min="0" step="0.01" className="input" placeholder={t.stakeLabel} required />
               <input name="entryFee" type="number" min="0" step="0.01" className="input" placeholder={t.feeLabel} defaultValue="0" required />

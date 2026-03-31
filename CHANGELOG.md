@@ -42,6 +42,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Clock timeout hard-close** — match state endpoint now triggers backend timeout resolution (`syncMatchTimeoutIfNeeded`) so games close immediately at 0 without waiting for a user move.
 - **Duel resolution guarantee** — participation monitor now resolves arcade duels by score when both players entered but one/both did not submit in time, defaulting missing score to 0 and always producing a winner.
 - **First move visibility fix** — match client now syncs `guest` and board state from `/api/matches/[id]/state`, removing the need for manual refresh when opponent joins/moves first.
+- **Quick match creation UX** — creating a match no longer asks for title or description; backend auto-generates title and default theme so users only set gameplay essentials.
+- **Bet eligibility clarity** — match sidebar now lists exact reasons why betting is blocked (not spectator, no rival yet, betting phase closed, already bet, etc.).
+- **Opponent resignation win modal** — when a player resigns, opponent now receives a victory dialog in match client; resign event is recorded in `moveHistory` as `[resign]` marker.
+- **Post-duel freeze guard** — match client now clears stale `pendingDuel` unless status remains `ARCADE_PENDING`, and move enablement relies on `status + turn` to prevent frozen turns after duel resolution.
 
 ### Changed
 

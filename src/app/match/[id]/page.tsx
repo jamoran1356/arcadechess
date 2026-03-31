@@ -46,6 +46,23 @@ export default async function MatchPage({ params }: MatchPageProps) {
       !match.betting.viewerBet,
   );
 
+  const betBlockReasons: string[] = [];
+  if (!session) {
+    betBlockReasons.push("Debes iniciar sesión para apostar.");
+  }
+  if (match.viewerRole !== "spectator") {
+    betBlockReasons.push("Los jugadores de la partida no pueden apostar en su propia mesa.");
+  }
+  if (!match.guest) {
+    betBlockReasons.push("Aún no hay rival; las apuestas se habilitan cuando la partida está completa.");
+  }
+  if (!match.betting.isOpen) {
+    betBlockReasons.push("La partida no está en fase de apuestas (solo aplica en IN_PROGRESS / ARCADE_PENDING).");
+  }
+  if (match.betting.viewerBet) {
+    betBlockReasons.push("Ya realizaste una apuesta en esta partida.");
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -154,7 +171,16 @@ export default async function MatchPage({ params }: MatchPageProps) {
                 <p className="text-xs leading-6 text-slate-400">{t.betHint}</p>
               </form>
             ) : (
-              <p className="mt-4 text-sm leading-7 text-slate-300">{t.betClosed}</p>
+              <div className="mt-4 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+                <p>{t.betClosed}</p>
+                {betBlockReasons.length > 0 ? (
+                  <ul className="list-disc space-y-1 pl-5 text-xs text-slate-400">
+                    {betBlockReasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
             )}
           </aside>
         </section>
