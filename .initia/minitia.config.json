@@ -1,0 +1,52 @@
+{
+  "l1_config": {
+    "chain_id": "initiation-2",
+    "rpc_url": "https://rpc.testnet.initia.xyz",
+    "gas_prices": "0.15uinit"
+  },
+  "l2_config": {
+    "chain_id": "arcadechess-1",
+    "denom": "umin",
+    "moniker": "operator",
+    "bridge_id": 1
+  },
+  "op_bridge": {
+    "output_submission_interval": "1m",
+    "output_finalization_period": "168h",
+    "output_submission_start_height": 1,
+    "batch_submission_target": "INITIA",
+    "enable_oracle": true
+  },
+  "system_keys": {
+    "validator": {
+      "l1_address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "l2_address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "mnemonic": "logic reduce now style bracket buzz zebra copy clutch exchange exclude kiwi lady apple subject bacon puppy duty stomach sock direct apple trouble tomato"
+    },
+    "bridge_executor": {
+      "l1_address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "l2_address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "mnemonic": "logic reduce now style bracket buzz zebra copy clutch exchange exclude kiwi lady apple subject bacon puppy duty stomach sock direct apple trouble tomato"
+    },
+    "output_submitter": {
+      "l1_address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "l2_address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "mnemonic": "logic reduce now style bracket buzz zebra copy clutch exchange exclude kiwi lady apple subject bacon puppy duty stomach sock direct apple trouble tomato"
+    },
+    "batch_submitter": {
+      "da_address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "mnemonic": "logic reduce now style bracket buzz zebra copy clutch exchange exclude kiwi lady apple subject bacon puppy duty stomach sock direct apple trouble tomato"
+    },
+    "challenger": {
+      "l1_address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "l2_address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "mnemonic": "logic reduce now style bracket buzz zebra copy clutch exchange exclude kiwi lady apple subject bacon puppy duty stomach sock direct apple trouble tomato"
+    }
+  },
+  "genesis_accounts": [
+    {
+      "address": "init1hepzz6uxjfvjggjdueq003n9tg0tc8f3nuztj5",
+      "coins": "10000000000000000000umin"
+    }
+  ]
+}

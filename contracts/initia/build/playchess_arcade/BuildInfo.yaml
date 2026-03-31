@@ -1,0 +1,36 @@
+---
+compiled_package_info:
+  package_name: playchess_arcade
+  address_alias_instantiation:
+    playchess: 000000000000000000000000be42216b86925924224de640f7c6655a1ebc1d31
+    std: "0000000000000000000000000000000000000000000000000000000000000001"
+  source_digest: 0D4D6E91BA0D9E314570B7655EB6ED0FA60A04B5E5812CC4BF32A97D0EEC8AD8
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: false
+    generate_abis: false
+    generate_move_model: true
+    full_model_generation: false
+    install_dir: "."
+    force_recompilation: false
+    additional_named_addresses: {}
+    architecture: ~
+    fetch_deps_only: false
+    skip_fetch_latest_git_deps: false
+    compiler_config:
+      bytecode_version: ~
+      known_attributes:
+        - bytecode_instruction
+        - deprecated
+        - event
+        - expected_failure
+        - native_interface
+        - test
+        - test_only
+        - verify_only
+        - view
+      skip_attribute_checks: false
+      compiler_version: ~
+dependencies:
+  - MoveStdlib

@@ -1,0 +1,2 @@
+reduce: -c: line 1: unexpected EOF while looking for matching `"'
+reduce: -c: line 2: syntax error: unexpected end of file

@@ -27,7 +27,7 @@ export function getSupportedNetworks() {
       status: process.env.INITIA_RPC_URL ? "Configurado" : "Mock listo para conectar con weave/minitiad",
       contractAddress: initiaContract,
       explorerUrl: initiaContract
-        ? `https://scan.initia.xyz/${initiaChainId}/accounts/${initiaContract}`
+        ? `https://scan.testnet.initia.xyz/${initiaChainId}/accounts/${initiaContract}`
         : null,
     },
     {
