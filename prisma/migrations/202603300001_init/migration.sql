@@ -102,7 +102,9 @@ CREATE TABLE "MatchBet" (
     "metadata" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "settledAt" TIMESTAMP(3),
-
+    "whiteClockMs" INTEGER NOT NULL DEFAULT 300000,
+    "blackClockMs" INTEGER NOT NULL DEFAULT 300000,
+    "turnStartedAt" TIMESTAMP(3),
     CONSTRAINT "MatchBet_pkey" PRIMARY KEY ("id")
 );
 
@@ -124,6 +126,21 @@ CREATE TABLE "ArcadeDuel" (
     "resolvedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
+
+-- CreateTable
+CREATE TABLE "PlatformConfig" (
+    "id" TEXT NOT NULL,
+    "key" TEXT NOT NULL DEFAULT 'default',
+    "matchFeeBps" INTEGER NOT NULL DEFAULT 500,
+    "betFeeBps" INTEGER NOT NULL DEFAULT 300,
+    "arcadeFeeFixed" DECIMAL(18,6) NOT NULL DEFAULT 0.050000,
+    "minEntryFee" DECIMAL(18,6) NOT NULL DEFAULT 0.050000,
+    "notes" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "PlatformConfig_pkey" PRIMARY KEY ("id")
+);
     CONSTRAINT "ArcadeDuel_pkey" PRIMARY KEY ("id")
 );
 
@@ -166,6 +183,9 @@ CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Wallet_network_address_key" ON "Wallet"("network", "address");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PlatformConfig_key_key" ON "PlatformConfig"("key");
 
 -- CreateIndex
 CREATE INDEX "Match_status_idx" ON "Match"("status");
@@ -220,5 +240,33 @@ ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_userId_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_matchId_fkey" FOREIGN KEY ("matchId") REFERENCES "Match"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- Seed singleton platform config
+INSERT INTO "PlatformConfig" ("id", "key", "matchFeeBps", "betFeeBps", "arcadeFeeFixed", "minEntryFee", "isActive", "updatedAt")
+VALUES ('platform-config-default', 'default', 500, 300, 0.050000, 0.050000, true, CURRENT_TIMESTAMP)
+ON CONFLICT ("key") DO NOTHING;
+
+-- Seed default admin account
+INSERT INTO "User" (
+    "id",
+    "name",
+    "email",
+    "passwordHash",
+    "role",
+    "rating",
+    "createdAt",
+    "updatedAt"
+)
+VALUES (
+    'admin_seed_playchess',
+    'PlayChess Admin',
+    'admin@playchess.gg',
+    '$2b$10$ADhHWcFYo0rwCd1qRhJwsef8Fs9CSa8gIpOCI80fltMSpUwYClsnS',
+    'ADMIN'::"UserRole",
+    1200,
+    NOW(),
+    NOW()
+)
+ON CONFLICT ("email") DO NOTHING;
 
 

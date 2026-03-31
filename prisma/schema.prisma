@@ -88,6 +88,19 @@ model Plan {
   updatedAt   DateTime @updatedAt
 }
 
+model PlatformConfig {
+  id             String   @id @default(cuid())
+  key            String   @unique @default("default")
+  matchFeeBps    Int      @default(500)
+  betFeeBps      Int      @default(300)
+  arcadeFeeFixed Decimal  @db.Decimal(18, 6) @default(0.050000)
+  minEntryFee    Decimal  @db.Decimal(18, 6) @default(0.050000)
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 model Match {
   id               String             @id @default(cuid())
   title            String
@@ -103,6 +116,9 @@ model Match {
   arcadeGamePool   Json
   isSolo           Boolean            @default(false)
   gameClockMs      Int                @default(300000)
+  whiteClockMs     Int                @default(300000)
+  blackClockMs     Int                @default(300000)
+  turnStartedAt    DateTime?
   status           MatchStatus        @default(OPEN)
   hostId           String
   guestId          String?

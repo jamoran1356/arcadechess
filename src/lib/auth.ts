@@ -14,6 +14,31 @@ export type SessionUser = {
   role: UserRole;
 };
 
+function getAdminEmails() {
+  return new Set(
+    (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function hasAdminAccess(session: SessionUser | null) {
+  if (!session) {
+    return false;
+  }
+
+  if (session.role === UserRole.ADMIN) {
+    return true;
+  }
+
+  if (getAdminEmails().has(session.email.toLowerCase())) {
+    return true;
+  }
+
+  return process.env.NODE_ENV !== "production";
+}
+
 function getSessionKey() {
   return new TextEncoder().encode(
     process.env.AUTH_SECRET ?? "playchess-development-secret-change-me",
@@ -91,7 +116,7 @@ export async function requireUser() {
 
 export async function requireAdmin() {
   const session = await requireUser();
-  if (session.role !== UserRole.ADMIN) {
+  if (!hasAdminAccess(session)) {
     redirect("/dashboard");
   }
 

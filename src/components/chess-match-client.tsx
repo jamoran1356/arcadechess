@@ -1,6 +1,6 @@
 'use client';
 
-import { startTransition, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
@@ -15,6 +15,10 @@ type MatchClientProps = {
     fen: string;
     turn: string;
     status: string;
+    gameClockMs: number;
+    whiteClockMs: number;
+    blackClockMs: number;
+    turnStartedAt: string | null;
     stakeAmount: string;
     stakeToken: string;
     isSolo?: boolean;
@@ -48,9 +52,22 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [fen, setFen] = useState(match.fen);
   const [turn, setTurn] = useState(match.turn);
   const [status, setStatus] = useState(match.status);
+  const [whiteClockMs, setWhiteClockMs] = useState(match.whiteClockMs);
+  const [blackClockMs, setBlackClockMs] = useState(match.blackClockMs);
+  const [turnStartedAt, setTurnStartedAt] = useState<string | null>(match.turnStartedAt);
   const [moveHistory, setMoveHistory] = useState(match.moveHistory);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+
+  useEffect(() => {
+    setFen(match.fen);
+    setTurn(match.turn);
+    setStatus(match.status);
+    setWhiteClockMs(match.whiteClockMs);
+    setBlackClockMs(match.blackClockMs);
+    setTurnStartedAt(match.turnStartedAt);
+    setMoveHistory(match.moveHistory);
+  }, [match]);
 
   const isMyTurn =
     (match.viewerRole === "host" && turn === "w") ||
@@ -71,6 +88,55 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     }
     return "white" as const;
   }, [match.viewerRole]);
+
+  const [displayClocks, setDisplayClocks] = useState({
+    white: match.whiteClockMs,
+    black: match.blackClockMs,
+  });
+
+  useEffect(() => {
+    const tick = () => {
+      const nextWhite = whiteClockMs;
+      const nextBlack = blackClockMs;
+
+      if (status !== "IN_PROGRESS" || !turnStartedAt) {
+        setDisplayClocks({ white: nextWhite, black: nextBlack });
+        return;
+      }
+
+      const elapsed = Math.max(0, Date.now() - new Date(turnStartedAt).getTime());
+
+      if (turn === "w") {
+        setDisplayClocks({
+          white: Math.max(0, nextWhite - elapsed),
+          black: nextBlack,
+        });
+        return;
+      }
+
+      setDisplayClocks({
+        white: nextWhite,
+        black: Math.max(0, nextBlack - elapsed),
+      });
+    };
+
+    tick();
+    const intervalId = window.setInterval(tick, 250);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [blackClockMs, status, turn, turnStartedAt, whiteClockMs]);
+
+  const activeTurnClockMs = turn === "w" ? displayClocks.white : displayClocks.black;
+  const totalRemainingClockMs = displayClocks.white + displayClocks.black;
+
+  function formatClock(clockMs: number) {
+    const totalSeconds = Math.max(0, Math.ceil(clockMs / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  }
 
   function onPieceDrop(sourceSquare: string, targetSquare: string) {
     if (!canMove || isPending) {
@@ -101,6 +167,9 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
           setTurn(data.turn);
           setStatus(data.status);
           setMoveHistory(data.moveHistory);
+          setWhiteClockMs(data.whiteClockMs);
+          setBlackClockMs(data.blackClockMs);
+          setTurnStartedAt(data.turnStartedAt);
           if (data.refresh) {
             router.refresh();
           }
@@ -127,6 +196,25 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
           <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-200">
             {turn === "w" ? ch.turnWhite : ch.turnBlack}
           </span>
+        </div>
+
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-[1.5rem] border border-cyan-400/20 bg-cyan-400/10 p-4">
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-100/70">{ch.totalClockLabel}</p>
+            <p className="mt-2 text-2xl font-semibold text-cyan-100">{formatClock(totalRemainingClockMs)}</p>
+          </div>
+          <div className="rounded-[1.5rem] border border-amber-400/20 bg-amber-400/10 p-4">
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-amber-100/70">{ch.activeClockLabel}</p>
+            <p className="mt-2 text-2xl font-semibold text-amber-100">{formatClock(activeTurnClockMs)}</p>
+          </div>
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{ch.whiteClockLabel}</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{formatClock(displayClocks.white)}</p>
+          </div>
+          <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{ch.blackClockLabel}</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{formatClock(displayClocks.black)}</p>
+          </div>
         </div>
 
         <div className="rounded-[1.75rem] border border-white/10 bg-slate-950/85 p-3">

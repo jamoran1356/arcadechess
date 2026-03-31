@@ -3,6 +3,7 @@ import { Prisma, TransactionStatus, UserRole } from "@prisma/client";
 import { buildArcadeScenario, getArcadeDefinition, arcadeLibrary } from "@/lib/arcade";
 import { prisma } from "@/lib/db";
 import { getSupportedNetworks } from "@/lib/onchain/service";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 const AUTO_SOLO_TARGET = 4;
 const AUTO_SOLO_EMAIL = "arena-bot@playchess.local";
@@ -54,6 +55,9 @@ async function ensureAutoSoloMatches() {
         arcadeGamePool: ["TARGET_RUSH", "MEMORY_GRID"],
         isSolo: true,
         gameClockMs: preset.clock,
+          whiteClockMs: preset.clock,
+          blackClockMs: preset.clock,
+          turnStartedAt: null,
         status: "OPEN",
         hostId: bot.id,
       },
@@ -247,7 +251,8 @@ export async function getAdminActivitySnapshot() {
 }
 
 export async function getAdminRevenueSnapshot() {
-  const [settled, pending, failed, byNetwork] = await Promise.all([
+  const [platformConfig, settled, pending, failed, byNetwork, matches, bets] = await Promise.all([
+    getPlatformConfig(),
     prisma.transaction.aggregate({
       where: { status: TransactionStatus.SETTLED },
       _sum: { amount: true },
@@ -268,9 +273,38 @@ export async function getAdminRevenueSnapshot() {
       _sum: { amount: true },
       _count: true,
     }),
+    prisma.match.findMany({
+      select: { stakeAmount: true, entryFee: true, guestId: true, isSolo: true },
+    }),
+    prisma.matchBet.findMany({
+      select: { metadata: true },
+    }),
   ]);
 
+  const capturedMatchFees = matches.reduce((sum, match) => {
+    const participantCount = match.guestId ? 2 : match.isSolo ? 1 : 1;
+    return sum + Number(match.entryFee.toString()) * participantCount;
+  }, 0);
+
+  const capturedBetFees = bets.reduce((sum, bet) => {
+    if (!bet.metadata || typeof bet.metadata !== "object" || Array.isArray(bet.metadata)) {
+      return sum;
+    }
+
+    const maybeFee = (bet.metadata as Record<string, unknown>).platformFeeAmount;
+    const feeAmount = Number(maybeFee ?? 0);
+    return sum + (Number.isFinite(feeAmount) ? feeAmount : 0);
+  }, 0);
+
   return {
+    config: {
+      matchFeeBps: platformConfig.matchFeeBps,
+      betFeeBps: platformConfig.betFeeBps,
+      arcadeFeeFixed: platformConfig.arcadeFeeFixed.toString(),
+      minEntryFee: platformConfig.minEntryFee.toString(),
+      isActive: platformConfig.isActive,
+      notes: platformConfig.notes ?? "",
+    },
     settled: {
       amount: settled._sum.amount?.toString() ?? "0",
       count: settled._count,
@@ -288,6 +322,11 @@ export async function getAdminRevenueSnapshot() {
       amount: item._sum.amount?.toString() ?? "0",
       count: item._count,
     })),
+    feeCapture: {
+      matchFees: capturedMatchFees.toFixed(6),
+      betFees: capturedBetFees.toFixed(6),
+      total: (capturedMatchFees + capturedBetFees).toFixed(6),
+    },
   };
 }
 
@@ -365,6 +404,9 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
     entryFee: decimalToString(match.entryFee),
     stakeToken: match.stakeToken,
     gameClockMs: match.gameClockMs,
+    whiteClockMs: match.whiteClockMs,
+    blackClockMs: match.blackClockMs,
+    turnStartedAt: match.turnStartedAt?.toISOString() ?? null,
     host: match.host,
     guest: match.guest,
     winner: match.winner,
@@ -407,7 +449,7 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
           attackerId: pendingDuel.attackerId,
           defenderId: pendingDuel.defenderId,
           attackerName: pendingDuel.attacker.name,
-          defenderName: pendingDuel.defender.name,
+          defenderName: match.isSolo ? "Arena Bot" : pendingDuel.defender.name,
           gameType: pendingDuel.gameType,
           game: getArcadeDefinition(pendingDuel.gameType),
           seed: pendingDuel.seed,

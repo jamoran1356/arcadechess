@@ -6,9 +6,10 @@ import { MatchStatus, TransactionStatus, TransactionType, TransactionNetwork, Us
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { createSession, clearSession, hashPassword, requireUser, verifyPassword } from "@/lib/auth";
+import { createSession, clearSession, hashPassword, hasAdminAccess, requireUser, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOnchainAdapter } from "@/lib/onchain/service";
+import { calculateMatchEntryFee, getPlatformConfig } from "@/lib/platform-config";
 import { createMatchSchema, FormState, loginSchema, placeBetSchema, registerSchema } from "@/lib/validators";
 
 function parseBoolean(input: FormDataEntryValue | null | undefined) {
@@ -190,10 +191,14 @@ export async function createMatchAction(formData: FormData) {
     throw new Error(Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] ?? "No se pudo crear la partida.");
   }
 
+  const platformConfig = await getPlatformConfig();
+  const computedEntryFee = calculateMatchEntryFee(parsed.data.stakeAmount, platformConfig);
+  const effectiveEntryFee = Math.max(parsed.data.entryFee, computedEntryFee);
+
   const { autoFunded: hostAutoFunded } = await ensurePlayableWallet(currentUser.id, parsed.data.network);
 
   const matchId = randomUUID();
-  const hostTotalLock = (parsed.data.stakeAmount + parsed.data.entryFee).toFixed(6);
+  const hostTotalLock = (parsed.data.stakeAmount + effectiveEntryFee).toFixed(6);
   const adapter = getOnchainAdapter(parsed.data.network);
   const receipt = await adapter.createEscrow({
     matchId,
@@ -208,10 +213,13 @@ export async function createMatchAction(formData: FormData) {
       title: parsed.data.title,
       theme: parsed.data.theme,
       stakeAmount: parsed.data.stakeAmount.toFixed(6),
-      entryFee: parsed.data.entryFee.toFixed(6),
+      entryFee: effectiveEntryFee.toFixed(6),
       stakeToken: parsed.data.stakeToken.toUpperCase(),
       preferredNetwork: parsed.data.network,
       gameClockMs: parsed.data.gameClockMinutes * 60_000,
+      whiteClockMs: parsed.data.gameClockMinutes * 60_000,
+      blackClockMs: parsed.data.gameClockMinutes * 60_000,
+      turnStartedAt: isSolo ? new Date() : null,
       fen: new Chess().fen(),
       moveHistory: [],
         arcadeGamePool: parsed.data.arcadeGamePool.length > 0 ? parsed.data.arcadeGamePool : (await prisma.arcadeGame.findMany({ where: { isEnabled: true }, select: { gameType: true } })).map(g => g.gameType),
@@ -235,7 +243,13 @@ export async function createMatchAction(formData: FormData) {
         description: receipt.description,
         mode: receipt.mode,
         stakeAmount: parsed.data.stakeAmount.toFixed(6),
-        entryFee: parsed.data.entryFee.toFixed(6),
+        entryFee: effectiveEntryFee.toFixed(6),
+        feePolicy: {
+          matchFeeBps: platformConfig.matchFeeBps,
+          betFeeBps: platformConfig.betFeeBps,
+          arcadeFeeFixed: platformConfig.arcadeFeeFixed.toString(),
+          minEntryFee: platformConfig.minEntryFee.toString(),
+        },
         autoFundedWallet: hostAutoFunded,
       },
     },
@@ -273,6 +287,9 @@ export async function joinMatchAction(formData: FormData) {
       data: {
         guestId: currentUser.id,
         status: MatchStatus.IN_PROGRESS,
+        whiteClockMs: match.gameClockMs,
+        blackClockMs: match.gameClockMs,
+        turnStartedAt: new Date(),
       },
     }),
     prisma.transaction.create({
@@ -339,6 +356,9 @@ export async function startSoloMatchAction(formData: FormData) {
       data: {
         hostId: currentUser.id,
         status: MatchStatus.IN_PROGRESS,
+        whiteClockMs: match.gameClockMs,
+        blackClockMs: match.gameClockMs,
+        turnStartedAt: new Date(),
       },
     });
 
@@ -474,7 +494,7 @@ export async function placeMatchBetAction(formData: FormData) {
 
 export async function updateUserAction(formData: FormData) {
   const session = await requireUser();
-  if (session.role !== "ADMIN") throw new Error("Unauthorized");
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
   const userId = String(formData.get("userId") ?? "");
   const role = String(formData.get("role") ?? "USER");
 
@@ -493,7 +513,7 @@ export async function updateUserAction(formData: FormData) {
 
 export async function deleteUserAction(formData: FormData) {
   const session = await requireUser();
-  if (session.role !== "ADMIN") throw new Error("Unauthorized");
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
   const userId = String(formData.get("userId") ?? "");
   if (!userId) {
     throw new Error("Usuario invalido.");
@@ -506,7 +526,7 @@ export async function deleteUserAction(formData: FormData) {
 
 export async function updateTransactionAction(formData: FormData) {
   const session = await requireUser();
-  if (session.role !== "ADMIN") throw new Error("Unauthorized");
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
   const transactionId = String(formData.get("transactionId") ?? "");
   const status = String(formData.get("status") ?? "PENDING");
 
@@ -525,7 +545,7 @@ export async function updateTransactionAction(formData: FormData) {
 
 export async function updateMatchStatusAction(formData: FormData) {
   const session = await requireUser();
-  if (session.role !== "ADMIN") throw new Error("Unauthorized");
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
   const matchId = String(formData.get("matchId") ?? "");
   const status = String(formData.get("status") ?? MatchStatus.OPEN);
 
@@ -544,7 +564,7 @@ export async function updateMatchStatusAction(formData: FormData) {
 
 export async function updateWalletNetworkAction(formData: FormData) {
   const session = await requireUser();
-  if (session.role !== "ADMIN") throw new Error("Unauthorized");
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
   const walletId = String(formData.get("walletId") ?? "");
   const network = String(formData.get("network") ?? TransactionNetwork.INITIA);
   const balance = parseDecimal(formData.get("balance"), "0");
@@ -567,7 +587,7 @@ export async function updateWalletNetworkAction(formData: FormData) {
 
 export async function upsertPlanAction(formData: FormData) {
   const session = await requireUser();
-  if (session.role !== "ADMIN") throw new Error("Unauthorized");
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
   const planId = String(formData.get("planId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -614,7 +634,7 @@ export async function upsertPlanAction(formData: FormData) {
 
 export async function deletePlanAction(formData: FormData) {
   const session = await requireUser();
-  if (session.role !== "ADMIN") throw new Error("Unauthorized");
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
   const planId = String(formData.get("planId") ?? "");
   if (!planId) {
     throw new Error("Plan invalido.");
@@ -623,6 +643,42 @@ export async function deletePlanAction(formData: FormData) {
   await prisma.plan.delete({ where: { id: planId } });
   revalidatePath("/admin");
   revalidatePath("/admin/planes");
+}
+
+export async function upsertPlatformConfigAction(formData: FormData) {
+  const session = await requireUser();
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
+
+  const matchFeeBps = Math.max(0, Math.min(10_000, Number(formData.get("matchFeeBps") ?? 0)));
+  const betFeeBps = Math.max(0, Math.min(10_000, Number(formData.get("betFeeBps") ?? 0)));
+  const arcadeFeeFixed = parseDecimal(formData.get("arcadeFeeFixed"), "0");
+  const minEntryFee = parseDecimal(formData.get("minEntryFee"), "0");
+  const isActive = parseBoolean(formData.get("isActive"));
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  await prisma.platformConfig.upsert({
+    where: { key: "default" },
+    update: {
+      matchFeeBps,
+      betFeeBps,
+      arcadeFeeFixed,
+      minEntryFee,
+      isActive,
+      notes,
+    },
+    create: {
+      key: "default",
+      matchFeeBps,
+      betFeeBps,
+      arcadeFeeFixed,
+      minEntryFee,
+      isActive,
+      notes,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/ingresos");
 }
 
 export async function setLocaleAction(locale: string) {

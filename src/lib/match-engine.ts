@@ -10,6 +10,7 @@ import {
 import { evaluateArcadeAttempt, type ArcadeAttempt } from "@/lib/arcade";
 import { prisma } from "@/lib/db";
 import { getOnchainAdapter } from "@/lib/onchain/service";
+import { getPlatformConfig } from "@/lib/platform-config";
 
 type MoveInput = {
   from: string;
@@ -33,6 +34,108 @@ function asMoveHistory(value: Prisma.JsonValue | null | undefined) {
 
 function flipTurn(turn: string) {
   return turn === "w" ? "b" : "w";
+}
+
+function clampClock(clockMs: number) {
+  return Math.max(0, Math.round(clockMs));
+}
+
+function consumeActiveTurnClock(match: {
+  status: MatchStatus;
+  turn: string;
+  turnStartedAt: Date | null;
+  whiteClockMs: number;
+  blackClockMs: number;
+}) {
+  if (match.status !== MatchStatus.IN_PROGRESS || !match.turnStartedAt) {
+    return {
+      whiteClockMs: match.whiteClockMs,
+      blackClockMs: match.blackClockMs,
+    };
+  }
+
+  const elapsedMs = Math.max(0, Date.now() - match.turnStartedAt.getTime());
+
+  if (match.turn === "w") {
+    return {
+      whiteClockMs: clampClock(match.whiteClockMs - elapsedMs),
+      blackClockMs: match.blackClockMs,
+    };
+  }
+
+  return {
+    whiteClockMs: match.whiteClockMs,
+    blackClockMs: clampClock(match.blackClockMs - elapsedMs),
+  };
+}
+
+function buildSoloDefenderScore(gameType: ArcadeGameType, seed: string) {
+  let hash = 0;
+  const input = `${gameType}:${seed}:solo-bot`;
+
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash * 31 + input.charCodeAt(index)) >>> 0;
+  }
+
+  const normalized = (hash % 1000) / 1000;
+
+  switch (gameType) {
+    case ArcadeGameType.TARGET_RUSH:
+      return Math.round(3400 + normalized * 4200);
+    case ArcadeGameType.MEMORY_GRID:
+      return Math.round(1800 + normalized * 2600);
+    case ArcadeGameType.KEY_CLASH:
+      return Math.round(2200 + normalized * 2400);
+    default:
+      return Math.round(2500 + normalized * 2500);
+  }
+}
+
+type MatchProgressState = {
+  fen: string;
+  turn: string;
+  status: MatchStatus;
+  winnerId: string | null;
+  moveHistory: string[];
+  whiteClockMs: number;
+  blackClockMs: number;
+  turnStartedAt: Date | null;
+};
+
+function advanceSoloBotTurn(state: MatchProgressState) {
+  if (state.status === MatchStatus.FINISHED || state.turn !== "b") {
+    return state;
+  }
+
+  const botChess = new Chess(state.fen);
+  const botMoves = botChess.moves({ verbose: true });
+  const botMove = botMoves[Math.floor(Math.random() * botMoves.length)];
+
+  if (!botMove) {
+    return {
+      ...state,
+      turnStartedAt: state.status === MatchStatus.IN_PROGRESS ? new Date() : null,
+    };
+  }
+
+  const appliedBot = botChess.move({
+    from: botMove.from,
+    to: botMove.to,
+    promotion: botMove.promotion,
+  });
+
+  const nextStatus = botChess.isGameOver() ? MatchStatus.FINISHED : MatchStatus.IN_PROGRESS;
+
+  return {
+    fen: botChess.fen(),
+    turn: botChess.turn(),
+    status: nextStatus,
+    winnerId: null,
+    moveHistory: [...state.moveHistory, `${appliedBot.san} [solo-bot]`],
+    whiteClockMs: state.whiteClockMs,
+    blackClockMs: state.blackClockMs,
+    turnStartedAt: nextStatus === MatchStatus.IN_PROGRESS ? new Date() : null,
+  };
 }
 
 function calculateSettlementAmounts(match: {
@@ -109,6 +212,8 @@ export async function settleSpectatorBets(
   network: "INITIA" | "FLOW" | "SOLANA",
   token: string,
 ) {
+  const platformConfig = await getPlatformConfig();
+  const betFeeRate = platformConfig.betFeeBps / 10_000;
   const bets = await prisma.matchBet.findMany({
     where: {
       matchId,
@@ -140,7 +245,8 @@ export async function settleSpectatorBets(
   for (const bet of winningBets) {
     const stake = Number(bet.amount.toString());
     const share = totalWinning > 0 ? (stake / totalWinning) * totalLosing : 0;
-    const payout = (stake + share).toFixed(6);
+    const feeAmount = share * betFeeRate;
+    const payout = (stake + share - feeAmount).toFixed(6);
     const receipt = await adapter.settleBet({
       matchId,
       bettorId: bet.userId,
@@ -162,6 +268,8 @@ export async function settleSpectatorBets(
             ...(bet.metadata && typeof bet.metadata === "object" ? bet.metadata as Prisma.InputJsonObject : {}),
             payoutMode: receipt.mode,
             payoutDescription: receipt.description,
+            platformFeeAmount: feeAmount.toFixed(6),
+            platformFeeBps: platformConfig.betFeeBps,
             winnerId,
           },
         },
@@ -181,6 +289,8 @@ export async function settleSpectatorBets(
             mode: receipt.mode,
             category: "spectator-bet-payout",
             predictedWinnerId: bet.predictedWinnerId,
+            platformFeeAmount: feeAmount.toFixed(6),
+            platformFeeBps: platformConfig.betFeeBps,
             winnerId,
           },
         },
@@ -253,6 +363,7 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
     const defenderId = (userId === match.hostId ? match.guestId : match.hostId) ?? userId;
     const gamePool = asGameTypes(match.arcadeGamePool);
     const gameType = gamePool[Math.floor(Math.random() * gamePool.length)] ?? ArcadeGameType.TARGET_RUSH;
+    const clocks = consumeActiveTurnClock(match);
 
     const duel = await prisma.$transaction(async (tx) => {
       const created = await tx.arcadeDuel.create({
@@ -273,7 +384,12 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
 
       await tx.match.update({
         where: { id: matchId },
-        data: { status: MatchStatus.ARCADE_PENDING },
+        data: {
+          status: MatchStatus.ARCADE_PENDING,
+          whiteClockMs: clocks.whiteClockMs,
+          blackClockMs: clocks.blackClockMs,
+          turnStartedAt: null,
+        },
       });
 
       return created;
@@ -292,81 +408,64 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
     promotion: moveInput.promotion,
   });
 
-  const moveHistory = [...asMoveHistory(match.moveHistory), appliedMove.san];
-  let winnerId: string | null = null;
-  let status: MatchStatus = MatchStatus.IN_PROGRESS;
+  const clocks = consumeActiveTurnClock(match);
+  let nextState: MatchProgressState = {
+    fen: chess.fen(),
+    turn: chess.turn(),
+    status: MatchStatus.IN_PROGRESS,
+    winnerId: null,
+    moveHistory: [...asMoveHistory(match.moveHistory), appliedMove.san],
+    whiteClockMs: clocks.whiteClockMs,
+    blackClockMs: clocks.blackClockMs,
+    turnStartedAt: new Date(),
+  };
 
   if (chess.isGameOver()) {
-    status = MatchStatus.FINISHED;
+    nextState = {
+      ...nextState,
+      status: MatchStatus.FINISHED,
+      turnStartedAt: null,
+    };
     if (chess.isCheckmate()) {
-      winnerId = userId;
+      nextState = {
+        ...nextState,
+        winnerId: userId,
+      };
     }
+  }
+
+  if (match.isSolo) {
+    nextState = advanceSoloBotTurn(nextState);
   }
 
   await prisma.match.update({
     where: { id: matchId },
     data: {
-      fen: chess.fen(),
-      turn: chess.turn(),
-      status,
-      winnerId,
-      moveHistory,
+      fen: nextState.fen,
+      turn: nextState.turn,
+      status: nextState.status,
+      winnerId: nextState.winnerId,
+      moveHistory: nextState.moveHistory,
+      whiteClockMs: nextState.whiteClockMs,
+      blackClockMs: nextState.blackClockMs,
+      turnStartedAt: nextState.turnStartedAt,
     },
   });
 
-  if (winnerId) {
-    await settleWinner(match, winnerId);
-  }
-
-  if (match.isSolo && status !== MatchStatus.FINISHED) {
-    const botChess = new Chess(chess.fen());
-    const botMoves = botChess.moves({ verbose: true });
-    const botMove = botMoves[Math.floor(Math.random() * botMoves.length)];
-
-    if (botMove) {
-      const appliedBot = botChess.move({
-        from: botMove.from,
-        to: botMove.to,
-        promotion: botMove.promotion,
-      });
-
-      const botHistory = [...moveHistory, `${appliedBot.san} [solo-bot]`];
-      let botStatus: MatchStatus = MatchStatus.IN_PROGRESS;
-      const botWinnerId: string | null = null;
-
-      if (botChess.isGameOver()) {
-        botStatus = MatchStatus.FINISHED;
-      }
-
-      await prisma.match.update({
-        where: { id: matchId },
-        data: {
-          fen: botChess.fen(),
-          turn: botChess.turn(),
-          status: botStatus,
-          winnerId: botWinnerId,
-          moveHistory: botHistory,
-        },
-      });
-
-      return {
-        pendingDuel: false,
-        fen: botChess.fen(),
-        turn: botChess.turn(),
-        status: botStatus,
-        moveHistory: botHistory,
-        refresh: botStatus === MatchStatus.FINISHED,
-      };
-    }
+  if (nextState.winnerId) {
+    await settleWinner(match, nextState.winnerId);
   }
 
   return {
     pendingDuel: false,
-    fen: chess.fen(),
-    turn: chess.turn(),
-    status,
-    moveHistory,
-    refresh: status === MatchStatus.FINISHED,
+    fen: nextState.fen,
+    turn: nextState.turn,
+    status: nextState.status,
+    moveHistory: nextState.moveHistory,
+    whiteClockMs: nextState.whiteClockMs,
+    blackClockMs: nextState.blackClockMs,
+    turnStartedAt: nextState.turnStartedAt?.toISOString() ?? null,
+    refresh: nextState.status === MatchStatus.FINISHED,
   };
 }
 
@@ -397,12 +496,22 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   const evaluation = evaluateArcadeAttempt(duel.gameType, duel.seed, attempt);
   const score = evaluation.valid ? Math.max(0, Math.round(evaluation.score)) : 0;
 
-  const updatedDuel = await prisma.arcadeDuel.update({
+  let updatedDuel = await prisma.arcadeDuel.update({
     where: { id: duelId },
     data: isAttacker
       ? { attackerScore: score, attackerEnteredAt: duel.attackerEnteredAt ?? new Date() }
       : { defenderScore: score, defenderEnteredAt: duel.defenderEnteredAt ?? new Date() },
   });
+
+  if (duel.match.isSolo && isAttacker && updatedDuel.defenderScore === null) {
+    updatedDuel = await prisma.arcadeDuel.update({
+      where: { id: duelId },
+      data: {
+        defenderScore: buildSoloDefenderScore(duel.gameType, duel.seed),
+        defenderEnteredAt: updatedDuel.defenderEnteredAt ?? new Date(),
+      },
+    });
+  }
 
   if (updatedDuel.attackerScore === null || updatedDuel.defenderScore === null) {
     return {
@@ -414,38 +523,75 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   }
 
   const attackerWins = updatedDuel.attackerScore > updatedDuel.defenderScore;
-  const duelWinnerId = attackerWins ? duel.attackerId : duel.defenderId;
+  const duelWinnerId = attackerWins ? duel.attackerId : duel.match.isSolo ? null : duel.defenderId;
   const match = duel.match;
   const moveHistory = asMoveHistory(match.moveHistory);
+  const boardMove = duel.boardMove as { from: string; to: string; promotion?: string | null; san: string };
 
   const result = await prisma.$transaction(async (tx) => {
-    let nextFen = match.fen;
-    let nextTurn = match.turn;
-    let nextStatus: MatchStatus = MatchStatus.IN_PROGRESS;
-    let matchWinnerId: string | null = null;
-    let nextMoveHistory = [...moveHistory];
+    let nextState: MatchProgressState = {
+      fen: match.fen,
+      turn: match.turn,
+      status: MatchStatus.IN_PROGRESS,
+      winnerId: null,
+      moveHistory: [...moveHistory],
+      whiteClockMs: match.whiteClockMs,
+      blackClockMs: match.blackClockMs,
+      turnStartedAt: new Date(),
+    };
 
     if (attackerWins) {
       const chess = new Chess(match.fen);
-      const boardMove = duel.boardMove as { from: string; to: string; promotion?: string | null; san: string };
       const applied = chess.move({
         from: boardMove.from,
         to: boardMove.to,
         promotion: boardMove.promotion ?? undefined,
       });
 
-      nextFen = chess.fen();
-      nextTurn = chess.turn();
-      nextMoveHistory = [...moveHistory, `${applied.san} [arcade]`];
+      nextState = {
+        ...nextState,
+        fen: chess.fen(),
+        turn: chess.turn(),
+        moveHistory: [...moveHistory, `${applied.san} [arcade]`],
+      };
+
       if (chess.isGameOver()) {
-        nextStatus = MatchStatus.FINISHED;
+        nextState = {
+          ...nextState,
+          status: MatchStatus.FINISHED,
+          turnStartedAt: null,
+        };
         if (chess.isCheckmate()) {
-          matchWinnerId = duel.attackerId;
+          nextState = {
+            ...nextState,
+            winnerId: duel.attackerId,
+          };
         }
       }
     } else {
-      nextTurn = flipTurn(match.turn);
-      nextMoveHistory = [...moveHistory, `Defensa arcade exitosa en ${match.turn === "w" ? "blancas" : "negras"}`];
+      const chess = new Chess(match.fen);
+      const removedPiece = chess.remove(boardMove.from);
+      const attackerLostKing = removedPiece?.type === "k";
+
+      nextState = {
+        ...nextState,
+        fen: chess.fen(),
+        turn: flipTurn(match.turn),
+        moveHistory: [...moveHistory, `${boardMove.san} [arcade-loss]`],
+      };
+
+      if (attackerLostKing) {
+        nextState = {
+          ...nextState,
+          status: MatchStatus.FINISHED,
+          winnerId: duel.match.isSolo ? null : duel.defenderId,
+          turnStartedAt: null,
+        };
+      }
+    }
+
+    if (match.isSolo) {
+      nextState = advanceSoloBotTurn(nextState);
     }
 
     await tx.arcadeDuel.update({
@@ -459,19 +605,22 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
     await tx.match.update({
       where: { id: match.id },
       data: {
-        fen: nextFen,
-        turn: nextTurn,
-        status: nextStatus,
-        winnerId: matchWinnerId,
-        moveHistory: nextMoveHistory,
+        fen: nextState.fen,
+        turn: nextState.turn,
+        status: nextState.status,
+        winnerId: nextState.winnerId,
+        moveHistory: nextState.moveHistory,
+        whiteClockMs: nextState.whiteClockMs,
+        blackClockMs: nextState.blackClockMs,
+        turnStartedAt: nextState.turnStartedAt,
       },
     });
 
     return {
       attackerWins,
       duelWinnerId,
-      matchWinnerId,
-      status: nextStatus,
+      matchWinnerId: nextState.winnerId,
+      status: nextState.status,
     };
   });
 
