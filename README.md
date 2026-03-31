@@ -47,12 +47,12 @@ This is **a new competitive genre.**
 
 ### Project Overview
 
-Arcade Chess Arena transforma una partida de ajedrez en una experiencia competitiva híbrida donde cada captura se resuelve con un duelo arcade en tiempo real. El producto está orientado a jugadores competitivos, creadores de torneos y comunidades Web3 que buscan partidas con más intensidad, resultados verificables y mayor retención. Su valor principal es unir estrategia clásica con ejecución mecánica bajo presión.
+Arcade Chess Arena transforms a chess match into a hybrid competitive experience where every capture is resolved through a real-time arcade duel. The product is designed for competitive players, tournament creators, and Web3 communities looking for higher-intensity matches, verifiable outcomes, and stronger retention. Its core value is combining classic strategy with mechanical execution under pressure.
 
 ### Implementation Detail
 
-- **The Custom Implementation**: Implementamos una capa de resolución de capturas basada en minijuegos sincronizados entre atacante y defensor, con validación de resultado y actualización del estado de partida en backend.
-- **The Native Feature**: Integramos InterwovenKit en la app con `InterwovenKitProvider`, conexión de wallet en la barra superior y `enableAutoSign={true}` para habilitar el flujo de auto-firma en la cadena por defecto. Esto reduce fricción en operaciones repetitivas dentro del flujo competitivo.
+- **The Custom Implementation**: We implemented a capture-resolution layer based on synchronized mini-games between attacker and defender, with result validation and backend match-state updates.
+- **The Native Feature**: We integrated InterwovenKit into the app using `InterwovenKitProvider`, wallet connection in the top bar, and `enableAutoSign={true}` to enable auto-sign flow on the default chain. This reduces friction in repetitive operations within the competitive flow.
 
 
 ## 🎮 Core Gameplay Loop
@@ -153,37 +153,37 @@ Built for speed, scalability, and iteration.
 
 ---
 
-## 🆕 Novedades Recientes
+## 🆕 Recent Updates
 
-### Contrato en Initia (Move)
-- Se estructuro el paquete Move en `contracts/initia/` con `Move.toml` y modulo `arcade_escrow.move`.
-- El contrato incorpora primitives para flujo competitivo y apuestas:
-  - creacion/gestion de partidas con fondos en escrow
-  - colocacion de apuestas
-  - resolucion y settlement de resultados
-- La integracion de frontend usa InterwovenKit con red de testnet compatible y wallet connect en la UI.
+### Initia Contract (Move)
+- The Move package was structured in `contracts/initia/` with `Move.toml` and the `arcade_escrow.move` module.
+- The contract includes primitives for competitive flow and betting:
+  - match creation/management with escrowed funds
+  - bet placement
+  - result resolution and settlement
+- Frontend integration uses InterwovenKit with a compatible testnet network and wallet connect in the UI.
 
-### Apuestas de Espectadores
-- Se agrego soporte para que usuarios que no juegan la partida puedan apostar por un ganador.
-- Modelo persistente en base de datos:
-  - nueva entidad `MatchBet` en Prisma
-  - relacion con partida, usuario apostador y lado elegido
-- Flujo funcional en aplicacion:
-  - accion server-side para registrar apuesta
-  - visualizacion de pool total, cantidad de apostadores y apuesta del usuario
-  - panel de apuestas en la vista de partida
+### Spectator Betting
+- Support was added so users who are not playing the match can bet on a winner.
+- Persistent database model:
+  - new `MatchBet` entity in Prisma
+  - relationship with match, betting user, and selected side
+- Functional app flow:
+  - server-side action to register a bet
+  - display of total pool, bettor count, and user bet
+  - betting panel in the match view
 
-### Settlement y Logica Economica
-- Se actualizo la logica de liquidacion para separar con claridad:
-  - resultado del duelo principal
-  - liquidacion de apuestas de espectadores
-  - comisiones/plataforma
-- El settlement contempla cierre consistente de partida y distribucion de payout segun resultado final.
+### Settlement and Economic Logic
+- Settlement logic was updated to clearly separate:
+  - main duel outcome
+  - spectator bet settlement
+  - platform fees
+- Settlement now ensures consistent match closure and payout distribution based on final result.
 
-### Migraciones y Despliegue
-- Se migro a esquema de Prisma con migraciones versionadas (`prisma/migrations`).
-- El flujo de contenedores incluye etapa de migracion previa al inicio de la app (`migrate deploy`).
-- Configuracion orientada a entorno con variables para DB local y DB intra-contenedor.
+### Migrations and Deployment
+- The project was migrated to a Prisma schema with versioned migrations (`prisma/migrations`).
+- The container flow includes a pre-start migration stage (`migrate deploy`).
+- Environment-oriented configuration uses variables for local DB and in-container DB.
 
 ---
 
@@ -194,11 +194,11 @@ Built for speed, scalability, and iteration.
 - Duel-trigger capture logic  
 - Reflex-based mini-game (prototype)  
 - Match orchestration engine  
-- Integracion wallet con InterwovenKit en testnet  
-- Apuestas de espectadores (modelo + UI + acciones)  
-- Settlement de apuestas y payouts post-partida  
-- Esquema Prisma con migraciones versionadas  
-- Flujo docker con migracion automatica previa al arranque  
+- Wallet integration with InterwovenKit on testnet  
+- Spectator betting (model + UI + actions)  
+- Bet settlement and post-match payouts  
+- Prisma schema with versioned migrations  
+- Docker flow with automatic pre-start migration  
 
 ---
 
@@ -245,22 +245,22 @@ It’s:
 
 ## 🧪 Current Status
 
-MVP funcional y extendido con economia competitiva.
+Functional MVP extended with a competitive economy.
 
 ✔ Core gameplay functional  
 ✔ Duel system implemented  
 ✔ Match flow operational  
-✔ Apuestas de espectadores implementadas en app  
-✔ Settlement de payouts integrado  
-✔ Contrato Initia (Move) estructurado en repositorio  
-✔ Migraciones versionadas y flujo docker con migracion previa  
+✔ Spectator betting implemented in the app  
+✔ Payout settlement integrated  
+✔ Initia (Move) contract structured in the repository  
+✔ Versioned migrations and Docker flow with pre-start migration  
 
 ### Next Steps
 - Ranking & matchmaking  
 - Tournament engine  
-- Prize pools onchain en produccion  
+- Onchain prize pools in production  
 - Advanced mini-games  
-- Deployment y verificacion completa de contratos multi-chain  
+- Full deployment and verification of multi-chain contracts  
 
 ---
 
