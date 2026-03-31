@@ -6,12 +6,22 @@ import { createMatchAction, joinMatchAction } from "@/lib/actions";
 import { requireUser } from "@/lib/auth";
 import { arcadeLibrary } from "@/lib/arcade";
 import { getLobbySnapshot } from "@/lib/data";
+import { MatchShareControls } from "@/components/match-share-controls";
 
 export const dynamic = "force-dynamic";
 
-export default async function LobbyPage() {
+export default async function LobbyPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ network?: string }>;
+}) {
   const session = await requireUser();
   const { me, matches } = await getLobbySnapshot(session.id);
+  const params = (await searchParams) ?? {};
+  const selectedNetwork = String(params.network ?? "ALL").toUpperCase();
+  const filteredMatches = selectedNetwork === "ALL"
+    ? matches
+    : matches.filter((match) => match.network === selectedNetwork);
   const locale = await getLocale();
   const { lobby: t } = getDictionary(locale);
 
@@ -126,9 +136,24 @@ export default async function LobbyPage() {
         <div>
           <p className="eyebrow">{t.activeEyebrow}</p>
           <h2 className="mt-2 text-3xl font-semibold text-white">{t.activeTitle}</h2>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(["ALL", ...Object.values(TransactionNetwork)] as const).map((network) => (
+              <Link
+                key={network}
+                href={network === "ALL" ? "/lobby" : `/lobby?network=${network}`}
+                className={`rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.18em] transition ${
+                  selectedNetwork === network
+                    ? "border-cyan-300/40 bg-cyan-300/10 text-cyan-100"
+                    : "border-white/10 text-slate-300 hover:border-cyan-300/30"
+                }`}
+              >
+                {network}
+              </Link>
+            ))}
+          </div>
         </div>
 
-        {matches.length === 0 ? (
+        {filteredMatches.length === 0 ? (
           <article className="panel rounded-[1.75rem] p-6">
             <h3 className="text-2xl font-semibold text-white">{t.noMatchesTitle}</h3>
             <p className="mt-3 text-sm leading-7 text-slate-300">{t.noMatchesDesc}</p>
@@ -136,7 +161,7 @@ export default async function LobbyPage() {
           </article>
         ) : (
           <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-            {matches.map((match) => (
+            {filteredMatches.map((match) => (
               <article key={match.id} className="panel rounded-[1.75rem] p-6">
                 <div className="flex items-center justify-between gap-3">
                   <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">
@@ -179,6 +204,9 @@ export default async function LobbyPage() {
                     </form>
                   ) : null}
                   {match.hasPendingDuel ? <span className="text-xs text-amber-200">{t.pendingDuel}</span> : null}
+                </div>
+                <div className="mt-4">
+                  <MatchShareControls matchId={match.id} title={match.title} />
                 </div>
               </article>
             ))}

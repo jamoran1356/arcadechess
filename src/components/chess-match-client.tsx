@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
 import { ArcadeDuelModal } from "@/components/arcade-duel-modal";
+import { MatchShareControls } from "@/components/match-share-controls";
 import { useDict } from "@/components/locale-provider";
 
 type MatchClientProps = {
@@ -58,6 +59,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [moveHistory, setMoveHistory] = useState(match.moveHistory);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [timeoutMessage, setTimeoutMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setFen(match.fen);
@@ -93,6 +95,16 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     white: match.whiteClockMs,
     black: match.blackClockMs,
   });
+
+  // Check for clock timeout
+  useEffect(() => {
+    if (displayClocks.white <= 0 || displayClocks.black <= 0) {
+      const timeoutMsg = displayClocks.white <= 0 ? "Blancas agotaron tiempo" : "Negras agotaron tiempo";
+      setTimeoutMessage(timeoutMsg);
+    } else {
+      setTimeoutMessage(null);
+    }
+  }, [displayClocks]);
 
   useEffect(() => {
     const tick = () => {
@@ -251,6 +263,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
         </div>
 
         {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
+        {timeoutMessage ? <p className="mt-2 text-sm text-amber-300">{timeoutMessage}</p> : null}
       </section>
 
       <aside className="grid gap-5 self-start">
@@ -260,6 +273,9 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
             {match.stakeAmount} {match.stakeToken}
           </p>
           <p className="mt-4 text-sm leading-7 text-slate-300">{match.theme}</p>
+          <div className="mt-4">
+            <MatchShareControls matchId={match.id} title={match.title} />
+          </div>
           <Link href="/lobby" className="mt-5 inline-flex text-sm text-cyan-200 hover:text-cyan-100">
             {ch.backToLobby}
           </Link>

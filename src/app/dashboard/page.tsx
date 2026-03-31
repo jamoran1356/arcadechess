@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { getLocale } from "@/lib/i18n";
 import { getDictionary } from "@/dictionaries";
+import { TransactionNetwork } from "@prisma/client";
 import { hasAdminAccess, requireUser } from "@/lib/auth";
+import { linkWalletAddressAction } from "@/lib/actions";
+import { FriendInvitePanel, type FriendData } from "@/components/friend-invite-panel";
 import { getDashboardSnapshot } from "@/lib/data";
+import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -33,10 +37,32 @@ function formatStatusLabel(status: string) {
 
 export default async function DashboardPage() {
   const session = await requireUser();
-  const user = await getDashboardSnapshot(session.id);
+  const [user, rawFriendships] = await Promise.all([
+    getDashboardSnapshot(session.id),
+    prisma.friendship.findMany({
+      where: { OR: [{ userId: session.id }, { friendId: session.id }] },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        friend: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
   const locale = await getLocale();
   const { dashboard: t } = getDictionary(locale);
   const adminAccess = hasAdminAccess(session);
+
+  const friends: FriendData[] = rawFriendships.map((f) => {
+    const isSender = f.userId === session.id;
+    const other = isSender ? f.friend : f.user;
+    return {
+      id: f.id,
+      name: other.name,
+      email: other.email,
+      status: f.status as "PENDING" | "ACCEPTED",
+      direction: isSender ? "sent" : "received",
+    };
+  });
 
   if (!user) {
     return (
@@ -140,6 +166,17 @@ export default async function DashboardPage() {
               </article>
             )}
           </div>
+
+          <form action={linkWalletAddressAction} className="mt-6 grid gap-3 rounded-[1.4rem] border border-white/10 bg-white/5 p-4 sm:grid-cols-[180px_1fr_auto]">
+            <select name="network" className="input" defaultValue={TransactionNetwork.FLOW}>
+              {Object.values(TransactionNetwork).map((network) => (
+                <option key={network} value={network}>{network}</option>
+              ))}
+            </select>
+            <input name="address" className="input" placeholder="Wallet address to link" required />
+            <button type="submit" className="button-primary px-4 py-2 text-sm">Vincular</button>
+          </form>
+          <p className="mt-2 text-xs text-slate-400">Vincula tus billeteras de Flow y Solana para jugar y recibir pagos en esa red.</p>
         </div>
 
         <div className="panel rounded-[2rem] p-6">
@@ -169,6 +206,10 @@ export default async function DashboardPage() {
               </article>
             )}
           </div>
+        </div>
+
+        <div className="panel rounded-[2rem] p-6">
+          <FriendInvitePanel initialFriends={friends} />
         </div>
 
         <div className="panel rounded-[2rem] p-6">

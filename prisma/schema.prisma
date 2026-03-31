@@ -44,6 +44,11 @@ enum ArcadeGameType {
   KEY_CLASH
 }
 
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
 model User {
   id           String        @id @default(cuid())
   name         String
@@ -59,9 +64,11 @@ model User {
   wallets       Wallet[]
   transactions  Transaction[]
   bets          MatchBet[]
-  attackDuels   ArcadeDuel[] @relation("AttackerDuels")
-  defendDuels   ArcadeDuel[] @relation("DefenderDuels")
-  wonDuels      ArcadeDuel[] @relation("WinnerDuels")
+  attackDuels         ArcadeDuel[] @relation("AttackerDuels")
+  defendDuels         ArcadeDuel[] @relation("DefenderDuels")
+  wonDuels            ArcadeDuel[] @relation("WinnerDuels")
+  sentFriendships     Friendship[] @relation("SentFriendships")
+  receivedFriendships Friendship[] @relation("ReceivedFriendships")
 }
 
 model Wallet {
@@ -195,6 +202,20 @@ model ArcadeGame {
   updatedAt            DateTime @updatedAt
 
   @@unique([gameType])
+}
+
+model Friendship {
+  id        String           @id @default(cuid())
+  userId    String
+  friendId  String
+  status    FriendshipStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+  user      User             @relation("SentFriendships", fields: [userId], references: [id], onDelete: Cascade)
+  friend    User             @relation("ReceivedFriendships", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@index([friendId])
 }
 
 model Transaction {

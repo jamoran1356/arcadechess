@@ -8,7 +8,7 @@ import {
   TransactionStatus,
   TransactionType,
 } from "@prisma/client";
-import { evaluateArcadeAttempt, type ArcadeAttempt } from "@/lib/arcade";
+import { evaluateArcadeAttempt, getSoloArcadeTimeLimitMs, type ArcadeAttempt } from "@/lib/arcade";
 import { prisma } from "@/lib/db";
 import { getOnchainAdapter } from "@/lib/onchain/service";
 import { getPlatformConfig } from "@/lib/platform-config";
@@ -106,6 +106,48 @@ type MatchProgressState = {
   blackClockMs: number;
   turnStartedAt: Date | null;
 };
+
+async function checkAndResolveTimeoutVictory(
+  match: {
+    id: string;
+    whiteClockMs: number;
+    blackClockMs: number;
+    turn: string;
+    hostId: string;
+    guestId: string | null;
+    status: MatchStatus;
+    preferredNetwork: "INITIA" | "FLOW" | "SOLANA";
+    stakeAmount: Prisma.Decimal;
+    entryFee: Prisma.Decimal;
+    stakeToken: string;
+  },
+  currentTurnClocks: { whiteClockMs: number; blackClockMs: number },
+): Promise<string | null> {
+  const whiteTimeExpired = currentTurnClocks.whiteClockMs <= 0;
+  const blackTimeExpired = currentTurnClocks.blackClockMs <= 0;
+
+  if (!whiteTimeExpired && !blackTimeExpired) {
+    return null;
+  }
+
+  // Timeout detected: opponent wins
+  const winnerId = whiteTimeExpired ? match.guestId ?? match.hostId : match.hostId;
+
+  await prisma.match.update({
+    where: { id: match.id },
+    data: {
+      status: MatchStatus.FINISHED,
+      winnerId,
+      whiteClockMs: currentTurnClocks.whiteClockMs,
+      blackClockMs: currentTurnClocks.blackClockMs,
+      turnStartedAt: null,
+    },
+  });
+
+  await settleWinner(match, winnerId);
+
+  return winnerId;
+}
 
 function advanceSoloBotTurn(state: MatchProgressState) {
   if (state.status === MatchStatus.FINISHED || state.turn !== "b") {
@@ -328,6 +370,24 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
     throw new Error("La partida no existe.");
   }
 
+  // Check for timeout before processing any move
+  const clocks = consumeActiveTurnClock(match);
+  const timeoutWinnerId = await checkAndResolveTimeoutVictory(match, clocks);
+  if (timeoutWinnerId) {
+    return {
+      pendingDuel: false,
+      fen: match.fen,
+      turn: match.turn,
+      status: MatchStatus.FINISHED,
+      moveHistory: asMoveHistory(match.moveHistory),
+      whiteClockMs: clocks.whiteClockMs,
+      blackClockMs: clocks.blackClockMs,
+      turnStartedAt: null,
+      refresh: true,
+      timeoutMessage: `Tiempo agotado. ${clocks.whiteClockMs <= 0 ? "Blancas" : "Negras"} pierde por timeout.`,
+    };
+  }
+
   if (!match.guestId && !match.isSolo) {
     throw new Error("La partida aun espera un rival.");
   }
@@ -368,7 +428,6 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
     const defenderId = (userId === match.hostId ? match.guestId : match.hostId) ?? userId;
     const gamePool = asGameTypes(match.arcadeGamePool);
     const gameType = gamePool[Math.floor(Math.random() * gamePool.length)] ?? ArcadeGameType.TARGET_RUSH;
-    const clocks = consumeActiveTurnClock(match);
 
     const duel = await prisma.$transaction(async (tx) => {
       const created = await tx.arcadeDuel.create({
@@ -498,7 +557,15 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
     throw new Error("Ya enviaste tu intento.");
   }
 
-  const evaluation = evaluateArcadeAttempt(duel.gameType, duel.seed, attempt);
+  const boardMove = duel.boardMove as { from: string; to: string; promotion?: string | null; san: string };
+  const soloTimeLimitMs = duel.match.isSolo
+    ? getSoloArcadeTimeLimitMs({
+        fen: duel.match.fen,
+        targetSquare: boardMove.to,
+        attackerTurn: duel.match.turn === "b" ? "b" : "w",
+      })
+    : undefined;
+  const evaluation = evaluateArcadeAttempt(duel.gameType, duel.seed, attempt, { timeLimitMs: soloTimeLimitMs });
   const score = evaluation.valid ? Math.max(0, Math.round(evaluation.score)) : 0;
 
   let updatedDuel = await prisma.arcadeDuel.update({
@@ -531,7 +598,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   const duelWinnerId = attackerWins ? duel.attackerId : duel.match.isSolo ? null : duel.defenderId;
   const match = duel.match;
   const moveHistory = asMoveHistory(match.moveHistory);
-  const boardMove = duel.boardMove as { from: string; to: string; promotion?: string | null; san: string };
+  
 
   const result = await prisma.$transaction(async (tx) => {
     let nextState: MatchProgressState = {

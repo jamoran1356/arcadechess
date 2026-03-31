@@ -585,6 +585,123 @@ export async function updateWalletNetworkAction(formData: FormData) {
   revalidatePath("/admin/redes");
 }
 
+export async function linkWalletAddressAction(formData: FormData) {
+  const session = await requireUser();
+  const currentUser = await resolveSessionUser(session);
+  const network = String(formData.get("network") ?? "INITIA").toUpperCase();
+  const address = String(formData.get("address") ?? "").trim();
+
+  if (!Object.values(TransactionNetwork).includes(network as TransactionNetwork)) {
+    throw new Error("Red invalida.");
+  }
+
+  if (address.length < 6) {
+    throw new Error("Direccion de billetera invalida.");
+  }
+
+  const existingByUserNetwork = await prisma.wallet.findFirst({
+    where: {
+      userId: currentUser.id,
+      network: network as TransactionNetwork,
+    },
+  });
+
+  if (existingByUserNetwork) {
+    await prisma.wallet.update({
+      where: { id: existingByUserNetwork.id },
+      data: { address },
+    });
+  } else {
+    await prisma.wallet.create({
+      data: {
+        userId: currentUser.id,
+        network: network as TransactionNetwork,
+        address,
+        balance: "0",
+      },
+    });
+  }
+
+  revalidatePath("/dashboard");
+}
+
+export async function addFriendAction(formData: FormData) {
+  const session = await requireUser();
+  const identifier = String(formData.get("identifier") ?? "").trim();
+
+  if (!identifier) {
+    throw new Error("Indicá un correo o dirección de wallet.");
+  }
+
+  // Find target user by email or wallet address
+  let targetUser: { id: string } | null = null;
+
+  if (identifier.includes("@")) {
+    targetUser = await prisma.user.findUnique({
+      where: { email: identifier },
+      select: { id: true },
+    });
+  } else {
+    const wallet = await prisma.wallet.findFirst({
+      where: { address: identifier },
+      select: { userId: true },
+    });
+    if (wallet) {
+      targetUser = { id: wallet.userId };
+    }
+  }
+
+  if (!targetUser) {
+    throw new Error("No se encontró ningún usuario con ese correo o wallet.");
+  }
+
+  if (targetUser.id === session.id) {
+    throw new Error("No podés agregarte a vos mismo.");
+  }
+
+  await prisma.friendship.upsert({
+    where: { userId_friendId: { userId: session.id, friendId: targetUser.id } },
+    create: { userId: session.id, friendId: targetUser.id, status: "PENDING" },
+    update: {},
+  });
+
+  revalidatePath("/dashboard");
+}
+
+export async function acceptFriendAction(formData: FormData) {
+  const session = await requireUser();
+  const friendshipId = String(formData.get("friendshipId") ?? "").trim();
+
+  if (!friendshipId) {
+    throw new Error("ID de solicitud inválido.");
+  }
+
+  await prisma.friendship.updateMany({
+    where: { id: friendshipId, friendId: session.id, status: "PENDING" },
+    data: { status: "ACCEPTED" },
+  });
+
+  revalidatePath("/dashboard");
+}
+
+export async function removeFriendAction(formData: FormData) {
+  const session = await requireUser();
+  const friendshipId = String(formData.get("friendshipId") ?? "").trim();
+
+  if (!friendshipId) {
+    throw new Error("ID inválido.");
+  }
+
+  await prisma.friendship.deleteMany({
+    where: {
+      id: friendshipId,
+      OR: [{ userId: session.id }, { friendId: session.id }],
+    },
+  });
+
+  revalidatePath("/dashboard");
+}
+
 export async function upsertPlanAction(formData: FormData) {
   const session = await requireUser();
   if (!hasAdminAccess(session)) throw new Error("Unauthorized");

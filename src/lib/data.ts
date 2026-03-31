@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, TransactionStatus, UserRole } from "@prisma/client";
-import { buildArcadeScenario, getArcadeDefinition, arcadeLibrary } from "@/lib/arcade";
+import { buildArcadeScenario, getArcadeDefinition, getSoloArcadeTimeLimitMs, arcadeLibrary } from "@/lib/arcade";
 import { prisma } from "@/lib/db";
 import { getSupportedNetworks } from "@/lib/onchain/service";
 import { getPlatformConfig } from "@/lib/platform-config";
@@ -374,6 +374,19 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
   }
 
   const pendingDuel = match.duels.find((duel) => !duel.resolvedAt) ?? null;
+  const pendingDuelDefinition = pendingDuel
+    ? {
+        ...getArcadeDefinition(pendingDuel.gameType),
+        timeLimitMs:
+          match.isSolo
+            ? getSoloArcadeTimeLimitMs({
+                fen: match.fen,
+                targetSquare: String((pendingDuel.boardMove as { to?: string })?.to ?? ""),
+                attackerTurn: match.turn === "b" ? "b" : "w",
+              })
+            : getArcadeDefinition(pendingDuel.gameType).timeLimitMs,
+      }
+    : null;
   const totalBetPool = match.bets.reduce((sum, bet) => sum + Number(bet.amount.toString()), 0);
   const hostBetPool = match.bets
     .filter((bet) => bet.predictedWinnerId === match.hostId)
@@ -451,7 +464,7 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
           attackerName: pendingDuel.attacker.name,
           defenderName: match.isSolo ? "Arena Bot" : pendingDuel.defender.name,
           gameType: pendingDuel.gameType,
-          game: getArcadeDefinition(pendingDuel.gameType),
+          game: pendingDuelDefinition,
           seed: pendingDuel.seed,
           scenario: buildArcadeScenario(pendingDuel.gameType, pendingDuel.seed),
           attackerScore: pendingDuel.attackerScore,

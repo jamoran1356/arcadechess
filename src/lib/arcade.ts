@@ -1,4 +1,6 @@
 import { ArcadeGameType } from "@prisma/client";
+import { Chess } from "chess.js";
+import type { Color } from "chess.js";
 
 type Target = {
   id: string;
@@ -136,15 +138,67 @@ export function buildArcadeScenario(gameType: ArcadeGameType, seed: string): Arc
   }
 }
 
+function squareToCoords(square: string) {
+  const file = square.charCodeAt(0) - 97;
+  const rank = Number(square[1]) - 1;
+  if (Number.isNaN(rank) || file < 0 || file > 7 || rank < 0 || rank > 7) {
+    return null;
+  }
+  return { file, rank };
+}
+
+function findKingSquare(fen: string, color: Color): string | null {
+  try {
+    const chess = new Chess(fen);
+    const board = chess.board();
+    for (let rank = 0; rank < board.length; rank += 1) {
+      for (let file = 0; file < board[rank].length; file += 1) {
+        const piece = board[rank][file];
+        if (piece?.type === "k" && piece.color === color) {
+          const fileChar = String.fromCharCode(97 + file);
+          const rankChar = String(8 - rank);
+          return `${fileChar}${rankChar}`;
+        }
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+export function getSoloArcadeTimeLimitMs(params: {
+  fen: string;
+  targetSquare: string;
+  attackerTurn: "w" | "b";
+}) {
+  const defenderColor: Color = params.attackerTurn === "w" ? "b" : "w";
+  const kingSquare = findKingSquare(params.fen, defenderColor);
+  const target = squareToCoords(params.targetSquare);
+  const king = kingSquare ? squareToCoords(kingSquare) : null;
+
+  // Default for solo duels: 10 seconds
+  if (!target || !king) {
+    return 10_000;
+  }
+
+  const manhattan = Math.abs(target.file - king.file) + Math.abs(target.rank - king.rank);
+  const derivedSeconds = Math.max(3, Math.min(10, manhattan + 2));
+  return derivedSeconds * 1000;
+}
+
 export function evaluateArcadeAttempt(
   gameType: ArcadeGameType,
   seed: string,
   attempt: ArcadeAttempt,
+  options?: { timeLimitMs?: number },
 ) {
   const definition = getArcadeDefinition(gameType);
+  const timeLimitMs = options?.timeLimitMs ?? definition.timeLimitMs;
   const duration = attempt.finishedAt - attempt.startedAt;
 
-  if (duration <= 0 || duration > definition.timeLimitMs + 1200) {
+  if (duration <= 0 || duration > timeLimitMs + 1200) {
     return { valid: false, score: 0, reason: "Tiempo fuera de rango." };
   }
 
