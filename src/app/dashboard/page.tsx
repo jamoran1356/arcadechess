@@ -51,13 +51,6 @@ export default async function DashboardPage() {
   const locale = await getLocale();
   const { dashboard: t } = getDictionary(locale);
   const adminAccess = hasAdminAccess(session);
-  const dashboardNav = [
-    { id: "overview", label: "Resumen" },
-    { id: "wallets", label: "Billeteras" },
-    { id: "matches", label: "Partidas" },
-    { id: "friends", label: "Amigos" },
-    { id: "ledger", label: "Movimientos" },
-  ];
 
   const friends: FriendData[] = rawFriendships.map((f) => {
     const isSender = f.userId === session.id;
@@ -114,21 +107,6 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <nav className="mt-5 rounded-[1.5rem] border border-white/10 bg-white/5 p-3">
-              <p className="px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.22em] text-slate-500">Navegación</p>
-              <div className="grid gap-2">
-                {dashboardNav.map((item) => (
-                  <a
-                    key={item.id}
-                    href={`#${item.id}`}
-                    className="rounded-[1rem] border border-transparent px-3 py-3 text-sm text-slate-200 transition hover:border-cyan-300/20 hover:bg-cyan-300/10 hover:text-white"
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </div>
-            </nav>
-
             <div className="mt-5 grid gap-3">
               <Link href="/lobby" className="button-primary px-5 py-3 text-center text-sm">{t.primaryAction}</Link>
               <Link href="/arcade-test" className="button-secondary px-5 py-3 text-center text-sm text-slate-100">{t.secondaryAction}</Link>
@@ -176,11 +154,11 @@ export default async function DashboardPage() {
                   </div>
                 </article>
                 <article className="rounded-[1.75rem] border border-white/10 bg-black/20 p-5 backdrop-blur">
-                  <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">Quick links</p>
+                  <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">Estado de mesa</p>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <a href="#wallets" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10">Gestionar wallets</a>
-                    <a href="#matches" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10">Ver partidas</a>
-                    <a href="#friends" className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:border-white/20 hover:bg-white/10">Invitar amigos</a>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Wallets activas: {new Set(user.wallets.map((wallet) => wallet.network)).size}</span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Partidas hoy: {user.hostedMatches.length + user.joinedMatches.length}</span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Amigos: {friends.filter((friend) => friend.status === "ACCEPTED").length}</span>
                   </div>
                 </article>
               </div>

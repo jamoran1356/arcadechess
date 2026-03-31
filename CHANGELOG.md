@@ -39,6 +39,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Pending duel typing mismatch** — ensured `pendingDuel.game` is always populated in match snapshot to satisfy strict TypeScript expectations.
 - **Arcade replay loop** — the duel modal now preserves local state for the active duel and no longer depends on full page refreshes, preventing the minigame from restarting in a loop.
 - **Multiplayer arcade start sync** — pending duel snapshot now includes `attackerEnteredAt`/`defenderEnteredAt`, and when one player enters the minigame the opponent auto-enters/auto-starts from intro without page reload.
+- **Clock timeout hard-close** — match state endpoint now triggers backend timeout resolution (`syncMatchTimeoutIfNeeded`) so games close immediately at 0 without waiting for a user move.
+- **Duel resolution guarantee** — participation monitor now resolves arcade duels by score when both players entered but one/both did not submit in time, defaulting missing score to 0 and always producing a winner.
+- **First move visibility fix** — match client now syncs `guest` and board state from `/api/matches/[id]/state`, removing the need for manual refresh when opponent joins/moves first.
 
 ### Changed
 
@@ -47,6 +50,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Admin arcade UX** — replaced all `alert/confirm` calls with in-app dialog windows for success, error, warning and delete confirmation.
 - **Dashboard redesign** — rebuilt `/dashboard` with sticky left navigation, section anchors, improved visual hierarchy, and cleaner grouped content blocks.
 - **Versus match sync** — added `GET /api/matches/[id]/state` and client polling in match screen so opponent moves and duel resolution propagate fluidly without manual refresh.
+- **Dashboard UX simplification** — removed the internal navigation block to avoid dual navigation bars, keeping a single global navigation and concise status cards inside dashboard.
 
 ---
 

@@ -149,6 +149,40 @@ async function checkAndResolveTimeoutVictory(
   return winnerId;
 }
 
+export async function syncMatchTimeoutIfNeeded(matchId: string) {
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { duels: { where: { resolvedAt: null }, select: { id: true } } },
+  });
+
+  if (!match) {
+    return null;
+  }
+
+  if (match.status !== MatchStatus.IN_PROGRESS) {
+    return null;
+  }
+
+  const clocks = consumeActiveTurnClock(match);
+  const winnerId = await checkAndResolveTimeoutVictory(match, clocks);
+
+  if (!winnerId) {
+    return null;
+  }
+
+  if (match.duels.length > 0) {
+    await prisma.arcadeDuel.updateMany({
+      where: { matchId: match.id, resolvedAt: null },
+      data: {
+        resolvedAt: new Date(),
+        participationPenalty: "match_timeout",
+      },
+    });
+  }
+
+  return winnerId;
+}
+
 function advanceSoloBotTurn(state: MatchProgressState) {
   if (state.status === MatchStatus.FINISHED || state.turn !== "b") {
     return state;

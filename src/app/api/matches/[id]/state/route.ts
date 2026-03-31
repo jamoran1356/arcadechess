@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getMatchSnapshot } from "@/lib/data";
+import { syncMatchTimeoutIfNeeded } from "@/lib/match-engine";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -13,6 +14,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  await syncMatchTimeoutIfNeeded(id);
   const match = await getMatchSnapshot(id, session.id);
 
   if (!match) {

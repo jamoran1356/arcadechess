@@ -63,6 +63,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [blackClockMs, setBlackClockMs] = useState(match.blackClockMs);
   const [turnStartedAt, setTurnStartedAt] = useState<string | null>(match.turnStartedAt);
   const [moveHistory, setMoveHistory] = useState(match.moveHistory);
+  const [guest, setGuest] = useState(match.guest);
   const [pendingDuel, setPendingDuel] = useState<PendingDuelState | null>(match.pendingDuel);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -85,12 +86,13 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     setWhiteClockMs(data.whiteClockMs);
     setBlackClockMs(data.blackClockMs);
     setTurnStartedAt(data.turnStartedAt);
+    setGuest(data.guest ?? null);
     setPendingDuel(data.pendingDuel ?? null);
   }, [ch.moveError, match.id]);
 
   const isActiveParticipant =
     currentUserId &&
-    (match.host.id === currentUserId || match.guest?.id === currentUserId) &&
+    (match.host.id === currentUserId || guest?.id === currentUserId) &&
     (status === "IN_PROGRESS" || status === "OPEN" || status === "ARCADE_PENDING");
 
   function handleResign() {
@@ -107,6 +109,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     setBlackClockMs(match.blackClockMs);
     setTurnStartedAt(match.turnStartedAt);
     setMoveHistory(match.moveHistory);
+    setGuest(match.guest);
     setPendingDuel(match.pendingDuel ?? null);
   }, [match]);
 
@@ -116,8 +119,8 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
 
   const canMove = Boolean(
     currentUserId &&
-      (match.guest || match.isSolo) &&
-        pendingDuel === null &&
+      (guest || match.isSolo) &&
+      pendingDuel === null &&
       status !== "OPEN" &&
       status !== "FINISHED" &&
       isMyTurn,
@@ -340,7 +343,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
           </div>
           <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{ch.blacksLabel}</p>
-            <p className="mt-2 text-lg font-semibold text-white">{match.guest?.name ?? (match.isSolo ? ch.soloMode : ch.waitingRival)}</p>
+            <p className="mt-2 text-lg font-semibold text-white">{guest?.name ?? (match.isSolo ? ch.soloMode : ch.waitingRival)}</p>
           </div>
         </div>
 
