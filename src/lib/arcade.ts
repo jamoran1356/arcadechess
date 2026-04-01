@@ -348,12 +348,14 @@ export function evaluateArcadeAttempt(
     const expected = scenario.targets.map((target) => target.id);
     const received = attempt.actions.map((action) => action.value);
     const correct = expected.filter((value, index) => received[index] === value).length;
+    const basePoints = correct * 500;
 
     if (received.length !== expected.length || correct !== expected.length) {
-      return { valid: false, score: correct * 100, reason: "Objetivos incompletos o fuera de orden." };
+      return { valid: false, score: basePoints, reason: "Objetivos incompletos o fuera de orden." };
     }
 
-    return { valid: true, score: 10000 - duration };
+    const timeBonus = Math.max(0, Math.round(5000 * (1 - duration / timeLimitMs)));
+    return { valid: true, score: basePoints + timeBonus };
   }
 
   if (scenario.kind === "memory") {
@@ -393,9 +395,10 @@ export function evaluateArcadeAttempt(
     if (!reachedEnd) {
       return { valid: false, score: Math.min(actions.length * 50, 3000), reason: "No llegó a la meta." };
     }
-    // Fewer steps + faster = better
-    const stepPenalty = actions.length * 10;
-    return { valid: true, score: Math.max(0, 10000 - duration - stepPenalty) };
+    // Fewer steps + faster = better; score relative to time limit
+    const timeScore = Math.round(8000 * (1 - duration / timeLimitMs));
+    const stepPenalty = actions.length * 5;
+    return { valid: true, score: Math.max(100, timeScore + 2000 - stepPenalty) };
   }
 
   if (scenario.kind === "pong") {

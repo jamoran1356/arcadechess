@@ -611,7 +611,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       })
     : undefined;
   const evaluation = evaluateArcadeAttempt(duel.gameType, playerSeed, attempt, { timeLimitMs: soloTimeLimitMs });
-  const score = evaluation.valid ? Math.max(0, Math.round(evaluation.score)) : 0;
+  const score = Math.max(0, Math.round(evaluation.score));
 
   let updatedDuel = await prisma.arcadeDuel.update({
     where: { id: duelId },

@@ -1,25 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useInterwovenKit } from "@initia/interwovenkit-react";
 
 type Props = {
   address: string;
   network: string;
+  walletId: string;
 };
 
-export function OnchainBalance({ address, network }: Props) {
+export function OnchainBalance({ address, network, walletId }: Props) {
+  const { initiaAddress, isConnected } = useInterwovenKit();
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [linked, setLinked] = useState(false);
 
+  // The real address to query: use InterwovenKit address for INITIA, else the stored address
+  const realAddress =
+    network === "INITIA" && isConnected && initiaAddress ? initiaAddress : address;
+
+  const isPlaceholder =
+    realAddress.startsWith("initia_") ||
+    realAddress.startsWith("flow_") ||
+    realAddress.startsWith("solana_");
+
+  // Auto-link InterwovenKit address to platform wallet
   useEffect(() => {
-    if (!address || address.startsWith("initia_") || address.startsWith("flow_") || address.startsWith("solana_")) {
-      // Skip generated placeholder addresses
+    if (network !== "INITIA" || !isConnected || !initiaAddress || linked) return;
+    if (address === initiaAddress) {
+      setLinked(true);
+      return;
+    }
+
+    fetch("/api/wallet/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: initiaAddress, network: "INITIA" }),
+    })
+      .then((res) => { if (res.ok) setLinked(true); })
+      .catch(() => {});
+  }, [network, isConnected, initiaAddress, address, linked]);
+
+  // Fetch on-chain balance
+  useEffect(() => {
+    if (isPlaceholder) {
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    fetch(`/api/wallet/onchain-balance?address=${encodeURIComponent(address)}&network=${network}`)
+    fetch(`/api/wallet/onchain-balance?address=${encodeURIComponent(realAddress)}&network=${network}`)
       .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
@@ -28,10 +58,18 @@ export function OnchainBalance({ address, network }: Props) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [address, network]);
+  }, [realAddress, network, isPlaceholder]);
+
+  if (isPlaceholder && network === "INITIA" && !isConnected) {
+    return <p className="mt-1 text-xs opacity-50">Conecta tu wallet para ver el saldo on-chain</p>;
+  }
+
+  if (isPlaceholder) {
+    return null;
+  }
 
   if (loading) {
-    return <span className="text-xs opacity-50">cargando on-chain...</span>;
+    return <span className="mt-1 text-xs opacity-50">cargando on-chain...</span>;
   }
 
   if (balance === null) {
