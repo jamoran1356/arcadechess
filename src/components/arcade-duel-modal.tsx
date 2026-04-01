@@ -78,9 +78,11 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
           setMessage(data.message ?? arc.submitSuccess);
           await onStateRefresh?.();
         })
-        .catch((error: unknown) => {
+        .catch(async (error: unknown) => {
+          // If the duel was already resolved (e.g. by participation polling),
+          // just refresh state — don't reset to "intro" which causes a visual re-open.
           setMessage(error instanceof Error ? error.message : arc.submitError);
-          setPhase("intro");
+          try { await onStateRefresh?.(); } catch { /* best-effort */ }
         });
     });
   }, [arc.submitError, arc.submitSuccess, duel.id, onStateRefresh, phase]);
@@ -205,7 +207,9 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
     } catch (error) {
       console.error("Error registering arcade participation:", error);
       setMessage(error instanceof Error ? error.message : arc.submitError);
-      setPhase("intro");
+      // Don't reset to "intro" — the duel may already be resolved.
+      // Let state sync close the modal naturally.
+      try { await onStateRefresh?.(); } catch { /* best-effort */ }
       return;
     } finally {
       enteringRef.current = false;

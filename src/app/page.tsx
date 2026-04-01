@@ -38,8 +38,9 @@ export default async function Home() {
   type LandingMatch = (typeof openMatches)[number];
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-24 px-4 py-12 sm:px-6 lg:px-8 lg:py-20">
-      <section className="animate-rise relative min-h-[72vh] overflow-hidden rounded-[2rem] border border-white/10">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-28 px-4 py-12 sm:px-6 lg:px-8 lg:py-20">
+      {/* ── Hero ── */}
+      <section className="animate-rise relative min-h-[74vh] overflow-hidden rounded-[2.5rem] border border-white/[0.06]">
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
@@ -47,152 +48,152 @@ export default async function Home() {
               "url('https://upload.wikimedia.org/wikipedia/commons/3/34/Chess_game_in_Heraklion%2C_Crete.jpg')",
           }}
         />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.62),rgba(0,0,0,0.78))]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,7,17,0.55)_0%,rgba(3,7,17,0.85)_60%,rgba(3,7,17,0.95)_100%)]" />
 
-        <div className="relative z-10 mx-auto flex min-h-[72vh] max-w-5xl flex-col items-center justify-center px-6 py-16 text-center">
-          <p className="eyebrow">{t.heroEyebrow}</p>
-          <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+        <div className="relative z-10 mx-auto flex min-h-[74vh] max-w-5xl flex-col items-center justify-center px-6 py-20 text-center">
+          <p className="eyebrow animate-fade-in">{t.heroEyebrow}</p>
+          <h1 className="mt-5 max-w-4xl bg-gradient-to-b from-white via-white to-slate-400 bg-clip-text text-5xl font-bold leading-[1.05] tracking-tight text-transparent sm:text-6xl lg:text-7xl">
             {t.heroTitle}
           </h1>
-          <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-200 sm:text-xl">
+          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-300/90 sm:text-xl">
             {t.heroSubtitle}
           </p>
 
-          <div className="mt-8 flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:justify-center">
-            <Link href={session ? "/lobby#create-match" : "/register"} className="button-primary px-7 py-3 text-center">
+          <div className="mt-10 flex w-full max-w-md flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link href={session ? "/lobby#create-match" : "/register"} className="button-primary px-8 py-3.5 text-center text-sm">
               {session ? t.ctaCreate : t.ctaRegister}
             </Link>
-            <Link href="#how-to-play" className="button-secondary px-7 py-3 text-center text-slate-100">
+            <Link href="#how-to-play" className="button-secondary px-8 py-3.5 text-center text-sm">
               {t.ctaHowToPlay}
             </Link>
           </div>
 
-          <div className="mt-10 grid w-full max-w-4xl gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/20 bg-black/40 p-4 backdrop-blur-sm">
-              <p className="font-mono text-xs uppercase tracking-[0.16em] text-cyan-200/70">{t.statUsers}</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{stats.usersCount}</p>
+          <div className="mt-14 grid w-full max-w-3xl gap-4 sm:grid-cols-3">
+            <div className="group rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 backdrop-blur-md transition-all hover:border-cyan-400/20 hover:bg-white/[0.05]">
+              <p className="eyebrow text-[10px]">{t.statUsers}</p>
+              <p className="mt-2 text-3xl font-bold tracking-tight text-white">{stats.usersCount}</p>
             </div>
-            <div className="rounded-2xl border border-white/20 bg-black/40 p-4 backdrop-blur-sm">
-              <p className="font-mono text-xs uppercase tracking-[0.16em] text-cyan-200/70">{t.statTransactions}</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{stats.transactionsCount}</p>
+            <div className="group rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 backdrop-blur-md transition-all hover:border-cyan-400/20 hover:bg-white/[0.05]">
+              <p className="eyebrow text-[10px]">{t.statTransactions}</p>
+              <p className="mt-2 text-3xl font-bold tracking-tight text-white">{stats.transactionsCount}</p>
             </div>
-            <div className="rounded-2xl border border-white/20 bg-black/40 p-4 backdrop-blur-sm">
-              <p className="font-mono text-xs uppercase tracking-[0.16em] text-cyan-200/70">{t.statLiveMatches}</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{stats.availableMatches}</p>
+            <div className="group rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 backdrop-blur-md transition-all hover:border-amber-400/20 hover:bg-white/[0.05]">
+              <p className="eyebrow text-[10px]">{t.statLiveMatches}</p>
+              <p className="mt-2 text-3xl font-bold tracking-tight text-white">{stats.availableMatches}</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="how-to-play" className="grid gap-6">
+      {/* ── How to Play ── */}
+      <section id="how-to-play" className="grid gap-8">
         <div>
           <p className="eyebrow">{t.howToEyebrow}</p>
-          <h2 className="mt-2 text-3xl font-semibold text-white">{t.howToTitle}</h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">{t.howToTitle}</h2>
         </div>
         <div className="grid gap-5 lg:grid-cols-3">
-          <article className="panel rounded-[1.75rem] p-6">
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">{t.step2Label}</p>
-            <h3 className="mt-3 text-xl font-semibold text-white">{t.step2Title}</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">{t.step2Desc}</p>
-            <Link href="/arcade-test" className="mt-5 inline-flex text-sm text-cyan-200 hover:text-cyan-100">{t.step2Link}</Link>
-          </article>
-          <article className="panel rounded-[1.75rem] p-6">
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">{t.step1Label}</p>
-            <h3 className="mt-3 text-xl font-semibold text-white">{t.step1Title}</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">{t.step1Desc}</p>
-            <Link href={session ? "/lobby#create-match" : "/register"} className="mt-5 inline-flex text-sm text-cyan-200 hover:text-cyan-100">{t.step1Link}</Link>
-          </article>
-          <article className="panel rounded-[1.75rem] p-6">
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">{t.step3Label}</p>
-            <h3 className="mt-3 text-xl font-semibold text-white">{t.step3Title}</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">{t.step3Desc}</p>
-            <Link href={session ? "/dashboard" : "/login"} className="mt-5 inline-flex text-sm text-cyan-200 hover:text-cyan-100">{t.step3Link}</Link>
-          </article>
+          {[
+            { label: t.step2Label, title: t.step2Title, desc: t.step2Desc, link: t.step2Link, href: "/arcade-test", accent: "from-cyan-500/20 to-transparent" },
+            { label: t.step1Label, title: t.step1Title, desc: t.step1Desc, link: t.step1Link, href: session ? "/lobby#create-match" : "/register", accent: "from-amber-500/15 to-transparent" },
+            { label: t.step3Label, title: t.step3Title, desc: t.step3Desc, link: t.step3Link, href: session ? "/dashboard" : "/login", accent: "from-emerald-500/15 to-transparent" },
+          ].map((step) => (
+            <article key={step.label} className="card-glow panel rounded-[2rem] p-7 transition-transform duration-300 hover:-translate-y-1">
+              <div className={`absolute inset-0 rounded-[2rem] bg-gradient-to-br ${step.accent} opacity-0 transition-opacity duration-300 group-hover:opacity-100`} />
+              <p className="eyebrow text-[10px]">{step.label}</p>
+              <h3 className="mt-3 text-xl font-semibold text-white">{step.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-slate-400">{step.desc}</p>
+              <Link href={step.href} className="mt-5 inline-flex text-sm font-medium text-cyan-400 transition-colors hover:text-cyan-300">
+                {step.link} →
+              </Link>
+            </article>
+          ))}
         </div>
       </section>
 
+      {/* ── Meta Strategy ── */}
       <section className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-        <article className="panel rounded-[2rem] p-6 lg:p-8">
+        <article className="panel card-glow rounded-[2.5rem] p-7 lg:p-9">
           <p className="eyebrow">{t.metaEyebrow}</p>
-          <h2 className="mt-3 text-3xl font-semibold text-white">{t.metaTitle}</h2>
-          <p className="mt-4 text-sm leading-7 text-slate-300">{t.metaDesc}</p>
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">{t.phase1Label}</p>
-              <p className="mt-2 text-sm text-slate-200">{t.phase1Text}</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">{t.metaTitle}</h2>
+          <p className="mt-4 text-sm leading-7 text-slate-400">{t.metaDesc}</p>
+          <div className="mt-7 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-cyan-400/10 bg-cyan-400/[0.04] p-4">
+              <p className="eyebrow text-[10px]">{t.phase1Label}</p>
+              <p className="mt-2 text-sm text-slate-300">{t.phase1Text}</p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">{t.phase2Label}</p>
-              <p className="mt-2 text-sm text-slate-200">{t.phase2Text}</p>
+            <div className="rounded-xl border border-amber-400/10 bg-amber-400/[0.04] p-4">
+              <p className="eyebrow text-[10px] !text-amber-400">{t.phase2Label}</p>
+              <p className="mt-2 text-sm text-slate-300">{t.phase2Text}</p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">{t.phase3Label}</p>
-              <p className="mt-2 text-sm text-slate-200">{t.phase3Text}</p>
+            <div className="rounded-xl border border-emerald-400/10 bg-emerald-400/[0.04] p-4">
+              <p className="eyebrow text-[10px] !text-emerald-400">{t.phase3Label}</p>
+              <p className="mt-2 text-sm text-slate-300">{t.phase3Text}</p>
             </div>
           </div>
         </article>
 
-        <div className="panel overflow-hidden rounded-[2rem] p-3">
+        <div className="panel overflow-hidden rounded-[2.5rem] p-3">
           <Image
             src="/chess-arcade.svg"
             alt="Duelos arcade en paralelo durante una captura de ajedrez"
             width={1200}
             height={720}
-            className="h-auto w-full rounded-[1.25rem]"
+            className="h-auto w-full rounded-[2rem]"
           />
         </div>
       </section>
 
-      <section className="grid gap-6">
+      {/* ── Live Matches ── */}
+      <section className="grid gap-8">
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="eyebrow">{t.liveEyebrow}</p>
-            <h2 className="mt-2 text-3xl font-semibold text-white">{t.liveTitle}</h2>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">{t.liveTitle}</h2>
           </div>
-          <Link href="/lobby" className="text-sm text-cyan-200 hover:text-cyan-100">
-            {t.liveLink}
+          <Link href="/lobby" className="text-sm font-medium text-cyan-400 transition-colors hover:text-cyan-300">
+            {t.liveLink} →
           </Link>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-3">
           {openMatches.length > 0 ? (
             openMatches.map((match: LandingMatch) => (
-              <article key={match.id} className="panel rounded-[1.75rem] p-6">
+              <article key={match.id} className="card-glow panel rounded-[2rem] p-6 transition-transform duration-300 hover:-translate-y-1">
                 <div className="flex items-center justify-between gap-4">
-                  <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 font-mono text-xs uppercase tracking-[0.18em] text-cyan-200">
+                  <span className="rounded-full border border-cyan-400/20 bg-cyan-400/[0.08] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-300">
                     {match.network}
                   </span>
-                  <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
+                  <span className="tag">
                     {match.status.replaceAll("_", " ")}
                   </span>
                 </div>
-                <h3 className="mt-5 text-2xl font-semibold text-white">{match.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-slate-300">{match.theme}</p>
-                <div className="mt-5 flex flex-wrap gap-2 text-xs text-slate-300">
+                <h3 className="mt-5 text-xl font-bold text-white">{match.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-400">{match.theme}</p>
+                <div className="mt-4 flex flex-wrap gap-1.5 text-xs">
                   {match.arcadeGamePool.map((game: string) => (
-                    <span key={game} className="rounded-full bg-white/6 px-3 py-1">
+                    <span key={game} className="tag">
                       {game.replaceAll("_", " ")}
                     </span>
                   ))}
                 </div>
                 <div className="mt-6 flex items-end justify-between">
                   <div>
-                    <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{t.stakeLabel}</p>
-                    <p className="mt-2 text-2xl font-semibold text-amber-200">
-                      {match.stakeAmount} {match.stakeToken}
+                    <p className="eyebrow text-[10px]">{t.stakeLabel}</p>
+                    <p className="mt-1 text-2xl font-bold text-amber-300">
+                      {match.stakeAmount} <span className="text-base font-normal text-amber-300/60">{match.stakeToken}</span>
                     </p>
                   </div>
-                  <Link href={`/match/${match.id}`} className="button-secondary px-4 py-2 text-sm text-white">
+                  <Link href={`/match/${match.id}`} className="button-secondary px-5 py-2.5 text-sm">
                     {t.viewTable}
                   </Link>
                 </div>
               </article>
             ))
           ) : (
-            <article className="panel rounded-[1.75rem] p-6 lg:col-span-3">
-              <h3 className="text-2xl font-semibold text-white">{t.noMatchesTitle}</h3>
-              <p className="mt-3 text-sm leading-7 text-slate-300">{t.noMatchesDesc}</p>
-              <Link href={session ? "/lobby#create-match" : "/register"} className="button-primary mt-5 inline-flex px-5 py-2 text-sm">
+            <article className="panel rounded-[2rem] p-8 lg:col-span-3 text-center">
+              <h3 className="text-2xl font-bold text-white">{t.noMatchesTitle}</h3>
+              <p className="mt-3 text-sm leading-7 text-slate-400">{t.noMatchesDesc}</p>
+              <Link href={session ? "/lobby#create-match" : "/register"} className="button-primary mt-6 inline-flex px-6 py-3 text-sm">
                 {session ? t.noMatchesCta : t.noMatchesCtaRegister}
               </Link>
             </article>
@@ -200,26 +201,27 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-3">
+      {/* ── Networks ── */}
+      <section className="grid gap-8 lg:grid-cols-3">
         {networks.filter((n) => n.enabled).map((network) => (
-          <article key={network.id} className="panel rounded-[1.75rem] p-6">
+          <article key={network.id} className="card-glow panel rounded-[2rem] p-7 transition-transform duration-300 hover:-translate-y-1">
             <p className="eyebrow">{t.networkLabel}</p>
-            <h3 className="mt-3 text-2xl font-semibold text-white">{network.name}</h3>
-            <p className="mt-3 text-sm leading-7 text-slate-300">{network.summary}</p>
+            <h3 className="mt-3 text-2xl font-bold text-white">{network.name}</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-400">{network.summary}</p>
             {network.contractAddress && (
-              <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <p className="font-mono text-[0.65rem] uppercase tracking-widest text-cyan-300/60">Contract</p>
+              <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                <p className="eyebrow text-[9px]">Contract</p>
                 {network.explorerUrl ? (
                   <a
                     href={network.explorerUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 block break-all font-mono text-xs text-cyan-200 underline-offset-2 hover:underline"
+                    className="mt-1 block break-all font-mono text-xs text-cyan-300 underline-offset-2 hover:underline"
                   >
                     {network.contractAddress}
                   </a>
                 ) : (
-                  <p className="mt-1 break-all font-mono text-xs text-slate-300">{network.contractAddress}</p>
+                  <p className="mt-1 break-all font-mono text-xs text-slate-400">{network.contractAddress}</p>
                 )}
               </div>
             )}
@@ -227,90 +229,127 @@ export default async function Home() {
         ))}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-        <article className="panel rounded-[2rem] p-6 lg:p-8">
+      {/* ── Divider ── */}
+      <div className="section-divider" />
+
+      {/* ── About ── */}
+      <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <article className="panel card-glow rounded-[2.5rem] p-7 lg:p-9">
           <p className="eyebrow">{t.aboutEyebrow}</p>
-          <h2 className="mt-3 text-3xl font-semibold text-white">{t.aboutTitle}</h2>
-          <p className="mt-4 text-sm leading-7 text-slate-300">{t.aboutDesc}</p>
-          <ul className="mt-6 grid gap-3 text-sm text-slate-200">
-            <li className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">{t.rule1}</li>
-            <li className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">{t.rule2}</li>
-            <li className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">{t.rule3}</li>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">{t.aboutTitle}</h2>
+          <p className="mt-4 text-sm leading-7 text-slate-400">{t.aboutDesc}</p>
+          <ul className="mt-6 grid gap-3 text-sm text-slate-300">
+            <li className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">✦ {t.rule1}</li>
+            <li className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">✦ {t.rule2}</li>
+            <li className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">✦ {t.rule3}</li>
           </ul>
         </article>
-        <div className="panel overflow-hidden rounded-[2rem] p-3">
+        <div className="panel overflow-hidden rounded-[2.5rem] p-3">
           <Image
             src="/chess-arcade.svg"
             alt="Ajedrez competitivo con duelos arcade"
             width={1200}
             height={720}
-            className="h-auto w-full rounded-[1.25rem]"
+            className="h-auto w-full rounded-[2rem]"
           />
         </div>
       </section>
 
-      <section className="grid gap-6">
+      {/* ── Daily Challenges ── */}
+      <section className="grid gap-8">
         <div>
           <p className="eyebrow">{t.challengesEyebrow}</p>
-          <h2 className="mt-2 text-3xl font-semibold text-white">{t.challengesTitle}</h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">{t.challengesTitle}</h2>
         </div>
         <div className="grid gap-5 lg:grid-cols-3">
           {dailyChallenges.map((challenge) => (
-            <article key={challenge.title} className="panel rounded-[1.75rem] p-6">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">{challenge.title}</p>
-              <p className="mt-3 text-sm leading-7 text-slate-300">{challenge.description}</p>
-              <p className="mt-5 text-sm font-semibold text-amber-200">{t.challengeReward}: {challenge.reward}</p>
+            <article key={challenge.title} className="card-glow panel rounded-[2rem] p-7 transition-transform duration-300 hover:-translate-y-1">
+              <p className="eyebrow text-[10px]">{challenge.title}</p>
+              <p className="mt-3 text-sm leading-7 text-slate-400">{challenge.description}</p>
+              <div className="mt-5 flex items-center gap-2">
+                <span className="rounded-full bg-amber-400/10 border border-amber-400/20 px-3 py-1 text-sm font-semibold text-amber-300">{challenge.reward}</span>
+                <span className="text-xs text-slate-500">{t.challengeReward}</span>
+              </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="grid gap-6">
+      {/* ── Divider ── */}
+      <div className="section-divider" />
+
+      {/* ── Tournaments ── */}
+      <section className="grid gap-8">
         <div>
           <p className="eyebrow">{t.tournamentsEyebrow}</p>
-          <h2 className="mt-2 text-3xl font-semibold text-white">{t.tournamentsTitle}</h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">{t.tournamentsTitle}</h2>
         </div>
         <div className="grid gap-5 lg:grid-cols-3">
           {tournaments.map((tournament) => (
-            <article key={tournament.title} className="panel rounded-[1.75rem] p-6">
-              <h3 className="text-2xl font-semibold text-white">{tournament.title}</h3>
-              <p className="mt-3 text-sm text-slate-300">{tournament.when}</p>
-              <p className="mt-2 text-sm text-slate-300">{t.tournamentFormat}: {tournament.type}</p>
-              <p className="mt-2 text-sm font-semibold text-amber-200">{t.tournamentPrize}: {tournament.prize}</p>
+            <article key={tournament.title} className="card-glow panel rounded-[2rem] p-7 transition-transform duration-300 hover:-translate-y-1">
+              <h3 className="text-xl font-bold text-white">{tournament.title}</h3>
+              <p className="mt-3 text-sm text-slate-400">{tournament.when}</p>
+              <p className="mt-2 text-sm text-slate-400">{t.tournamentFormat}: <span className="text-slate-200">{tournament.type}</span></p>
+              <div className="mt-4 rounded-lg border border-amber-400/10 bg-amber-400/[0.04] px-3 py-2">
+                <p className="text-sm font-semibold text-amber-300">{t.tournamentPrize}: {tournament.prize}</p>
+              </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="grid gap-6">
+      {/* ── Testimonials ── */}
+      <section className="grid gap-8">
         <div>
           <p className="eyebrow">{t.testimonialsEyebrow}</p>
-          <h2 className="mt-2 text-3xl font-semibold text-white">{t.testimonialsTitle}</h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">{t.testimonialsTitle}</h2>
         </div>
         <div className="grid gap-5 lg:grid-cols-3">
           {testimonials.map((testimonial) => (
-            <article key={testimonial.name} className="panel rounded-[1.75rem] p-6">
-              <p className="text-sm leading-7 text-slate-200">“{testimonial.quote}”</p>
-              <p className="mt-5 text-base font-semibold text-white">{testimonial.name}</p>
-              <p className="text-xs uppercase tracking-[0.16em] text-cyan-200/70">{testimonial.role}</p>
+            <article key={testimonial.name} className="panel rounded-[2rem] p-7 transition-transform duration-300 hover:-translate-y-1">
+              <p className="text-sm leading-7 text-slate-300 italic">&ldquo;{testimonial.quote}&rdquo;</p>
+              <div className="mt-6 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400/20 to-amber-400/20 text-sm font-bold text-white">
+                  {testimonial.name.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">{testimonial.name}</p>
+                  <p className="eyebrow text-[9px]">{testimonial.role}</p>
+                </div>
+              </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="grid gap-6">
+      {/* ── Divider ── */}
+      <div className="section-divider" />
+
+      {/* ── Plans ── */}
+      <section className="grid gap-8">
         <div>
           <p className="eyebrow">{t.plansEyebrow}</p>
-          <h2 className="mt-2 text-3xl font-semibold text-white">{t.plansTitle}</h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">{t.plansTitle}</h2>
         </div>
         <div className="grid gap-5 lg:grid-cols-3">
-          {plans.map((plan) => (
-            <article key={plan.name} className="panel rounded-[1.75rem] p-6">
-              <h3 className="text-2xl font-semibold text-white">{plan.name}</h3>
-              <p className="mt-2 text-xl font-semibold text-amber-200">{plan.price}</p>
-              <ul className="mt-5 grid gap-2 text-sm text-slate-300">
+          {plans.map((plan, idx) => (
+            <article
+              key={plan.name}
+              className={`panel rounded-[2rem] p-7 transition-transform duration-300 hover:-translate-y-1 ${
+                idx === 1 ? "card-glow border-cyan-400/15 ring-1 ring-cyan-400/10" : ""
+              }`}
+            >
+              {idx === 1 && (
+                <span className="mb-4 inline-block rounded-full bg-gradient-to-r from-cyan-400/20 to-amber-400/20 border border-cyan-400/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-300">Popular</span>
+              )}
+              <h3 className="text-2xl font-bold text-white">{plan.name}</h3>
+              <p className="mt-2 text-2xl font-bold text-amber-300">{plan.price}</p>
+              <ul className="mt-6 grid gap-2.5 text-sm text-slate-400">
                 {plan.bullets.map((item) => (
-                  <li key={item}>• {item}</li>
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="mt-0.5 text-cyan-400">✦</span>
+                    <span>{item}</span>
+                  </li>
                 ))}
               </ul>
             </article>

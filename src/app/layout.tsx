@@ -40,11 +40,14 @@ export default async function RootLayout({
       lang={locale}
       className={`${display.variable} ${mono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[radial-gradient(circle_at_top,_rgba(250,204,21,0.15),_transparent_24%),linear-gradient(180deg,_#07111f_0%,_#08131b_55%,_#02060a_100%)] text-stone-100">
+      <body className="min-h-full bg-[#030711] text-stone-100">
         <InterwovenKitProviders>
           <LocaleProvider locale={locale} dict={dict}>
             <div className="relative min-h-screen overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:54px_54px] opacity-20" />
+          {/* Background layers */}
+          <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(34,211,238,0.12),transparent),radial-gradient(ellipse_60%_40%_at_80%_100%,rgba(251,191,36,0.06),transparent)]" />
+          <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] opacity-40" />
+
           <Navbar session={session} logoutAction={logoutAction} />
 
           <main className="relative z-10 min-h-[calc(100vh-8rem)]">{children}</main>
