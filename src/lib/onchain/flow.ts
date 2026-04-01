@@ -31,4 +31,7 @@ export const flowAdapter: OnchainAdapter = {
   async settleBet(intent: BetPayoutIntent) {
     return buildReceipt(`Payout Flow de apuesta para ${intent.bettorId} en ${intent.matchId}.`);
   },
+  async queryBalance(_address: string, _denom?: string) {
+    return { amount: 0, denom: "FLOW" };
+  },
 };

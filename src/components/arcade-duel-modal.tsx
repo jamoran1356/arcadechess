@@ -503,7 +503,30 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
 
         {phase === "submitted" && (
           <div className="space-y-4 text-center">
-            <p className="text-lg font-semibold text-slate-300">{arc.waitingRival}</p>
+            {myScore !== null && (
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Tu puntuación</p>
+                <p className="mt-1 text-3xl font-bold text-amber-300">{myScore}</p>
+              </div>
+            )}
+            {(() => {
+              const rivalScore = currentUserId === duel.attackerId ? duel.defenderScore : duel.attackerScore;
+              if (rivalScore !== null && myScore !== null) {
+                const won = myScore > rivalScore;
+                const tied = myScore === rivalScore;
+                return (
+                  <div className={`rounded-xl border p-4 ${won ? "border-emerald-400/30 bg-emerald-400/10" : tied ? "border-amber-400/30 bg-amber-400/10" : "border-rose-400/30 bg-rose-400/10"}`}>
+                    <p className="text-sm text-slate-300">
+                      Rival: <span className="font-bold">{rivalScore}</span>
+                    </p>
+                    <p className={`mt-1 text-lg font-bold ${won ? "text-emerald-300" : tied ? "text-amber-300" : "text-rose-300"}`}>
+                      {won ? "¡Ganaste el duelo!" : tied ? "Empate → Revancha" : "Perdiste el duelo"}
+                    </p>
+                  </div>
+                );
+              }
+              return <p className="text-lg font-semibold text-slate-300">{arc.waitingRival}</p>;
+            })()}
             {message ? <p className="text-sm text-slate-400">{message}</p> : null}
           </div>
         )}

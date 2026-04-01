@@ -254,7 +254,7 @@ function getPlayerColor(match: { hostId: string; guestId: string | null }, userI
   return null;
 }
 
-async function settleWinner(match: {
+export async function settleWinner(match: {
   id: string;
   guestId: string | null;
   preferredNetwork: "INITIA" | "FLOW" | "SOLANA";

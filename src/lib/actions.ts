@@ -12,6 +12,7 @@ import { getOnchainAdapter } from "@/lib/onchain/service";
 import { calculateMatchEntryFee, getPlatformConfig } from "@/lib/platform-config";
 import { createMatchSchema, FormState, loginSchema, placeBetSchema, registerSchema } from "@/lib/validators";
 import { creditWallet, debitWallet, getOrCreateWalletForNetwork, getWalletOrFail } from "@/lib/wallet";
+import { settleWinner } from "@/lib/match-engine";
 import { getEnabledNetworks } from "@/lib/networks";
 
 function parseBoolean(input: FormDataEntryValue | null | undefined) {
@@ -579,7 +580,17 @@ export async function resignMatchAction(formData: FormData) {
 
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { id: true, hostId: true, guestId: true, status: true, moveHistory: true },
+    select: {
+      id: true,
+      hostId: true,
+      guestId: true,
+      status: true,
+      moveHistory: true,
+      stakeAmount: true,
+      entryFee: true,
+      stakeToken: true,
+      preferredNetwork: true,
+    },
   });
 
   if (!match) {
@@ -615,6 +626,15 @@ export async function resignMatchAction(formData: FormData) {
       ],
     },
   });
+
+  // Liquidar fondos: acreditar al ganador y liquidar apuestas
+  if (opponentId) {
+    try {
+      await settleWinner(match, opponentId);
+    } catch (error) {
+      console.error("Settlement error on resign:", error);
+    }
+  }
 
   revalidatePath(`/match/${matchId}`);
   revalidatePath("/lobby");

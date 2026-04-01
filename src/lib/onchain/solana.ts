@@ -31,4 +31,7 @@ export const solanaAdapter: OnchainAdapter = {
   async settleBet(intent: BetPayoutIntent) {
     return buildReceipt(`Payout Solana de apuesta para ${intent.bettorId} en ${intent.matchId}.`);
   },
+  async queryBalance(_address: string, _denom?: string) {
+    return { amount: 0, denom: "SOL" };
+  },
 };
