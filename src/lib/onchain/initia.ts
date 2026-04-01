@@ -182,23 +182,29 @@ export const initiaAdapter: OnchainAdapter = {
   },
 
   async queryBalance(address: string, denom = "uinit") {
-    const LCD_URL = process.env.NEXT_PUBLIC_INITIA_RPC || "https://lcd.testnet.initia.xyz";
-    try {
-      const response = await fetch(
-        `${LCD_URL}/cosmos/bank/v1beta1/balances/${encodeURIComponent(address)}`,
-        { next: { revalidate: 15 } },
-      );
-      if (!response.ok) {
-        console.error(`Initia LCD error: ${response.status} ${response.statusText}`);
-        return { amount: 0, denom };
+    const LCD_URL = process.env.NEXT_PUBLIC_INITIA_RPC || "https://rest.testnet.initia.xyz";
+    const FALLBACK_LCD = "https://rest.testnet.initia.xyz";
+
+    for (const baseUrl of [LCD_URL, ...(LCD_URL !== FALLBACK_LCD ? [FALLBACK_LCD] : [])]) {
+      try {
+        const response = await fetch(
+          `${baseUrl}/cosmos/bank/v1beta1/balances/${encodeURIComponent(address)}`,
+          { next: { revalidate: 15 } },
+        );
+        if (!response.ok) {
+          console.error(`Initia LCD error (${baseUrl}): ${response.status} ${response.statusText}`);
+          continue;
+        }
+        const data = (await response.json()) as { balances?: Array<{ denom: string; amount: string }> };
+        const coin = data.balances?.find((b) => b.denom === denom);
+        const microAmount = Number(coin?.amount ?? "0");
+        return { amount: microAmount / 1_000_000, denom: "INIT" };
+      } catch (error) {
+        console.error(`Initia queryBalance error (${baseUrl}):`, error);
+        continue;
       }
-      const data = (await response.json()) as { balances?: Array<{ denom: string; amount: string }> };
-      const coin = data.balances?.find((b) => b.denom === denom);
-      const microAmount = Number(coin?.amount ?? "0");
-      return { amount: microAmount / 1_000_000, denom: "INIT" };
-    } catch (error) {
-      console.error("Initia queryBalance error:", error);
-      return { amount: 0, denom: "INIT" };
     }
+
+    return null;
   },
 };

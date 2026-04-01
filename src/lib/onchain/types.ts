@@ -49,6 +49,6 @@ export interface OnchainAdapter {
   settleEscrow(intent: SettlementIntent): Promise<OnchainReceipt>;
   placeBet(intent: BetIntent): Promise<OnchainReceipt>;
   settleBet(intent: BetPayoutIntent): Promise<OnchainReceipt>;
-  /** Query on-chain balance for a wallet address. Returns human-readable amount (e.g. INIT not uinit). */
-  queryBalance(address: string, denom?: string): Promise<{ amount: number; denom: string }>;
+  /** Query on-chain balance for a wallet address. Returns human-readable amount (e.g. INIT not uinit). Returns null on failure. */
+  queryBalance(address: string, denom?: string): Promise<{ amount: number; denom: string } | null>;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useInterwovenKit } from "@initia/interwovenkit-react";
 
 type Props = {
@@ -11,6 +12,7 @@ type Props = {
 
 export function OnchainBalance({ address, network, walletId }: Props) {
   const { initiaAddress, isConnected } = useInterwovenKit();
+  const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [linked, setLinked] = useState(false);
@@ -37,7 +39,7 @@ export function OnchainBalance({ address, network, walletId }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address: initiaAddress, network: "INITIA" }),
     })
-      .then((res) => { if (res.ok) setLinked(true); })
+      .then((res) => { if (res.ok) { setLinked(true); router.refresh(); } })
       .catch(() => {});
   }, [network, isConnected, initiaAddress, address, linked]);
 
@@ -53,10 +55,12 @@ export function OnchainBalance({ address, network, walletId }: Props) {
       .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
-          setBalance(data.amount ?? 0);
+          setBalance(typeof data.amount === "number" ? data.amount : null);
+        } else {
+          setBalance(null);
         }
       })
-      .catch(() => {})
+      .catch(() => setBalance(null))
       .finally(() => setLoading(false));
   }, [realAddress, network, isPlaceholder]);
 

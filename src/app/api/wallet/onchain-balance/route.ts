@@ -17,5 +17,9 @@ export async function GET(request: NextRequest) {
   const adapter = getOnchainAdapter(network);
   const result = await adapter.queryBalance(address);
 
+  if (!result) {
+    return NextResponse.json({ amount: null, error: "Balance query failed" });
+  }
+
   return NextResponse.json(result);
 }
