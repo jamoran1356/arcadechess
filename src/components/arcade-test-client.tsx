@@ -298,8 +298,14 @@ export function ArcadeTestClient() {
       ? `${targetIndex}/${scenario.targets.length}`
       : scenario.kind === "memory"
         ? `${memoryIndex}/${scenario.sequence.length}`
-        : `${keyIndex}/${scenario.sequence.length}`;
-        const liveScore = combo * 120 + (scenario.kind === "targets" ? targetIndex * 80 : scenario.kind === "memory" ? memoryIndex * 100 : keyIndex * 70);
+        : scenario.kind === "keys"
+          ? `${keyIndex}/${scenario.sequence.length}`
+          : scenario.kind === "maze"
+            ? "🏁 Llega a la meta"
+            : scenario.kind === "pong"
+              ? `Gana ${scenario.winScore} puntos`
+              : "Reacciona rápido";
+        const liveScore = combo * 120 + (scenario.kind === "targets" ? targetIndex * 80 : scenario.kind === "memory" ? memoryIndex * 100 : scenario.kind === "keys" ? keyIndex * 70 : 0);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_0.95fr]">

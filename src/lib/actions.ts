@@ -149,7 +149,6 @@ export async function createMatchAction(formData: FormData) {
   const isSolo = parseBoolean(formData.get("isSolo"));
   const parsed = createMatchSchema.safeParse({
     stakeAmount: formData.get("stakeAmount"),
-    entryFee: formData.get("entryFee"),
     gameClockMinutes: formData.get("gameClockMinutes"),
     stakeToken: formData.get("stakeToken"),
     network: formData.get("network"),
@@ -166,8 +165,7 @@ export async function createMatchAction(formData: FormData) {
   }
 
   const platformConfig = await getPlatformConfig();
-  const computedEntryFee = calculateMatchEntryFee(parsed.data.stakeAmount, platformConfig);
-  const effectiveEntryFee = Math.max(parsed.data.entryFee, computedEntryFee);
+  const effectiveEntryFee = calculateMatchEntryFee(parsed.data.stakeAmount, platformConfig);
 
   const matchId = randomUUID();
   const hostTotalLock = (parsed.data.stakeAmount + effectiveEntryFee).toFixed(6);

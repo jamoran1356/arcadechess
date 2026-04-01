@@ -253,7 +253,7 @@ async function resolveDuelWithPenalty(
         moveHistory: [
           ...moveHistory,
           defenderWon
-            ? `${boardMove?.san ?? "move"} [arcade-loss-penalty]`
+            ? `${boardMove?.san ?? "move"} [arcade-loss-penalty: ${penaltyReason}]`
             : `Arcade penalty resolved (${penaltyReason})`,
         ],
       },
@@ -330,6 +330,7 @@ async function resolveDuelByScores(
   const boardMove = parseBoardMove(duel.boardMove);
   const isTie = winnerId === null;
   const attackerWins = !isTie && winnerId === duel.attackerId;
+  const scoreTag = `${attackerScore} vs ${defenderScore}`;
   let settledMatchWinnerId: string | null = null;
 
   await prisma.$transaction(async (tx) => {
@@ -392,7 +393,7 @@ async function resolveDuelByScores(
       await tx.match.update({
         where: { id: match.id },
         data: {
-          moveHistory: [...moveHistory, `${boardMove?.san ?? "move"} [arcade-tie → rematch]`],
+          moveHistory: [...moveHistory, `${boardMove?.san ?? "move"} [arcade-tie ${scoreTag} → rematch]`],
         },
       });
       return;
@@ -424,7 +425,7 @@ async function resolveDuelByScores(
           turn: nextTurn,
           winnerId: matchWinnerId,
           turnStartedAt: nextStatus === "FINISHED" ? null : new Date(),
-          moveHistory: [...moveHistory, `${applied.san} [arcade]`],
+          moveHistory: [...moveHistory, `${applied.san} [arcade ${scoreTag}]`],
         },
       });
     } else {
@@ -445,7 +446,7 @@ async function resolveDuelByScores(
           turn: nextTurn,
           winnerId: matchWinnerId,
           turnStartedAt: new Date(),
-          moveHistory: [...moveHistory, `${boardMove.san ?? "move"} [arcade-loss]`],
+          moveHistory: [...moveHistory, `${boardMove.san ?? "move"} [arcade-loss ${scoreTag}]`],
         },
       });
     }

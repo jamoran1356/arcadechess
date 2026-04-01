@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { arcadeLibrary } from "@/lib/arcade";
 import { getLobbySnapshot } from "@/lib/data";
 import { getEnabledNetworks } from "@/lib/networks";
+import { getPlatformConfig } from "@/lib/platform-config";
 import { MatchShareControls } from "@/components/match-share-controls";
 import { CreateMatchForm } from "@/components/create-match-form";
 
@@ -16,9 +17,10 @@ export default async function LobbyPage({
   searchParams?: Promise<{ network?: string }>;
 }) {
   const session = await requireUser();
-  const [{ me, matches }, enabledNetworks] = await Promise.all([
+  const [{ me, matches }, enabledNetworks, platformConfig] = await Promise.all([
     getLobbySnapshot(session.id),
     getEnabledNetworks(),
+    getPlatformConfig(),
   ]);
   const enabledSet = new Set(enabledNetworks);
   const params = (await searchParams) ?? {};
@@ -48,13 +50,17 @@ export default async function LobbyPage({
             wallets={(me?.wallets ?? []).filter((w) => enabledSet.has(w.network)).map((w) => ({ id: w.id, network: w.network, balance: String(w.balance) }))}
             enabledNetworks={enabledNetworks}
             arcadeLibrary={arcadeLibrary.map((g) => ({ id: g.id, name: g.name, blurb: g.blurb }))}
+            feeConfig={{
+              matchFeeBps: platformConfig.matchFeeBps,
+              arcadeFeeFixed: Number(platformConfig.arcadeFeeFixed.toString()),
+              minEntryFee: Number(platformConfig.minEntryFee.toString()),
+            }}
             labels={{
               publishEyebrow: t.publishEyebrow,
               publishTitle: t.publishTitle,
               modeVersus: t.modeVersus,
               modeSolo: t.modeSolo,
               stakeLabel: t.stakeLabel,
-              feeLabel: t.feeLabel,
               clockLabel: t.clockLabel,
               clockNote: t.clockNote,
               arcadeLibrary: t.arcadeLibrary,

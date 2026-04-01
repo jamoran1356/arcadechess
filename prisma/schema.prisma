@@ -42,6 +42,9 @@ enum ArcadeGameType {
   TARGET_RUSH
   MEMORY_GRID
   KEY_CLASH
+  MAZE_RUNNER
+  PING_PONG
+  REACTION_DUEL
 }
 
 enum FriendshipStatus {

@@ -92,6 +92,12 @@ function buildSoloDefenderScore(gameType: ArcadeGameType, seed: string) {
       return Math.round(1800 + normalized * 2600);
     case ArcadeGameType.KEY_CLASH:
       return Math.round(2200 + normalized * 2400);
+    case ArcadeGameType.MAZE_RUNNER:
+      return Math.round(3000 + normalized * 4000);
+    case ArcadeGameType.PING_PONG:
+      return Math.round(3500 + normalized * 4500);
+    case ArcadeGameType.REACTION_DUEL:
+      return Math.round(4000 + normalized * 3500);
     default:
       return Math.round(2500 + normalized * 2500);
   }
@@ -638,7 +644,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   const duelWinnerId = isTie ? null : attackerWins ? duel.attackerId : duel.match.isSolo ? null : duel.defenderId;
   const match = duel.match;
   const moveHistory = asMoveHistory(match.moveHistory);
-  
+  const scoreTag = `${updatedDuel.attackerScore} vs ${updatedDuel.defenderScore}`;
 
   const result = await prisma.$transaction(async (tx) => {
     // Guard against race with arcade-participation polling
@@ -670,7 +676,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
         ...nextState,
         fen: chess.fen(),
         turn: chess.turn(),
-        moveHistory: [...moveHistory, `${applied.san} [arcade]`],
+        moveHistory: [...moveHistory, `${applied.san} [arcade ${scoreTag}]`],
       };
 
       if (chess.isGameOver()) {
@@ -712,7 +718,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       await tx.match.update({
         where: { id: match.id },
         data: {
-          moveHistory: [...moveHistory, `${boardMove.san} [arcade-tie → rematch]`],
+          moveHistory: [...moveHistory, `${boardMove.san} [arcade-tie ${scoreTag} → rematch]`],
         },
       });
 
@@ -739,7 +745,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
         ...nextState,
         fen: fenParts.join(" "),
         turn: newTurn,
-        moveHistory: [...moveHistory, `${boardMove.san} [arcade-loss]`],
+        moveHistory: [...moveHistory, `${boardMove.san} [arcade-loss ${scoreTag}]`],
       };
 
       if (attackerLostKing) {

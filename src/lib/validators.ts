@@ -24,7 +24,6 @@ export const loginSchema = z.object({
 
 export const createMatchSchema = z.object({
   stakeAmount: z.coerce.number().min(0, "El stake no puede ser negativo."),
-  entryFee: z.coerce.number().min(0, "El fee no puede ser negativo.").max(9999, "Fee demasiado alto."),
   gameClockMinutes: z.coerce.number().int().min(1, "Minimo 1 minuto.").max(30, "Maximo 30 minutos."),
   stakeToken: z.string().min(2).max(10).default("INIT"),
   network: z.nativeEnum(TransactionNetwork),

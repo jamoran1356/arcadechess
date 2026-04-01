@@ -9,17 +9,23 @@ import { getInitiaExplorerTxUrl } from "@/lib/explorer";
 
 type WalletInfo = { id: string; network: string; balance: string };
 
+type FeeConfig = { matchFeeBps: number; arcadeFeeFixed: number; minEntryFee: number };
+
+function computeFee(stake: number, cfg: FeeConfig) {
+  return Math.max(cfg.minEntryFee, (stake * cfg.matchFeeBps) / 10_000 + cfg.arcadeFeeFixed);
+}
+
 type Props = {
   wallets: WalletInfo[];
   enabledNetworks: string[];
   arcadeLibrary: { id: string; name: string; blurb: string }[];
+  feeConfig: FeeConfig;
   labels: {
     publishEyebrow: string;
     publishTitle: string;
     modeVersus: string;
     modeSolo: string;
     stakeLabel: string;
-    feeLabel: string;
     clockLabel: string;
     clockNote: string;
     arcadeLibrary: string;
@@ -27,7 +33,7 @@ type Props = {
   };
 };
 
-export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, labels: t }: Props) {
+export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeConfig, labels: t }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +52,6 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, label
 
     const fd = new FormData(form);
     const stake = Number(fd.get("stakeAmount") ?? 0);
-    const fee = Number(fd.get("entryFee") ?? 0);
     const token = String(fd.get("stakeToken") ?? "INIT");
     const network = String(fd.get("network") ?? "INITIA");
 
@@ -55,6 +60,7 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, label
       return;
     }
 
+    const fee = computeFee(stake, feeConfig);
     const total = stake + fee;
     const wallet = wallets.find((w) => w.network === network);
     const walletBalance = wallet ? Number(wallet.balance).toFixed(6) : "0.000000";
@@ -126,9 +132,8 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, label
             {t.modeSolo}
           </label>
         </div>
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           <input name="stakeAmount" type="number" min="0" step="0.01" className="input" placeholder={t.stakeLabel} required />
-          <input name="entryFee" type="number" min="0" step="0.01" className="input" placeholder={t.feeLabel} defaultValue="0" required />
           <input name="stakeToken" className="input" defaultValue="INIT" />
           {enabledNetworks.length === 1 ? (
             <input type="hidden" name="network" value={defaultNetwork} />
@@ -232,7 +237,7 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, label
               <span className="font-semibold text-amber-200">{preview.stake} {preview.token}</span>
             </div>
             <div className="flex justify-between">
-              <span>Entry Fee</span>
+              <span>Platform fee ({(feeConfig.matchFeeBps / 100).toFixed(0)}%)</span>
               <span className="font-semibold text-amber-200">{preview.fee} {preview.token}</span>
             </div>
             <div className="border-t border-white/10 pt-2 flex justify-between font-semibold">

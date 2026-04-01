@@ -35,7 +35,31 @@ type KeyClashScenario = {
   sequence: string[];
 };
 
-export type ArcadeScenario = TargetRushScenario | MemoryGridScenario | KeyClashScenario;
+type MazeCell = { row: number; col: number; walls: { top: boolean; right: boolean; bottom: boolean; left: boolean } };
+
+type MazeScenario = {
+  kind: "maze";
+  grid: MazeCell[][];
+  rows: number;
+  cols: number;
+  start: { row: number; col: number };
+  end: { row: number; col: number };
+};
+
+type PongScenario = {
+  kind: "pong";
+  ballSpeed: number;
+  paddleH: number;
+  winScore: number;
+};
+
+type ReactionScenario = {
+  kind: "reaction";
+  rounds: number;
+  delays: number[];
+};
+
+export type ArcadeScenario = TargetRushScenario | MemoryGridScenario | KeyClashScenario | MazeScenario | PongScenario | ReactionScenario;
 
 export type ArcadeLibraryItem = {
   id: ArcadeGameType;
@@ -73,6 +97,30 @@ export const arcadeLibrary: ArcadeLibraryItem[] = [
     blurb: "Teclea la cadena de comandos antes que tu oponente.",
     timeLimitMs: 16000,
     antiCheat: "Inputs invalidados si exceden tiempo o rompen el patron generado.",
+  },
+  {
+    id: ArcadeGameType.MAZE_RUNNER,
+    slug: "maze-runner",
+    name: "Maze Runner",
+    blurb: "Navega el laberinto desde el inicio hasta la meta antes que tu rival.",
+    timeLimitMs: 25000,
+    antiCheat: "El laberinto se genera del seed. Se valida ruta sin atravesar paredes.",
+  },
+  {
+    id: ArcadeGameType.PING_PONG,
+    slug: "ping-pong",
+    name: "Ping Pong",
+    blurb: "Gana la partida de ping pong contra la maquina para sumar puntos.",
+    timeLimitMs: 30000,
+    antiCheat: "Score y golpes registrados con timestamps. Se valida secuencia.",
+  },
+  {
+    id: ArcadeGameType.REACTION_DUEL,
+    slug: "reaction-duel",
+    name: "Reaction Duel",
+    blurb: "Reacciona rapido a la señal en multiples rondas. El mas rapido gana.",
+    timeLimitMs: 20000,
+    antiCheat: "Delays generados del seed. Reacciones tempranas se penalizan.",
   },
 ];
 
@@ -122,6 +170,88 @@ function buildKeyClash(seed: string): KeyClashScenario {
   };
 }
 
+function buildMaze(seed: string): MazeScenario {
+  const rand = createRng(`${seed}:maze`);
+  const rows = 8;
+  const cols = 10;
+
+  // Initialize grid with all walls
+  const grid: MazeCell[][] = Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c) => ({
+      row: r,
+      col: c,
+      walls: { top: true, right: true, bottom: true, left: true },
+    })),
+  );
+
+  // Randomized DFS to carve passages
+  const visited: boolean[][] = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
+  const stack: Array<{ row: number; col: number }> = [{ row: 0, col: 0 }];
+  visited[0][0] = true;
+
+  const dirs: Array<[number, number, 'top' | 'right' | 'bottom' | 'left', 'top' | 'right' | 'bottom' | 'left']> = [
+    [-1, 0, 'top', 'bottom'],
+    [0, 1, 'right', 'left'],
+    [1, 0, 'bottom', 'top'],
+    [0, -1, 'left', 'right'],
+  ];
+
+  while (stack.length > 0) {
+    const current = stack[stack.length - 1];
+    const neighbors = dirs
+      .map(([dr, dc, wall, opposite]) => {
+        const nr = current.row + dr;
+        const nc = current.col + dc;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited[nr][nc]) {
+          return { row: nr, col: nc, wall, opposite };
+        }
+        return null;
+      })
+      .filter(Boolean) as Array<{ row: number; col: number; wall: 'top' | 'right' | 'bottom' | 'left'; opposite: 'top' | 'right' | 'bottom' | 'left' }>;
+
+    if (neighbors.length === 0) {
+      stack.pop();
+      continue;
+    }
+
+    const next = neighbors[Math.floor(rand() * neighbors.length)];
+    grid[current.row][current.col].walls[next.wall] = false;
+    grid[next.row][next.col].walls[next.opposite] = false;
+    visited[next.row][next.col] = true;
+    stack.push({ row: next.row, col: next.col });
+  }
+
+  return {
+    kind: 'maze',
+    grid,
+    rows,
+    cols,
+    start: { row: 0, col: 0 },
+    end: { row: rows - 1, col: cols - 1 },
+  };
+}
+
+function buildPong(seed: string): PongScenario {
+  const rand = createRng(`${seed}:pong`);
+  return {
+    kind: 'pong',
+    ballSpeed: 2.5 + rand() * 1.5,          // 2.5–4.0
+    paddleH: 0.18 + rand() * 0.08,           // 18–26% of height
+    winScore: 3,
+  };
+}
+
+function buildReaction(seed: string): ReactionScenario {
+  const rand = createRng(`${seed}:reaction`);
+  const rounds = 5;
+  const delays = Array.from({ length: rounds }, () => Math.round(1500 + rand() * 3000)); // 1.5–4.5s
+  return {
+    kind: 'reaction',
+    rounds,
+    delays,
+  };
+}
+
 export function getArcadeDefinition(gameType: ArcadeGameType) {
   return arcadeLibrary.find((game) => game.id === gameType)!;
 }
@@ -132,6 +262,12 @@ export function buildArcadeScenario(gameType: ArcadeGameType, seed: string): Arc
       return buildMemoryGrid(seed);
     case ArcadeGameType.KEY_CLASH:
       return buildKeyClash(seed);
+    case ArcadeGameType.MAZE_RUNNER:
+      return buildMaze(seed);
+    case ArcadeGameType.PING_PONG:
+      return buildPong(seed);
+    case ArcadeGameType.REACTION_DUEL:
+      return buildReaction(seed);
     case ArcadeGameType.TARGET_RUSH:
     default:
       return buildTargetRush(seed);
@@ -233,14 +369,62 @@ export function evaluateArcadeAttempt(
     };
   }
 
-  const correct = scenario.sequence.filter((value, index) => attempt.actions[index]?.value.toUpperCase() === value).length;
-  if (attempt.actions.length !== scenario.sequence.length) {
-    return { valid: false, score: correct * 300, reason: "Comandos incompletos." };
+  if (scenario.kind === "keys") {
+    const correct = scenario.sequence.filter((value, index) => attempt.actions[index]?.value.toUpperCase() === value).length;
+    if (attempt.actions.length !== scenario.sequence.length) {
+      return { valid: false, score: correct * 300, reason: "Comandos incompletos." };
+    }
+
+    return {
+      valid: correct === scenario.sequence.length,
+      score: correct * 800 - duration / 3,
+      reason: correct === scenario.sequence.length ? undefined : "Comando fuera de orden.",
+    };
   }
 
-  return {
-    valid: correct === scenario.sequence.length,
-    score: correct * 800 - duration / 3,
-    reason: correct === scenario.sequence.length ? undefined : "Comando fuera de orden.",
-  };
+  if (scenario.kind === "maze") {
+    const actions = attempt.actions.map((a) => a.value);
+    if (actions.length === 0) {
+      return { valid: false, score: 0, reason: "No se movió en el laberinto." };
+    }
+    const last = actions[actions.length - 1];
+    const [lr, lc] = (last ?? "").split(",").map(Number);
+    const reachedEnd = lr === scenario.end.row && lc === scenario.end.col;
+    if (!reachedEnd) {
+      return { valid: false, score: Math.min(actions.length * 50, 3000), reason: "No llegó a la meta." };
+    }
+    // Fewer steps + faster = better
+    const stepPenalty = actions.length * 10;
+    return { valid: true, score: Math.max(0, 10000 - duration - stepPenalty) };
+  }
+
+  if (scenario.kind === "pong") {
+    const finalAction = attempt.actions.find((a) => a.value.startsWith("final:"));
+    if (!finalAction) {
+      return { valid: false, score: 0, reason: "Partida no completada." };
+    }
+    const [pStr, cStr] = finalAction.value.replace("final:", "").split("-");
+    const playerScore = Number(pStr);
+    const cpuScore = Number(cStr);
+    const hits = attempt.actions.filter((a) => a.value === "hit").length;
+    if (playerScore >= scenario.winScore) {
+      return { valid: true, score: 5000 + hits * 200 + Math.max(0, 5000 - duration) };
+    }
+    return { valid: true, score: playerScore * 800 + hits * 100 - cpuScore * 400 };
+  }
+
+  if (scenario.kind === "reaction") {
+    const reacts = attempt.actions.filter((a) => a.value.startsWith("react:"));
+    const earlyCount = attempt.actions.filter((a) => a.value.startsWith("early:")).length;
+    if (reacts.length + earlyCount < scenario.rounds) {
+      return { valid: false, score: 0, reason: "Rondas incompletas." };
+    }
+    const times = reacts.map((a) => Number(a.value.replace("react:", "").replace("ms", "")));
+    const avg = times.length > 0 ? times.reduce((s, t) => s + t, 0) / times.length : 9999;
+    // Faster average = higher score, early clicks penalize heavily
+    const baseScore = Math.max(0, 10000 - avg * 10);
+    return { valid: true, score: Math.round(baseScore - earlyCount * 2000) };
+  }
+
+  return { valid: false, score: 0, reason: "Tipo de juego desconocido." };
 }

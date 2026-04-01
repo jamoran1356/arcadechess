@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import type { ArcadeAttempt, ArcadeScenario } from "@/lib/arcade";
 import { useDict } from "@/components/locale-provider";
+import { MazeRunnerGame } from "@/components/arcade-games/maze-runner";
+import { PingPongGame } from "@/components/arcade-games/ping-pong";
+import { ReactionDuelGame } from "@/components/arcade-games/reaction-duel";
 
 type ArcadeDuelModalProps = {
   duel: {
@@ -170,6 +173,15 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
     }
     if (duel.scenario.kind === "keys") {
       return `${keyIndex}/${(duel.scenario as { sequence: string[] }).sequence.length}`;
+    }
+    if (duel.scenario.kind === "maze") {
+      return "🏁 Llega a la meta";
+    }
+    if (duel.scenario.kind === "pong") {
+      return `Gana ${(duel.scenario as { winScore: number }).winScore} puntos`;
+    }
+    if (duel.scenario.kind === "reaction") {
+      return `Reacciona rápido`;
     }
     return "";
   }, [duel.scenario, keyIndex, memoryIndex, targetIndex]);
@@ -438,6 +450,51 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
                   ))}
                 </div>
               </div>
+            ) : null}
+
+            {duel.scenario.kind === "maze" ? (
+              <MazeRunnerGame
+                scenario={duel.scenario as import("@/components/arcade-games/maze-runner").MazeScenario}
+                onAction={(value) => {
+                  const startedAt = startTimeRef.current ?? 0;
+                  actionsRef.current = [
+                    ...actionsRef.current,
+                    { at: Math.max(0, Math.round(performance.now() - startedAt)), value },
+                  ];
+                }}
+                onComplete={() => void submitAttemptRef.current?.()}
+                disabled={phase !== "active"}
+              />
+            ) : null}
+
+            {duel.scenario.kind === "pong" ? (
+              <PingPongGame
+                scenario={duel.scenario as import("@/components/arcade-games/ping-pong").PingPongScenario}
+                onAction={(value) => {
+                  const startedAt = startTimeRef.current ?? 0;
+                  actionsRef.current = [
+                    ...actionsRef.current,
+                    { at: Math.max(0, Math.round(performance.now() - startedAt)), value },
+                  ];
+                }}
+                onComplete={() => void submitAttemptRef.current?.()}
+                disabled={phase !== "active"}
+              />
+            ) : null}
+
+            {duel.scenario.kind === "reaction" ? (
+              <ReactionDuelGame
+                scenario={duel.scenario as import("@/components/arcade-games/reaction-duel").ReactionScenario}
+                onAction={(value) => {
+                  const startedAt = startTimeRef.current ?? 0;
+                  actionsRef.current = [
+                    ...actionsRef.current,
+                    { at: Math.max(0, Math.round(performance.now() - startedAt)), value },
+                  ];
+                }}
+                onComplete={() => void submitAttemptRef.current?.()}
+                disabled={phase !== "active"}
+              />
             ) : null}
 
             {message ? <p className="mt-4 text-sm text-rose-300">{message}</p> : null}

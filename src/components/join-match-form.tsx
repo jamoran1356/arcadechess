@@ -159,7 +159,7 @@ export function JoinMatchForm({
               <span className="font-semibold text-amber-200">{stakeAmount} {stakeToken}</span>
             </div>
             <div className="flex justify-between">
-              <span>Entry Fee (plataforma)</span>
+              <span>Platform fee</span>
               <span className="font-semibold text-amber-200">{entryFee} {stakeToken}</span>
             </div>
             <div className="border-t border-white/10 pt-2 flex justify-between font-semibold">
