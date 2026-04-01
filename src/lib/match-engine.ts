@@ -296,6 +296,123 @@ export async function settleWinner(match: {
   await settleSpectatorBets(match.id, winnerId, match.preferredNetwork, match.stakeToken);
 }
 
+/**
+ * Refund both players their stakeAmount when the match ends in a draw
+ * (stalemate, insufficient material, repetition, 50-move rule, etc.).
+ * entryFee is NOT refunded — it's the platform's commission.
+ */
+export async function settleDraw(match: {
+  id: string;
+  hostId: string;
+  guestId: string | null;
+  preferredNetwork: "INITIA" | "FLOW" | "SOLANA";
+  stakeAmount: Prisma.Decimal;
+  stakeToken: string;
+}) {
+  const stakeNum = Number(match.stakeAmount.toString());
+  if (stakeNum <= 0) return;
+
+  const participants = [match.hostId, match.guestId].filter(Boolean) as string[];
+  for (const userId of participants) {
+    await prisma.transaction.create({
+      data: {
+        userId,
+        matchId: match.id,
+        network: match.preferredNetwork,
+        type: TransactionType.PRIZE_PAYOUT,
+        status: TransactionStatus.SETTLED,
+        amount: stakeNum.toFixed(6),
+        token: match.stakeToken,
+        txHash: `draw_refund_${match.id}_${userId}`,
+        metadata: {
+          description: `Empate — reembolso de stake para partida ${match.id}.`,
+          mode: "internal",
+          category: "draw-refund",
+        },
+      },
+    });
+    await creditWallet(userId, match.preferredNetwork, stakeNum);
+  }
+
+  // Refund all open bets
+  await refundOpenBets(match.id, match.preferredNetwork, match.stakeToken);
+}
+
+/**
+ * Refund a single player their full lock (stake + entryFee)
+ * when a match is cancelled with no opponent.
+ */
+export async function refundPlayer(match: {
+  id: string;
+  hostId: string;
+  preferredNetwork: "INITIA" | "FLOW" | "SOLANA";
+  stakeAmount: Prisma.Decimal;
+  entryFee: Prisma.Decimal;
+  stakeToken: string;
+}, userId: string) {
+  const refundAmount = Number(match.stakeAmount.toString()) + Number(match.entryFee.toString());
+  if (refundAmount <= 0) return;
+
+  await prisma.transaction.create({
+    data: {
+      userId,
+      matchId: match.id,
+      network: match.preferredNetwork,
+      type: TransactionType.PRIZE_PAYOUT,
+      status: TransactionStatus.SETTLED,
+      amount: refundAmount.toFixed(6),
+      token: match.stakeToken,
+      txHash: `cancel_refund_${match.id}_${userId}`,
+      metadata: {
+        description: `Cancelación — reembolso completo para partida ${match.id}.`,
+        mode: "internal",
+        category: "cancel-refund",
+      },
+    },
+  });
+  await creditWallet(userId, match.preferredNetwork, refundAmount);
+}
+
+async function refundOpenBets(
+  matchId: string,
+  network: "INITIA" | "FLOW" | "SOLANA",
+  token: string,
+) {
+  const openBets = await prisma.matchBet.findMany({
+    where: { matchId, status: "OPEN" },
+  });
+  if (openBets.length === 0) return;
+
+  const settledAt = new Date();
+  for (const bet of openBets) {
+    const amount = Number(bet.amount.toString());
+    await prisma.$transaction([
+      prisma.matchBet.update({
+        where: { id: bet.id },
+        data: { status: "CANCELLED", settledAt },
+      }),
+      prisma.transaction.create({
+        data: {
+          userId: bet.userId,
+          matchId,
+          network,
+          type: TransactionType.PRIZE_PAYOUT,
+          status: TransactionStatus.SETTLED,
+          amount: amount.toFixed(6),
+          token,
+          txHash: `bet_refund_${matchId}_${bet.id}`,
+          metadata: {
+            description: `Empate/cancelación — reembolso de apuesta.`,
+            mode: "internal",
+            category: "bet-refund",
+          },
+        },
+      }),
+    ]);
+    await creditWallet(bet.userId, network, amount);
+  }
+}
+
 export async function settleSpectatorBets(
   matchId: string,
   winnerId: string,
@@ -561,6 +678,8 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
 
   if (nextState.winnerId) {
     await settleWinner(match, nextState.winnerId);
+  } else if (nextState.status === MatchStatus.FINISHED) {
+    await settleDraw(match);
   }
 
   return {
@@ -812,6 +931,8 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
 
   if (result.matchWinnerId) {
     await settleWinner(match, result.matchWinnerId);
+  } else if (result.status === MatchStatus.FINISHED) {
+    await settleDraw(match);
   }
 
   return {
@@ -895,9 +1016,15 @@ export async function performBotMove(matchId: string) {
   if (nextState.winnerId) {
     const fullMatch = await prisma.match.findUniqueOrThrow({
       where: { id: matchId },
-      select: { id: true, guestId: true, preferredNetwork: true, stakeAmount: true, entryFee: true, stakeToken: true },
+      select: { id: true, hostId: true, guestId: true, preferredNetwork: true, stakeAmount: true, entryFee: true, stakeToken: true },
     });
     await settleWinner(fullMatch, nextState.winnerId);
+  } else if (nextState.status === MatchStatus.FINISHED) {
+    const fullMatch = await prisma.match.findUniqueOrThrow({
+      where: { id: matchId },
+      select: { id: true, hostId: true, guestId: true, preferredNetwork: true, stakeAmount: true, stakeToken: true },
+    });
+    await settleDraw(fullMatch);
   }
 
   return {

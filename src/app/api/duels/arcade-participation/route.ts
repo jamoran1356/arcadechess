@@ -4,7 +4,7 @@ import type { Square } from "chess.js";
 import { ArcadeGameType, Prisma } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { settleSpectatorBets } from "@/lib/match-engine";
+import { settleDraw, settleSpectatorBets } from "@/lib/match-engine";
 import { getOnchainAdapter } from "@/lib/onchain/service";
 import { creditWallet } from "@/lib/wallet";
 
@@ -145,6 +145,7 @@ async function resolveDuelWithPenalty(
   const defenderWon = winnerId === duel.defenderId;
   const boardMove = parseBoardMove(duel.boardMove);
   let settledMatchWinnerId: string | null = null;
+  let matchEndedAsDraw = false;
 
   await prisma.$transaction(async (tx) => {
     // Guard against race with submitArcadeAttempt — if it already resolved, bail.
@@ -295,6 +296,8 @@ async function resolveDuelWithPenalty(
           },
         },
       });
+    } else if (nextStatus === "FINISHED") {
+      matchEndedAsDraw = true;
     }
   });
 
@@ -303,6 +306,15 @@ async function resolveDuelWithPenalty(
     const prizeAmount = Number(match.stakeAmount.mul(participantCount).toString());
     await creditWallet(settledMatchWinnerId, match.preferredNetwork, prizeAmount);
     await settleSpectatorBets(match.id, settledMatchWinnerId, match.preferredNetwork, match.stakeToken);
+  } else if (matchEndedAsDraw) {
+    await settleDraw({
+      id: match.id,
+      hostId: duel.attackerId,
+      guestId: match.guestId,
+      preferredNetwork: match.preferredNetwork,
+      stakeAmount: match.stakeAmount as unknown as Prisma.Decimal,
+      stakeToken: match.stakeToken,
+    });
   }
 }
 
@@ -336,6 +348,7 @@ async function resolveDuelByScores(
   const attackerWins = !isTie && winnerId === duel.attackerId;
   const scoreTag = `${attackerScore} vs ${defenderScore}`;
   let settledMatchWinnerId: string | null = null;
+  let matchEndedAsDraw = false;
 
   await prisma.$transaction(async (tx) => {
     // Guard against race with submitArcadeAttempt — if it already resolved, bail.
@@ -488,6 +501,8 @@ async function resolveDuelByScores(
           },
         },
       });
+    } else if (nextStatus === "FINISHED") {
+      matchEndedAsDraw = true;
     }
   });
 
@@ -496,6 +511,15 @@ async function resolveDuelByScores(
     const prizeAmount = Number(match.stakeAmount.mul(participantCount).toString());
     await creditWallet(settledMatchWinnerId, match.preferredNetwork, prizeAmount);
     await settleSpectatorBets(match.id, settledMatchWinnerId, match.preferredNetwork, match.stakeToken);
+  } else if (matchEndedAsDraw) {
+    await settleDraw({
+      id: match.id,
+      hostId: duel.attackerId,
+      guestId: match.guestId,
+      preferredNetwork: match.preferredNetwork,
+      stakeAmount: match.stakeAmount as unknown as Prisma.Decimal,
+      stakeToken: match.stakeToken,
+    });
   }
 }
 

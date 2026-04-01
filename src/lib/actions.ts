@@ -12,7 +12,7 @@ import { getOnchainAdapter } from "@/lib/onchain/service";
 import { calculateMatchEntryFee, getPlatformConfig } from "@/lib/platform-config";
 import { createMatchSchema, FormState, loginSchema, placeBetSchema, registerSchema } from "@/lib/validators";
 import { creditWallet, debitWallet, getOrCreateWalletForNetwork, getWalletOrFail } from "@/lib/wallet";
-import { settleWinner } from "@/lib/match-engine";
+import { refundPlayer, settleWinner } from "@/lib/match-engine";
 import { getEnabledNetworks } from "@/lib/networks";
 
 function parseBoolean(input: FormDataEntryValue | null | undefined) {
@@ -633,6 +633,13 @@ export async function resignMatchAction(formData: FormData) {
       await settleWinner(match, opponentId);
     } catch (error) {
       console.error("Settlement error on resign:", error);
+    }
+  } else {
+    // No opponent — refund the host's full lock (stake + entryFee)
+    try {
+      await refundPlayer(match, session.id);
+    } catch (error) {
+      console.error("Refund error on resign without opponent:", error);
     }
   }
 
