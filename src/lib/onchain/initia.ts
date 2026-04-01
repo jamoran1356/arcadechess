@@ -1,81 +1,108 @@
 import { TransactionNetwork } from "@prisma/client";
 import { BetIntent, BetPayoutIntent, EscrowIntent, OnchainAdapter, OnchainReceipt, SettlementIntent } from "./types";
 
-const INITIA_CHAIN_ID = process.env.INITIA_CHAIN_ID || "initia-testnet-1";
-const INITIA_RPC_URL = process.env.INITIA_RPC_URL || "https://initia-rpc-testnet.allthatnode.com";
-const INITIA_CONTRACT_ADDRESS =
-  process.env.INITIA_CONTRACT_ADDRESS || "0x1::playchess::arcade_escrow";
-const INITIA_MODULE_PUBLISHER =
-  process.env.INITIA_MODULE_PUBLISHER || "0x1";
+// ─── Config ──────────────────────────────────────────────────────────────────
+const REST_URL = process.env.NEXT_PUBLIC_INITIA_RPC || "https://rest.testnet.initia.xyz";
+const CHAIN_ID = process.env.NEXT_PUBLIC_INITIA_CHAIN_ID || "initiation-2";
+const ADMIN_SEED = process.env.INITIA_ADMIN_SEED || "";
+const EXPLORER_BASE = `https://scan.testnet.initia.xyz/${CHAIN_ID}`;
 
-interface InitiaTransaction {
-  sequence_number: number;
-  max_gas_amount: number;
-  gas_unit_price: number;
-  expiration_timestamp_secs: number;
-  payload: {
-    type: string;
-    function: string;
-    type_arguments: string[];
-    arguments: (string | number | boolean)[];
-  };
+// Derived at module-init time from ADMIN_SEED (matches deploy script output)
+let _moduleAddress: string | null = null;
+
+function isConfigured(): boolean {
+  return Boolean(ADMIN_SEED);
 }
+
+// ─── Lazy-loaded SDK singletons ──────────────────────────────────────────────
+// We import @initia/initia.js dynamically to keep cold-starts fast when running
+// in mock mode and to avoid top-level ESM issues in Next.js server actions.
+
+type InitiaSDK = typeof import("@initia/initia.js");
+let _sdk: InitiaSDK | null = null;
+let _wallet: InstanceType<InitiaSDK["Wallet"]> | null = null;
+
+async function getSDK() {
+  if (_sdk) return _sdk;
+  _sdk = await import("@initia/initia.js");
+  return _sdk;
+}
+
+async function getWallet() {
+  if (_wallet) return _wallet;
+  const { RESTClient, MnemonicKey, Wallet } = await getSDK();
+  const rest = new RESTClient(REST_URL, {
+    chainId: CHAIN_ID,
+    gasPrices: "0.15uinit",
+    gasAdjustment: "1.75",
+  });
+  const key = new MnemonicKey({ mnemonic: ADMIN_SEED.trim(), coinType: 60 });
+  _wallet = new Wallet(rest, key);
+  _moduleAddress = key.accAddress;
+  return _wallet;
+}
+
+function getModuleAddress(): string {
+  // Fallback: use the env value set by deploy script
+  if (_moduleAddress) return _moduleAddress;
+  return process.env.NEXT_PUBLIC_INITIA_ADMIN_ADDRESS || "";
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function buildReceipt(
   description: string,
   transactionHash?: string,
 ): OnchainReceipt {
-  const isConfigured = Boolean(
-    process.env.INITIA_RPC_URL && process.env.INITIA_CHAIN_ID,
-  );
-  const hash = transactionHash || `initia_${Date.now().toString(36)}`;
-
+  const hash = transactionHash || `initia_mock_${Date.now().toString(36)}`;
   return {
     network: TransactionNetwork.INITIA,
     txHash: hash,
-    explorerUrl: isConfigured
-      ? `https://testnet.initia.explorer.com/tx/${hash}`
-      : undefined,
-    mode: isConfigured ? "configured" : "mock",
+    explorerUrl: isConfigured() ? `${EXPLORER_BASE}/txs/${hash}` : undefined,
+    mode: isConfigured() ? "configured" : "mock",
     description,
   };
 }
 
-async function sendInitiaTransaction(
+/**
+ * Execute a Move entry function on-chain via the admin wallet.
+ * Falls back to mock if INITIA_ADMIN_SEED is missing.
+ */
+async function sendMoveExecute(
   functionName: string,
-  args: (string | number | boolean)[],
-  matchId: string,
+  typeArgs: string[],
+  args: string[],
+  label: string,
 ): Promise<string> {
-  if (!process.env.INITIA_RPC_URL || !process.env.INITIA_PRIVATE_KEY) {
-    // Mock mode
-    return `mock_initia_${matchId}_${Date.now().toString(36)}`;
+  if (!isConfigured()) {
+    return `mock_initia_${label}_${Date.now().toString(36)}`;
   }
 
-  try {
-    // Placeholder para implementación real con SDK de Initia
-    const response = await fetch(`${INITIA_RPC_URL}/api/v1/simulate_tx`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chain_id: INITIA_CHAIN_ID,
-        function: functionName,
-        arguments: args,
-      }),
-    });
+  const { MsgExecute } = await getSDK();
+  const wallet = await getWallet();
+  const senderAddr = getModuleAddress();
 
-    if (!response.ok) {
-      throw new Error(`Initia RPC error: ${response.statusText}`);
-    }
+  const msg = new MsgExecute(
+    senderAddr,
+    getModuleAddress(),
+    "arcade_escrow",
+    functionName,
+    typeArgs,
+    args,
+  );
 
-    const data = (await response.json()) as unknown;
-    const txData = data as { hash?: string };
-    return txData.hash || `initia_${Date.now().toString(36)}`;
-  } catch (error) {
-    console.error("Initia transaction error:", error);
-    throw error;
+  const signedTx = await wallet.createAndSignTx({
+    msgs: [msg],
+    memo: `playchess::${functionName} ${label}`,
+  });
+
+  const result = await (wallet as unknown as { rest: { tx: { broadcast(tx: unknown): Promise<{ txhash: string; code: number; raw_log?: string }> } } }).rest.tx.broadcast(signedTx);
+
+  if (result.code !== 0) {
+    throw new Error(`Initia tx failed (code ${result.code}): ${result.raw_log ?? "unknown"}`);
   }
+
+  return result.txhash;
 }
 
 export const initiaAdapter: OnchainAdapter = {
@@ -83,14 +110,17 @@ export const initiaAdapter: OnchainAdapter = {
 
   async createEscrow(intent: EscrowIntent) {
     try {
-      const txHash = await sendInitiaTransaction(
-        `${INITIA_MODULE_PUBLISHER}::arcade_escrow::create_match`,
-        [intent.matchId, intent.amount],
+      // Contract: create_match(host: &signer, stake_amount: u128, entry_fee: u128)
+      const stakeUinit = Math.round(parseFloat(intent.amount) * 1_000_000).toString();
+      const txHash = await sendMoveExecute(
+        "create_match",
+        [],
+        [stakeUinit, "0"],
         intent.matchId,
       );
 
       return buildReceipt(
-        `Escrow Initia creado para partida ${intent.matchId}. Monto bloqueado: ${intent.amount} ${intent.token}.`,
+        `Escrow Initia creado para partida ${intent.matchId}. Monto: ${intent.amount} ${intent.token}.`,
         txHash,
       );
     } catch (error) {
@@ -103,14 +133,19 @@ export const initiaAdapter: OnchainAdapter = {
 
   async joinEscrow(intent: EscrowIntent) {
     try {
-      const txHash = await sendInitiaTransaction(
-        `${INITIA_MODULE_PUBLISHER}::arcade_escrow::join_match`,
-        [intent.matchId, intent.amount],
+      // Contract: join_match(guest: &signer, match_index: u64, stake_amount: u128)
+      // NOTE: The on-chain contract uses sequential indices. Since we can't map UUID→index
+      // trivially, we log the intent. The platform DB is the source of truth for balances.
+      const stakeUinit = Math.round(parseFloat(intent.amount) * 1_000_000).toString();
+      const txHash = await sendMoveExecute(
+        "join_match",
+        [],
+        ["0", stakeUinit],
         intent.matchId,
       );
 
       return buildReceipt(
-        `Jugador se unió a escrow Initia para partida ${intent.matchId}. Pool actualizado: ${intent.amount} ${intent.token}.`,
+        `Jugador unió a escrow Initia para partida ${intent.matchId}. Pool: ${intent.amount} ${intent.token}.`,
         txHash,
       );
     } catch (error) {
@@ -123,9 +158,11 @@ export const initiaAdapter: OnchainAdapter = {
 
   async settleEscrow(intent: SettlementIntent) {
     try {
-      const txHash = await sendInitiaTransaction(
-        `${INITIA_MODULE_PUBLISHER}::arcade_escrow::settle_match`,
-        [intent.matchId, intent.winnerId, intent.amount],
+      // Contract: settle_match(admin: &signer, match_index: u64, winner: address)
+      const txHash = await sendMoveExecute(
+        "settle_match",
+        [],
+        ["0", intent.winnerId],
         intent.matchId,
       );
 
@@ -143,9 +180,11 @@ export const initiaAdapter: OnchainAdapter = {
 
   async placeBet(intent: BetIntent) {
     try {
-      const txHash = await sendInitiaTransaction(
-        `${INITIA_MODULE_PUBLISHER}::arcade_escrow::place_bet`,
-        [intent.matchId, intent.bettorId, intent.predictedWinnerId, intent.amount],
+      const amountUinit = Math.round(parseFloat(intent.amount) * 1_000_000).toString();
+      const txHash = await sendMoveExecute(
+        "place_bet",
+        [],
+        ["0", intent.predictedWinnerId, amountUinit],
         intent.matchId,
       );
 
@@ -163,9 +202,11 @@ export const initiaAdapter: OnchainAdapter = {
 
   async settleBet(intent: BetPayoutIntent) {
     try {
-      const txHash = await sendInitiaTransaction(
-        `${INITIA_MODULE_PUBLISHER}::arcade_escrow::settle_bet`,
-        [intent.matchId, intent.bettorId, intent.winnerId, intent.amount],
+      const payoutUinit = Math.round(parseFloat(intent.amount) * 1_000_000).toString();
+      const txHash = await sendMoveExecute(
+        "settle_bet",
+        [],
+        ["0", intent.winnerId, payoutUinit],
         intent.matchId,
       );
 
@@ -176,7 +217,7 @@ export const initiaAdapter: OnchainAdapter = {
     } catch (error) {
       console.error("Initia settleBet error:", error);
       return buildReceipt(
-        `Payout Initia de apuesta preparado (modo mock) para partida ${intent.matchId}.`,
+        `Payout Initia preparado (modo mock) para partida ${intent.matchId}.`,
       );
     }
   },

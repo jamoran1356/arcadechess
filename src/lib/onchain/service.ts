@@ -50,7 +50,7 @@ export function getSupportedNetworks(enabledList?: TransactionNetwork[]) {
       id: TransactionNetwork.INITIA,
       name: "Initia",
       summary: "Escrow principal para stakes del hackathon y appchain gaming.",
-      status: process.env.INITIA_RPC_URL ? "Configurado" : "Mock listo para conectar con weave/minitiad",
+      status: process.env.INITIA_ADMIN_SEED ? "Configurado" : "Mock listo para conectar con weave/minitiad",
       contractAddress: initiaContract,
       explorerUrl: initiaContract
         ? `https://scan.testnet.initia.xyz/${initiaChainId}/accounts/${initiaContract}`
