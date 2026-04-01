@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { settleSpectatorBets } from "@/lib/match-engine";
 import { getOnchainAdapter } from "@/lib/onchain/service";
+import { creditWallet } from "@/lib/wallet";
 
 /**
  * System endpoint que detecta y penaliza a jugadores que no participan en duelos arcade.
@@ -298,6 +299,9 @@ async function resolveDuelWithPenalty(
   });
 
   if (settledMatchWinnerId) {
+    const participantCount = match.guestId ? 2 : 1;
+    const prizeAmount = Number(match.stakeAmount.mul(participantCount).toString());
+    await creditWallet(settledMatchWinnerId, match.preferredNetwork, prizeAmount);
     await settleSpectatorBets(match.id, settledMatchWinnerId, match.preferredNetwork, match.stakeToken);
   }
 }
@@ -488,6 +492,9 @@ async function resolveDuelByScores(
   });
 
   if (settledMatchWinnerId) {
+    const participantCount = match.guestId ? 2 : 1;
+    const prizeAmount = Number(match.stakeAmount.mul(participantCount).toString());
+    await creditWallet(settledMatchWinnerId, match.preferredNetwork, prizeAmount);
     await settleSpectatorBets(match.id, settledMatchWinnerId, match.preferredNetwork, match.stakeToken);
   }
 }
