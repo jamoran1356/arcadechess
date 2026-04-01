@@ -26,7 +26,7 @@ const CONTRACT_DIR = resolve(ROOT, 'contracts/initia')
 const CONTRACT_DIR_POSIX = CONTRACT_DIR.replace(/\\/g, '/')
 const MOVE_TOML = resolve(CONTRACT_DIR, 'Move.toml')
 const BUILD_DIR = resolve(CONTRACT_DIR, 'build/playchess_arcade/bytecode_modules')
-const MV_FILE = resolve(BUILD_DIR, 'arcade_escrow.mv')
+const MV_FILE = resolve(BUILD_DIR, 'arcade_escrow_v2.mv')
 const ENV_FILE = resolve(ROOT, '.env')
 
 const REST_URL = 'https://rest.testnet.initia.xyz'
@@ -298,7 +298,7 @@ async function main() {
   const bytecode  = readFileSync(MV_FILE)
   const codeB64   = bytecode.toString('base64')
 
-  // Testnet requires explicit policy; use COMPATIBLE for iterative development.
+  // Testnet: use COMPATIBLE for iterative development.
   const msg       = new MsgPublish(senderBech32, [codeB64], MsgPublish.Policy.COMPATIBLE)
   const wallet    = new Wallet(rest, key)
 

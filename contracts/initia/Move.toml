@@ -1,10 +1,12 @@
 [package]
 name = "playchess_arcade"
-version = "0.0.1"
+version = "0.0.2"
 
 [dependencies]
 MoveStdlib = { local = "./move_stdlib" }
+InitiaStdlib = { local = "./initia_stdlib" }
 
 [addresses]
 std = "0x1"
+initia_std = "0x1"
 playchess = "0x000000000000000000000000be42216b86925924224de640f7c6655a1ebc1d31"

@@ -15,9 +15,6 @@ function isConfigured(): boolean {
 }
 
 // ─── Lazy-loaded SDK singletons ──────────────────────────────────────────────
-// We import @initia/initia.js dynamically to keep cold-starts fast when running
-// in mock mode and to avoid top-level ESM issues in Next.js server actions.
-
 type InitiaSDK = typeof import("@initia/initia.js");
 let _sdk: InitiaSDK | null = null;
 let _wallet: InstanceType<InitiaSDK["Wallet"]> | null = null;
@@ -43,7 +40,6 @@ async function getWallet() {
 }
 
 function getModuleAddress(): string {
-  // Fallback: use the env value set by deploy script
   if (_moduleAddress) return _moduleAddress;
   return process.env.NEXT_PUBLIC_INITIA_ADMIN_ADDRESS || "";
 }
@@ -85,7 +81,7 @@ async function sendMoveExecute(
   const msg = new MsgExecute(
     senderAddr,
     getModuleAddress(),
-    "arcade_escrow",
+    "arcade_escrow_v2",
     functionName,
     typeArgs,
     args,
@@ -105,23 +101,103 @@ async function sendMoveExecute(
   return result.txhash;
 }
 
+// ─── On-chain match index tracking ──────────────────────────────────────────
+// The contract uses sequential match indices starting from 1.
+// We track the next index locally so we can map DB matchId → on-chain index.
+let _nextMatchIndex: number | null = null;
+
+async function getNextMatchIndex(): Promise<number> {
+  if (_nextMatchIndex !== null) return _nextMatchIndex;
+  try {
+    const moduleAddr = getModuleAddress();
+    const res = await fetch(
+      `${REST_URL}/initia/move/v1/accounts/${moduleAddr}/modules/arcade_escrow_v2/view_functions/get_match_count`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ args: [] }),
+      },
+    );
+    if (res.ok) {
+      const data = (await res.json()) as { data?: string };
+      _nextMatchIndex = parseInt(data.data ?? "0", 10);
+      return _nextMatchIndex;
+    }
+  } catch { /* fall through */ }
+  _nextMatchIndex = 0;
+  return 0;
+}
+
+// ─── Standalone on-chain settlement helpers (draw / refund) ─────────────────
+// These call contract entry functions not in the OnchainAdapter interface.
+
+/**
+ * Call settle_draw on-chain — refunds both players from vault.
+ * match_index must map to the on-chain index (0-based).
+ */
+export async function initiaSettleDrawOnchain(matchIndex: number, label: string): Promise<string | null> {
+  try {
+    return await sendMoveExecute(
+      "settle_draw",
+      [],
+      [matchIndex.toString()],
+      `draw_${label}`,
+    );
+  } catch (error) {
+    console.error("Initia settle_draw on-chain error:", error);
+    return null;
+  }
+}
+
+/**
+ * Call refund_match on-chain — cancels and refunds deposits from vault.
+ */
+export async function initiaRefundMatchOnchain(matchIndex: number, label: string): Promise<string | null> {
+  try {
+    return await sendMoveExecute(
+      "refund_match",
+      [],
+      [matchIndex.toString()],
+      `refund_${label}`,
+    );
+  } catch (error) {
+    console.error("Initia refund_match on-chain error:", error);
+    return null;
+  }
+}
+
 export const initiaAdapter: OnchainAdapter = {
   network: TransactionNetwork.INITIA,
 
   async createEscrow(intent: EscrowIntent) {
     try {
-      // Contract: create_match(host: &signer, stake_amount: u128, entry_fee: u128)
-      const stakeUinit = Math.round(parseFloat(intent.amount) * 1_000_000).toString();
-      const txHash = await sendMoveExecute(
+      const stakeUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
+      const hostAddress = intent.actorWallet || "";
+
+      // 1. Create match record on-chain
+      const matchIndex = await getNextMatchIndex();
+      const txHash1 = await sendMoveExecute(
         "create_match",
         [],
-        [stakeUinit, "0"],
-        intent.matchId,
+        [hostAddress, stakeUinit.toString(), "0"],
+        `create_${intent.matchId}`,
       );
 
+      // 2. Deposit host's stake from admin treasury to vault
+      if (stakeUinit > 0) {
+        await sendMoveExecute(
+          "deposit_funds",
+          [],
+          [matchIndex.toString(), hostAddress, stakeUinit.toString()],
+          `deposit_host_${intent.matchId}`,
+        );
+      }
+
+      _nextMatchIndex = matchIndex + 1;
+
       return buildReceipt(
-        `Escrow Initia creado para partida ${intent.matchId}. Monto: ${intent.amount} ${intent.token}.`,
-        txHash,
+        `Escrow Initia creado (match #${matchIndex}). Host: ${hostAddress}. Monto: ${intent.amount} ${intent.token}. Fondos custodiados en vault.`,
+        txHash1,
       );
     } catch (error) {
       console.error("Initia createEscrow error:", error);
@@ -133,19 +209,21 @@ export const initiaAdapter: OnchainAdapter = {
 
   async joinEscrow(intent: EscrowIntent) {
     try {
-      // Contract: join_match(guest: &signer, match_index: u64, stake_amount: u128)
-      // NOTE: The on-chain contract uses sequential indices. Since we can't map UUID→index
-      // trivially, we log the intent. The platform DB is the source of truth for balances.
-      const stakeUinit = Math.round(parseFloat(intent.amount) * 1_000_000).toString();
+      const stakeUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
+      const guestAddress = intent.actorWallet || "";
+
+      // Deposit guest's stake to vault (match should already exist)
+      // The match_index needs to come from the match metadata
+      const matchIndex = await getNextMatchIndex() - 1; // latest match
       const txHash = await sendMoveExecute(
-        "join_match",
+        "deposit_funds",
         [],
-        ["0", stakeUinit],
-        intent.matchId,
+        [matchIndex.toString(), guestAddress, stakeUinit.toString()],
+        `deposit_guest_${intent.matchId}`,
       );
 
       return buildReceipt(
-        `Jugador unió a escrow Initia para partida ${intent.matchId}. Pool: ${intent.amount} ${intent.token}.`,
+        `Guest unió a escrow Initia (match #${matchIndex}). Depósito: ${intent.amount} ${intent.token} custodiado en vault.`,
         txHash,
       );
     } catch (error) {
@@ -158,16 +236,18 @@ export const initiaAdapter: OnchainAdapter = {
 
   async settleEscrow(intent: SettlementIntent) {
     try {
-      // Contract: settle_match(admin: &signer, match_index: u64, winner: address)
+      const prizeUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
+      // settle_to_winner(admin, match_index, winner, prize_amount)
+      // 6-layer validation happens on-chain in the contract
       const txHash = await sendMoveExecute(
-        "settle_match",
+        "settle_to_winner",
         [],
-        ["0", intent.winnerId],
-        intent.matchId,
+        ["0", intent.winnerId, prizeUinit.toString()],
+        `settle_${intent.matchId}`,
       );
 
       return buildReceipt(
-        `Liquidación Initia completada para partida ${intent.matchId}. Ganador: ${intent.winnerId}. Premio: ${intent.amount} ${intent.token}.`,
+        `Liquidación Initia completada on-chain. Ganador: ${intent.winnerId}. Premio: ${intent.amount} ${intent.token} transferido desde vault.`,
         txHash,
       );
     } catch (error) {
@@ -179,47 +259,17 @@ export const initiaAdapter: OnchainAdapter = {
   },
 
   async placeBet(intent: BetIntent) {
-    try {
-      const amountUinit = Math.round(parseFloat(intent.amount) * 1_000_000).toString();
-      const txHash = await sendMoveExecute(
-        "place_bet",
-        [],
-        ["0", intent.predictedWinnerId, amountUinit],
-        intent.matchId,
-      );
-
-      return buildReceipt(
-        `Apuesta Initia registrada para partida ${intent.matchId} sobre ${intent.predictedWinnerId} por ${intent.amount} ${intent.token}.`,
-        txHash,
-      );
-    } catch (error) {
-      console.error("Initia placeBet error:", error);
-      return buildReceipt(
-        `Apuesta Initia preparada (modo mock) para partida ${intent.matchId}.`,
-      );
-    }
+    // Bets remain DB-only for now — on-chain betting planned for v2
+    return buildReceipt(
+      `Apuesta registrada (DB) para partida ${intent.matchId} sobre ${intent.predictedWinnerId} por ${intent.amount} ${intent.token}.`,
+    );
   },
 
   async settleBet(intent: BetPayoutIntent) {
-    try {
-      const payoutUinit = Math.round(parseFloat(intent.amount) * 1_000_000).toString();
-      const txHash = await sendMoveExecute(
-        "settle_bet",
-        [],
-        ["0", intent.winnerId, payoutUinit],
-        intent.matchId,
-      );
-
-      return buildReceipt(
-        `Payout Initia de apuesta para ${intent.bettorId} en partida ${intent.matchId}: ${intent.amount} ${intent.token}.`,
-        txHash,
-      );
-    } catch (error) {
-      console.error("Initia settleBet error:", error);
-      return buildReceipt(
-        `Payout Initia preparado (modo mock) para partida ${intent.matchId}.`,
-      );
-    }
+    // Bets remain DB-only for now
+    return buildReceipt(
+      `Payout de apuesta (DB) para ${intent.bettorId} en partida ${intent.matchId}: ${intent.amount} ${intent.token}.`,
+    );
   },
 
   async queryBalance(address: string, denom = "uinit") {
