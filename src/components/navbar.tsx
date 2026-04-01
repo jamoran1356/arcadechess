@@ -50,88 +50,67 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
 
   return (
     <header className="sticky top-0 z-40">
-      {/* Top accent bar */}
-      <div className="h-[2px] bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
-
-      <div className="border-b border-white/[0.06] bg-[rgba(3,7,17,0.7)] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_4px_24px_rgba(0,0,0,0.4)]">
+      {/* ── Primary bar: logo + nav links + auth ── */}
+      <div className="border-b border-white/[0.06] bg-[rgba(3,7,17,0.85)] backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          {/* Logo + Brand */}
-          <Link href="/" className="group flex items-center gap-3 rounded-xl pr-3 transition-all hover:bg-white/[0.03]">
-            <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-cyan-500/10 to-amber-500/10 shadow-lg transition-all group-hover:border-cyan-400/30 group-hover:shadow-cyan-900/30">
+          {/* Logo */}
+          <Link href="/" className="group flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.04]">
               <Image
                 src="/assets/images/logo.webp"
                 alt="PlayChess Arena"
                 width={90}
                 height={90}
-                className="h-8 w-8 object-contain"
+                className="h-7 w-7 object-contain"
                 priority
               />
             </div>
             <div className="hidden sm:block">
-              <p className="eyebrow text-[9px]">
-                {dict.nav.brand}
-              </p>
               <p className="font-display text-sm font-bold leading-tight tracking-tight text-white">
                 {dict.nav.brandTitle}
               </p>
             </div>
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden items-center gap-0.5 md:flex">
+          {/* Center nav */}
+          <nav className="hidden items-center gap-1 md:flex">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`group relative rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all duration-200 ${
+                className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors ${
                   isActive(link.href)
-                    ? "text-white"
-                    : "text-slate-400 hover:text-slate-200"
+                    ? "bg-white/[0.08] text-white"
+                    : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
                 }`}
               >
-                {isActive(link.href) && (
-                  <span className="absolute inset-0 rounded-lg bg-white/[0.07]" />
-                )}
-                <span className="relative">{link.label}</span>
-                {isActive(link.href) && (
-                  <span className="absolute inset-x-2 -bottom-[13px] h-[2px] rounded-full bg-gradient-to-r from-cyan-400 to-amber-400" />
-                )}
+                {link.label}
               </Link>
             ))}
           </nav>
 
-          {/* Right side */}
+          {/* Right: auth only */}
           <div className="flex items-center gap-2">
-            <InterwovenKitConnectButton />
             <LanguageSwitcher />
 
             {session ? (
-              <div className="hidden items-center gap-3 sm:flex">
-                <div className="flex items-center gap-2.5 rounded-full border border-white/[0.08] bg-white/[0.03] py-1.5 pl-1.5 pr-4">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-400/25 to-cyan-400/25 text-[11px] font-bold text-white shadow-inner">
-                    {initials}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[13px] font-medium leading-none text-white">{session.name}</p>
-                    <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-cyan-300/50">
-                      {session.role}
-                    </p>
-                  </div>
-                </div>
+              <div className="hidden items-center gap-2.5 sm:flex">
+                <span className="text-[13px] font-medium text-slate-300">{session.name}</span>
+                <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">{session.role}</span>
                 <form action={logoutAction}>
                   <button
                     type="submit"
-                    className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs text-slate-400 transition-all hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+                    className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs text-slate-400 transition hover:border-white/15 hover:text-white"
                   >
                     {dict.nav.logout}
                   </button>
                 </form>
               </div>
             ) : (
-              <div className="hidden items-center gap-2.5 sm:flex">
+              <div className="hidden items-center gap-2 sm:flex">
                 <Link
                   href="/login"
-                  className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-1.5 text-[13px] text-slate-300 transition-all hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+                  className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-1.5 text-[13px] text-slate-300 transition hover:border-white/15 hover:text-white"
                 >
                   {dict.nav.login}
                 </Link>
@@ -148,7 +127,7 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
             <button
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="relative z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-white transition-all hover:border-white/15 hover:bg-white/[0.08] md:hidden"
+              className="relative z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-white transition hover:bg-white/[0.08] md:hidden"
               aria-label="Menu"
             >
               <div className="flex w-4 flex-col items-center gap-[5px]">
@@ -160,6 +139,23 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
           </div>
         </div>
       </div>
+
+      {/* ── Secondary bar: wallet connect (only when logged in) ── */}
+      {session && (
+        <div className="border-b border-white/[0.04] bg-[rgba(3,7,17,0.6)] backdrop-blur-lg">
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-end gap-3 px-4 py-2 sm:px-6 lg:px-8">
+            <span className="mr-auto text-[11px] font-mono uppercase tracking-wider text-slate-500">{dict.nav.brand}</span>
+            <InterwovenKitConnectButton />
+          </div>
+        </div>
+      )}
+      {!session && (
+        <div className="border-b border-white/[0.04] bg-[rgba(3,7,17,0.6)] backdrop-blur-lg">
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-end gap-3 px-4 py-2 sm:px-6 lg:px-8">
+            <InterwovenKitConnectButton />
+          </div>
+        </div>
+      )}
 
       {/* Mobile drawer */}
       <div
@@ -175,7 +171,7 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
         />
 
         <div
-          className={`absolute right-0 top-0 h-full w-72 border-l border-white/[0.06] bg-[linear-gradient(180deg,rgba(3,7,17,0.98),rgba(6,12,22,0.96))] p-6 pt-20 shadow-[−24px_0_80px_rgba(0,0,0,0.6)] transition-transform duration-300 ${
+          className={`absolute right-0 top-0 h-full w-72 border-l border-white/[0.06] bg-[rgba(3,7,17,0.98)] p-6 pt-20 shadow-[−24px_0_80px_rgba(0,0,0,0.6)] transition-transform duration-300 ${
             mobileOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
@@ -199,7 +195,7 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
             {session ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400/20 to-cyan-400/20 border border-white/10 text-sm font-bold text-white">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.08] border border-white/10 text-sm font-bold text-white">
                     {initials}
                   </div>
                   <div>

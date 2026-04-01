@@ -633,8 +633,9 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
     };
   }
 
-  const attackerWins = updatedDuel.attackerScore > updatedDuel.defenderScore;
-  const duelWinnerId = attackerWins ? duel.attackerId : duel.match.isSolo ? null : duel.defenderId;
+  const isTie = updatedDuel.attackerScore === updatedDuel.defenderScore;
+  const attackerWins = !isTie && updatedDuel.attackerScore > updatedDuel.defenderScore;
+  const duelWinnerId = isTie ? null : attackerWins ? duel.attackerId : duel.match.isSolo ? null : duel.defenderId;
   const match = duel.match;
   const moveHistory = asMoveHistory(match.moveHistory);
   
@@ -685,6 +686,43 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
           };
         }
       }
+    } else if (isTie) {
+      // Tie — create a new duel (rematch) with a different minigame.
+      const gamePool = asGameTypes(match.arcadeGamePool);
+      const newGameType = gamePool[Math.floor(Math.random() * gamePool.length)] ?? ArcadeGameType.TARGET_RUSH;
+
+      const rematch = await tx.arcadeDuel.create({
+        data: {
+          matchId: match.id,
+          attackerId: duel.attackerId,
+          defenderId: duel.defenderId,
+          gameType: newGameType,
+          seed: randomUUID(),
+          boardMove: duel.boardMove as Prisma.InputJsonValue,
+        },
+      });
+
+      // Mark current duel as resolved (tie)
+      await tx.arcadeDuel.update({
+        where: { id: duelId },
+        data: { winnerId: null, resolvedAt: new Date() },
+      });
+
+      // Keep match in ARCADE_PENDING — don't update FEN/turn
+      await tx.match.update({
+        where: { id: match.id },
+        data: {
+          moveHistory: [...moveHistory, `${boardMove.san} [arcade-tie → rematch]`],
+        },
+      });
+
+      return {
+        attackerWins: false,
+        duelWinnerId: null,
+        matchWinnerId: null,
+        status: MatchStatus.ARCADE_PENDING,
+        rematchDuelId: rematch.id,
+      };
     } else {
       const chess = new Chess(match.fen);
       // Attacker lost the duel — remove their piece from the starting square.
@@ -752,6 +790,17 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       message: "El duelo ya fue resuelto.",
       winnerId: null,
       matchStatus: MatchStatus.IN_PROGRESS,
+    };
+  }
+
+  if ("rematchDuelId" in result && result.rematchDuelId) {
+    return {
+      resolved: true,
+      rematch: true,
+      rematchDuelId: result.rematchDuelId,
+      message: "Empate — se abre un nuevo duelo arcade.",
+      winnerId: null,
+      matchStatus: MatchStatus.ARCADE_PENDING,
     };
   }
 

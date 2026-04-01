@@ -38,11 +38,11 @@ export const moveSchema = z.object({
 });
 
 export const duelAttemptSchema = z.object({
-  startedAt: z.number().int().nonnegative(),
-  finishedAt: z.number().int().positive(),
+  startedAt: z.number().nonnegative().transform(Math.round),
+  finishedAt: z.number().positive().transform(Math.round),
   actions: z.array(
     z.object({
-      at: z.number().int().nonnegative(),
+      at: z.number().nonnegative().transform(Math.round),
       value: z.string().min(1).max(12),
     }),
   ),

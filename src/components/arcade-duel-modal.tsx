@@ -58,9 +58,9 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
     }
 
     const payload: ArcadeAttempt = {
-      startedAt: startTimeRef.current,
-      finishedAt: performance.now(),
-      actions: actionsRef.current,
+      startedAt: Math.round(startTimeRef.current),
+      finishedAt: Math.round(performance.now()),
+      actions: actionsRef.current.map((a) => ({ ...a, at: Math.round(a.at) })),
     };
 
     setPhase("submitted");
@@ -355,7 +355,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
                 void startGame();
               }}
               disabled={isPending}
-              className="w-full rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 py-3 font-bold text-slate-950 transition hover:from-amber-300 hover:to-amber-400 disabled:opacity-50"
+              className="w-full rounded-lg bg-amber-400 py-3 font-bold text-slate-950 transition hover:bg-amber-300 active:bg-amber-500 disabled:opacity-50"
             >
               {arc.startBtn}
             </button>

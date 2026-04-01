@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import type { Square } from "chess.js";
+import { ArcadeGameType, Prisma } from "@prisma/client";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { settleSpectatorBets } from "@/lib/match-engine";
@@ -57,7 +59,8 @@ export async function POST(request: Request) {
         const defenderScore = duel.defenderScore ?? 0;
 
         if (duel.createdAt < duelResolveThreshold || (duel.attackerScore !== null && duel.defenderScore !== null)) {
-          const winner = attackerScore > defenderScore ? duel.attackerId : duel.defenderId;
+          const isTie = attackerScore === defenderScore;
+          const winner = isTie ? null : attackerScore > defenderScore ? duel.attackerId : duel.defenderId;
           await resolveDuelByScores(duel, attackerScore, defenderScore, winner, "duel_timeout_or_completed");
           results.push({
             duelId: duel.id,
@@ -310,6 +313,7 @@ async function resolveDuelByScores(
       fen: string;
       turn: string;
       moveHistory: unknown;
+      arcadeGamePool: unknown;
       preferredNetwork: "INITIA" | "FLOW" | "SOLANA";
       stakeAmount: { toString(): string; mul(value: number): { toString(): string } };
       entryFee: { toString(): string; mul(value: number): { toString(): string } };
@@ -319,12 +323,13 @@ async function resolveDuelByScores(
   },
   attackerScore: number,
   defenderScore: number,
-  winnerId: string,
+  winnerId: string | null,
   reason: string,
 ) {
   const match = duel.match;
   const boardMove = parseBoardMove(duel.boardMove);
-  const attackerWins = winnerId === duel.attackerId;
+  const isTie = winnerId === null;
+  const attackerWins = !isTie && winnerId === duel.attackerId;
   let settledMatchWinnerId: string | null = null;
 
   await prisma.$transaction(async (tx) => {
@@ -359,6 +364,35 @@ async function resolveDuelByScores(
           winnerId: matchWinnerId,
           turnStartedAt: new Date(),
           moveHistory: [...moveHistory, `Arcade resolved (${reason}) - invalid boardMove payload`],
+        },
+      });
+      return;
+    }
+
+    if (isTie) {
+      // Tie — create a rematch duel with a different minigame
+      const arcadeGamePool = (match as unknown as { arcadeGamePool?: unknown }).arcadeGamePool;
+      const poolArray = Array.isArray(arcadeGamePool)
+        ? arcadeGamePool.filter((g): g is string => typeof g === "string" && Object.values(ArcadeGameType).includes(g as ArcadeGameType))
+        : [];
+      const newGameType = (poolArray[Math.floor(Math.random() * poolArray.length)] as ArcadeGameType | undefined) ?? ArcadeGameType.TARGET_RUSH;
+
+      await tx.arcadeDuel.create({
+        data: {
+          matchId: match.id,
+          attackerId: duel.attackerId,
+          defenderId: duel.defenderId,
+          gameType: newGameType,
+          seed: randomUUID(),
+          boardMove: duel.boardMove as Prisma.InputJsonValue,
+        },
+      });
+
+      // Keep match in ARCADE_PENDING
+      await tx.match.update({
+        where: { id: match.id },
+        data: {
+          moveHistory: [...moveHistory, `${boardMove?.san ?? "move"} [arcade-tie → rematch]`],
         },
       });
       return;
