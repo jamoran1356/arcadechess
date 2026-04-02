@@ -44,6 +44,18 @@ function getModuleAddress(): string {
   return process.env.NEXT_PUBLIC_INITIA_ADMIN_ADDRESS || "";
 }
 
+// ─── BCS encoding helpers (Move args must be BCS-serialized base64) ─────────
+
+async function bcsAddress(addr: string): Promise<string> {
+  const { bcs } = await getSDK();
+  return bcs.address().serialize(addr).toBase64();
+}
+
+async function bcsU64(val: number | bigint): Promise<string> {
+  const { bcs } = await getSDK();
+  return bcs.u64().serialize(val).toBase64();
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function buildReceipt(
@@ -120,7 +132,9 @@ async function getNextMatchIndex(): Promise<number> {
     );
     if (res.ok) {
       const data = (await res.json()) as { data?: string };
-      return parseInt(data.data ?? "0", 10);
+      // API returns quoted numbers like "\"3\"" — strip non-digits
+      const raw = String(data.data ?? "0").replace(/[^0-9]/g, "");
+      return parseInt(raw, 10) || 0;
     }
   } catch { /* fall through */ }
   return 0;
@@ -137,11 +151,11 @@ export const initiaAdapter: OnchainAdapter = {
       // Query the current match count — this becomes the 0-based index for the new match
       const matchIndex = await getNextMatchIndex();
 
-      // 1. Create match record on-chain
+      // 1. Create match record on-chain (args must be BCS-encoded)
       const txHash1 = await sendMoveExecute(
         "create_match",
         [],
-        [hostAddress, stakeUinit.toString(), "0"],
+        [await bcsAddress(hostAddress), await bcsU64(stakeUinit), await bcsU64(0)],
         `create_${intent.matchId}`,
       );
 
@@ -150,7 +164,7 @@ export const initiaAdapter: OnchainAdapter = {
         await sendMoveExecute(
           "deposit_funds",
           [],
-          [matchIndex.toString(), hostAddress, stakeUinit.toString()],
+          [await bcsU64(matchIndex), await bcsAddress(hostAddress), await bcsU64(stakeUinit)],
           `deposit_host_${intent.matchId}`,
         );
       }
@@ -184,7 +198,7 @@ export const initiaAdapter: OnchainAdapter = {
       const txHash = await sendMoveExecute(
         "deposit_funds",
         [],
-        [matchIndex.toString(), guestAddress, stakeUinit.toString()],
+        [await bcsU64(matchIndex), await bcsAddress(guestAddress), await bcsU64(stakeUinit)],
         `deposit_guest_${intent.matchId}`,
       );
 
@@ -225,7 +239,7 @@ export const initiaAdapter: OnchainAdapter = {
       const txHash = await sendMoveExecute(
         "settle_to_winner",
         [],
-        [matchIndex.toString(), intent.winnerAddress, prizeUinit.toString()],
+        [await bcsU64(matchIndex), await bcsAddress(intent.winnerAddress), await bcsU64(prizeUinit)],
         `settle_${intent.matchId}`,
       );
 
@@ -252,7 +266,7 @@ export const initiaAdapter: OnchainAdapter = {
       const txHash = await sendMoveExecute(
         "settle_draw",
         [],
-        [matchIndex.toString()],
+        [await bcsU64(matchIndex)],
         `draw_${intent.matchId}`,
       );
       return buildReceipt(
@@ -275,7 +289,7 @@ export const initiaAdapter: OnchainAdapter = {
       const txHash = await sendMoveExecute(
         "refund_match",
         [],
-        [matchIndex.toString()],
+        [await bcsU64(matchIndex)],
         `refund_${intent.matchId}`,
       );
       return buildReceipt(
