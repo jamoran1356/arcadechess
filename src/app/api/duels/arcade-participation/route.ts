@@ -270,20 +270,27 @@ async function resolveDuelWithPenalty(
       const stakePool = match.stakeAmount.mul(participantCount);
       const feePool = match.entryFee.mul(participantCount);
 
-      // Resolve winner wallet address for on-chain settlement
-      const winnerWallet = await prisma.wallet.findFirst({
-        where: { userId: matchWinnerId, network: match.preferredNetwork },
-        select: { address: true },
-      });
-
-      const receipt = await adapter.settleEscrow({
-        matchId: match.id,
-        winnerId: matchWinnerId,
-        winnerAddress: winnerWallet?.address ?? "",
-        onchainMatchIndex: match.onchainMatchIndex ?? null,
-        amount: stakePool.toString(),
-        token: match.stakeToken,
-      });
+      let receipt;
+      if (!match.guestId) {
+        // Solo match: contract in OPEN status → use refund_match
+        receipt = await adapter.refundMatchOnchain({
+          matchId: match.id,
+          onchainMatchIndex: match.onchainMatchIndex ?? null,
+        });
+      } else {
+        const winnerWallet = await prisma.wallet.findFirst({
+          where: { userId: matchWinnerId, network: match.preferredNetwork },
+          select: { address: true },
+        });
+        receipt = await adapter.settleEscrow({
+          matchId: match.id,
+          winnerId: matchWinnerId,
+          winnerAddress: winnerWallet?.address ?? "",
+          onchainMatchIndex: match.onchainMatchIndex ?? null,
+          amount: stakePool.toString(),
+          token: match.stakeToken,
+        });
+      }
 
       await tx.transaction.create({
         data: {
@@ -486,20 +493,27 @@ async function resolveDuelByScores(
       const stakePool = match.stakeAmount.mul(participantCount);
       const feePool = match.entryFee.mul(participantCount);
 
-      // Resolve winner wallet address for on-chain settlement
-      const winnerWallet = await prisma.wallet.findFirst({
-        where: { userId: matchWinnerId, network: match.preferredNetwork },
-        select: { address: true },
-      });
-
-      const receipt = await adapter.settleEscrow({
-        matchId: match.id,
-        winnerId: matchWinnerId,
-        winnerAddress: winnerWallet?.address ?? "",
-        onchainMatchIndex: match.onchainMatchIndex ?? null,
-        amount: stakePool.toString(),
-        token: match.stakeToken,
-      });
+      let receipt;
+      if (!match.guestId) {
+        // Solo match: contract in OPEN status → use refund_match
+        receipt = await adapter.refundMatchOnchain({
+          matchId: match.id,
+          onchainMatchIndex: match.onchainMatchIndex ?? null,
+        });
+      } else {
+        const winnerWallet = await prisma.wallet.findFirst({
+          where: { userId: matchWinnerId, network: match.preferredNetwork },
+          select: { address: true },
+        });
+        receipt = await adapter.settleEscrow({
+          matchId: match.id,
+          winnerId: matchWinnerId,
+          winnerAddress: winnerWallet?.address ?? "",
+          onchainMatchIndex: match.onchainMatchIndex ?? null,
+          amount: stakePool.toString(),
+          token: match.stakeToken,
+        });
+      }
 
       await tx.transaction.create({
         data: {

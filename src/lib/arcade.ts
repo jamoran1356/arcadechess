@@ -403,24 +403,31 @@ export function evaluateArcadeAttempt(
 
   if (scenario.kind === "pong") {
     const finalAction = attempt.actions.find((a) => a.value.startsWith("final:"));
-    if (!finalAction) {
-      return { valid: false, score: 0, reason: "Partida no completada." };
+    let playerScore: number;
+    let cpuScore: number;
+
+    if (finalAction) {
+      const [pStr, cStr] = finalAction.value.replace("final:", "").split("-");
+      playerScore = Number(pStr);
+      cpuScore = Number(cStr);
+    } else {
+      // Timer expired before winScore — compute from individual score events
+      playerScore = attempt.actions.filter((a) => a.value.startsWith("player-score:")).length;
+      cpuScore = attempt.actions.filter((a) => a.value.startsWith("cpu-score:")).length;
     }
-    const [pStr, cStr] = finalAction.value.replace("final:", "").split("-");
-    const playerScore = Number(pStr);
-    const cpuScore = Number(cStr);
+
     const hits = attempt.actions.filter((a) => a.value === "hit").length;
     if (playerScore >= scenario.winScore) {
       return { valid: true, score: 5000 + hits * 200 + Math.max(0, 5000 - duration) };
     }
-    return { valid: true, score: playerScore * 800 + hits * 100 - cpuScore * 400 };
+    return { valid: true, score: Math.max(0, playerScore * 800 + hits * 100 - cpuScore * 400) };
   }
 
   if (scenario.kind === "reaction") {
     const reacts = attempt.actions.filter((a) => a.value.startsWith("react:"));
     const earlyCount = attempt.actions.filter((a) => a.value.startsWith("early:")).length;
-    if (reacts.length + earlyCount < scenario.rounds) {
-      return { valid: false, score: 0, reason: "Rondas incompletas." };
+    if (reacts.length + earlyCount === 0) {
+      return { valid: false, score: 0, reason: "No reaccionó." };
     }
     const times = reacts.map((a) => Number(a.value.replace("react:", "").replace("ms", "")));
     const avg = times.length > 0 ? times.reduce((s, t) => s + t, 0) / times.length : 9999;

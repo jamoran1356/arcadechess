@@ -193,7 +193,7 @@ export async function syncMatchTimeoutIfNeeded(matchId: string) {
 
 function advanceSoloBotTurn(state: MatchProgressState) {
   if (state.status === MatchStatus.FINISHED || state.turn !== "b") {
-    return state;
+    return { ...state, isBotCheckmate: false };
   }
 
   const botChess = new Chess(state.fen);
@@ -203,6 +203,7 @@ function advanceSoloBotTurn(state: MatchProgressState) {
   if (!botMove) {
     return {
       ...state,
+      isBotCheckmate: false,
       turnStartedAt: state.status === MatchStatus.IN_PROGRESS ? new Date() : null,
     };
   }
@@ -214,12 +215,14 @@ function advanceSoloBotTurn(state: MatchProgressState) {
   });
 
   const nextStatus = botChess.isGameOver() ? MatchStatus.FINISHED : MatchStatus.IN_PROGRESS;
+  const isBotCheckmate = botChess.isCheckmate();
 
   return {
     fen: botChess.fen(),
     turn: botChess.turn(),
     status: nextStatus,
     winnerId: null,
+    isBotCheckmate,
     moveHistory: [...state.moveHistory, `${appliedBot.san} [solo-bot]`],
     whiteClockMs: state.whiteClockMs,
     blackClockMs: state.blackClockMs,
@@ -267,20 +270,31 @@ export async function settleWinner(match: {
   const settlement = calculateSettlementAmounts(match);
   const adapter = getOnchainAdapter(match.preferredNetwork);
 
-  // Resolve the winner's wallet address for on-chain settlement
-  const winnerWallet = await prisma.wallet.findFirst({
-    where: { userId: winnerId, network: match.preferredNetwork },
-    select: { address: true },
-  });
+  let receipt;
 
-  const receipt = await adapter.settleEscrow({
-    matchId: match.id,
-    winnerId,
-    winnerAddress: winnerWallet?.address ?? "",
-    onchainMatchIndex: match.onchainMatchIndex ?? null,
-    amount: settlement.prize.toString(),
-    token: match.stakeToken,
-  });
+  if (!match.guestId) {
+    // Solo match: contract is in OPEN status (only host deposited).
+    // Use refund_match to return the deposit from vault to the host.
+    receipt = await adapter.refundMatchOnchain({
+      matchId: match.id,
+      onchainMatchIndex: match.onchainMatchIndex ?? null,
+    });
+  } else {
+    // PvP match: both players deposited → STATUS_FUNDED → settle_to_winner
+    const winnerWallet = await prisma.wallet.findFirst({
+      where: { userId: winnerId, network: match.preferredNetwork },
+      select: { address: true },
+    });
+
+    receipt = await adapter.settleEscrow({
+      matchId: match.id,
+      winnerId,
+      winnerAddress: winnerWallet?.address ?? "",
+      onchainMatchIndex: match.onchainMatchIndex ?? null,
+      amount: settlement.prize.toString(),
+      token: match.stakeToken,
+    });
+  }
 
   await prisma.transaction.create({
     data: {
@@ -324,12 +338,23 @@ export async function settleDraw(match: {
   const stakeNum = Number(match.stakeAmount.toString());
   if (stakeNum <= 0) return;
 
-  // On-chain draw refund
   const adapter = getOnchainAdapter(match.preferredNetwork);
-  const onchainReceipt = await adapter.settleDrawOnchain({
-    matchId: match.id,
-    onchainMatchIndex: match.onchainMatchIndex ?? null,
-  });
+
+  let onchainReceipt;
+
+  if (!match.guestId) {
+    // Solo match: contract in OPEN status → use refund_match
+    onchainReceipt = await adapter.refundMatchOnchain({
+      matchId: match.id,
+      onchainMatchIndex: match.onchainMatchIndex ?? null,
+    });
+  } else {
+    // PvP match: both deposited → STATUS_FUNDED → settle_draw
+    onchainReceipt = await adapter.settleDrawOnchain({
+      matchId: match.id,
+      onchainMatchIndex: match.onchainMatchIndex ?? null,
+    });
+  }
 
   const participants = [match.hostId, match.guestId].filter(Boolean) as string[];
   for (const userId of participants) {
@@ -1000,11 +1025,17 @@ export async function performBotMove(matchId: string) {
     });
     await settleWinner(fullMatch, nextState.winnerId);
   } else if (nextState.status === MatchStatus.FINISHED) {
-    const fullMatch = await prisma.match.findUniqueOrThrow({
-      where: { id: matchId },
-      select: { id: true, hostId: true, guestId: true, preferredNetwork: true, stakeAmount: true, stakeToken: true, onchainMatchIndex: true },
-    });
-    await settleDraw(fullMatch);
+    if (nextState.isBotCheckmate) {
+      // Bot checkmated the player — host loses. No refund, vault keeps deposit.
+      console.log(`Solo match ${matchId}: bot checkmate — host loses stake.`);
+    } else {
+      // True draw (stalemate, repetition, etc.) — refund the host
+      const fullMatch = await prisma.match.findUniqueOrThrow({
+        where: { id: matchId },
+        select: { id: true, hostId: true, guestId: true, preferredNetwork: true, stakeAmount: true, stakeToken: true, onchainMatchIndex: true },
+      });
+      await settleDraw(fullMatch);
+    }
   }
 
   return {
