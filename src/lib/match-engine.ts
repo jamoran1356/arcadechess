@@ -127,6 +127,7 @@ async function checkAndResolveTimeoutVictory(
     stakeAmount: Prisma.Decimal;
     entryFee: Prisma.Decimal;
     stakeToken: string;
+    onchainMatchIndex?: number | null;
   },
   currentTurnClocks: { whiteClockMs: number; blackClockMs: number },
 ): Promise<string | null> {
@@ -261,12 +262,22 @@ export async function settleWinner(match: {
   stakeAmount: Prisma.Decimal;
   entryFee: Prisma.Decimal;
   stakeToken: string;
+  onchainMatchIndex?: number | null;
 }, winnerId: string) {
   const settlement = calculateSettlementAmounts(match);
   const adapter = getOnchainAdapter(match.preferredNetwork);
+
+  // Resolve the winner's wallet address for on-chain settlement
+  const winnerWallet = await prisma.wallet.findFirst({
+    where: { userId: winnerId, network: match.preferredNetwork },
+    select: { address: true },
+  });
+
   const receipt = await adapter.settleEscrow({
     matchId: match.id,
     winnerId,
+    winnerAddress: winnerWallet?.address ?? "",
+    onchainMatchIndex: match.onchainMatchIndex ?? null,
     amount: settlement.prize.toString(),
     token: match.stakeToken,
   });
@@ -308,9 +319,17 @@ export async function settleDraw(match: {
   preferredNetwork: "INITIA" | "FLOW" | "SOLANA";
   stakeAmount: Prisma.Decimal;
   stakeToken: string;
+  onchainMatchIndex?: number | null;
 }) {
   const stakeNum = Number(match.stakeAmount.toString());
   if (stakeNum <= 0) return;
+
+  // On-chain draw refund
+  const adapter = getOnchainAdapter(match.preferredNetwork);
+  const onchainReceipt = await adapter.settleDrawOnchain({
+    matchId: match.id,
+    onchainMatchIndex: match.onchainMatchIndex ?? null,
+  });
 
   const participants = [match.hostId, match.guestId].filter(Boolean) as string[];
   for (const userId of participants) {
@@ -320,13 +339,13 @@ export async function settleDraw(match: {
         matchId: match.id,
         network: match.preferredNetwork,
         type: TransactionType.PRIZE_PAYOUT,
-        status: TransactionStatus.SETTLED,
+        status: onchainReceipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
         amount: stakeNum.toFixed(6),
         token: match.stakeToken,
-        txHash: `draw_refund_${match.id}_${userId}`,
+        txHash: onchainReceipt.txHash || `draw_refund_${match.id}_${userId}`,
         metadata: {
-          description: `Empate — reembolso de stake para partida ${match.id}.`,
-          mode: "internal",
+          description: onchainReceipt.description,
+          mode: onchainReceipt.mode,
           category: "draw-refund",
         },
       },
@@ -349,9 +368,17 @@ export async function refundPlayer(match: {
   stakeAmount: Prisma.Decimal;
   entryFee: Prisma.Decimal;
   stakeToken: string;
+  onchainMatchIndex?: number | null;
 }, userId: string) {
   const refundAmount = Number(match.stakeAmount.toString()) + Number(match.entryFee.toString());
   if (refundAmount <= 0) return;
+
+  // On-chain refund
+  const adapter = getOnchainAdapter(match.preferredNetwork);
+  const onchainReceipt = await adapter.refundMatchOnchain({
+    matchId: match.id,
+    onchainMatchIndex: match.onchainMatchIndex ?? null,
+  });
 
   await prisma.transaction.create({
     data: {
@@ -359,13 +386,13 @@ export async function refundPlayer(match: {
       matchId: match.id,
       network: match.preferredNetwork,
       type: TransactionType.PRIZE_PAYOUT,
-      status: TransactionStatus.SETTLED,
+      status: onchainReceipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
       amount: refundAmount.toFixed(6),
       token: match.stakeToken,
-      txHash: `cancel_refund_${match.id}_${userId}`,
+      txHash: onchainReceipt.txHash || `cancel_refund_${match.id}_${userId}`,
       metadata: {
-        description: `Cancelación — reembolso completo para partida ${match.id}.`,
-        mode: "internal",
+        description: onchainReceipt.description,
+        mode: onchainReceipt.mode,
         category: "cancel-refund",
       },
     },
@@ -1016,13 +1043,13 @@ export async function performBotMove(matchId: string) {
   if (nextState.winnerId) {
     const fullMatch = await prisma.match.findUniqueOrThrow({
       where: { id: matchId },
-      select: { id: true, hostId: true, guestId: true, preferredNetwork: true, stakeAmount: true, entryFee: true, stakeToken: true },
+      select: { id: true, hostId: true, guestId: true, preferredNetwork: true, stakeAmount: true, entryFee: true, stakeToken: true, onchainMatchIndex: true },
     });
     await settleWinner(fullMatch, nextState.winnerId);
   } else if (nextState.status === MatchStatus.FINISHED) {
     const fullMatch = await prisma.match.findUniqueOrThrow({
       where: { id: matchId },
-      select: { id: true, hostId: true, guestId: true, preferredNetwork: true, stakeAmount: true, stakeToken: true },
+      select: { id: true, hostId: true, guestId: true, preferredNetwork: true, stakeAmount: true, stakeToken: true, onchainMatchIndex: true },
     });
     await settleDraw(fullMatch);
   }

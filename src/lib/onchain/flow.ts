@@ -1,5 +1,5 @@
 import { TransactionNetwork } from "@prisma/client";
-import { BetIntent, BetPayoutIntent, EscrowIntent, OnchainAdapter, OnchainReceipt, SettlementIntent } from "./types";
+import { BetIntent, BetPayoutIntent, CancelRefundIntent, DrawRefundIntent, EscrowIntent, OnchainAdapter, OnchainReceipt, SettlementIntent } from "./types";
 
 function buildReceipt(description: string): OnchainReceipt {
   const configured = Boolean(process.env.FLOW_ACCESS_NODE);
@@ -24,6 +24,12 @@ export const flowAdapter: OnchainAdapter = {
   },
   async settleEscrow(intent: SettlementIntent) {
     return buildReceipt(`Liquidacion Flow preparada para ${intent.matchId} y ganador ${intent.winnerId}.`);
+  },
+  async settleDrawOnchain(intent: DrawRefundIntent) {
+    return buildReceipt(`Draw refund Flow para ${intent.matchId}.`);
+  },
+  async refundMatchOnchain(intent: CancelRefundIntent) {
+    return buildReceipt(`Cancel refund Flow para ${intent.matchId}.`);
   },
   async placeBet(intent: BetIntent) {
     return buildReceipt(`Apuesta Flow registrada para ${intent.matchId} sobre ${intent.predictedWinnerId}.`);

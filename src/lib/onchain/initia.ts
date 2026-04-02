@@ -1,5 +1,5 @@
 import { TransactionNetwork } from "@prisma/client";
-import { BetIntent, BetPayoutIntent, EscrowIntent, OnchainAdapter, OnchainReceipt, SettlementIntent } from "./types";
+import { BetIntent, BetPayoutIntent, CancelRefundIntent, DrawRefundIntent, EscrowIntent, OnchainAdapter, OnchainReceipt, SettlementIntent } from "./types";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const REST_URL = process.env.NEXT_PUBLIC_INITIA_RPC || "https://rest.testnet.initia.xyz";
@@ -49,6 +49,7 @@ function getModuleAddress(): string {
 function buildReceipt(
   description: string,
   transactionHash?: string,
+  onchainMatchIndex?: number,
 ): OnchainReceipt {
   const hash = transactionHash || `initia_mock_${Date.now().toString(36)}`;
   return {
@@ -57,6 +58,7 @@ function buildReceipt(
     explorerUrl: isConfigured() ? `${EXPLORER_BASE}/txs/${hash}` : undefined,
     mode: isConfigured() ? "configured" : "mock",
     description,
+    onchainMatchIndex,
   };
 }
 
@@ -102,12 +104,10 @@ async function sendMoveExecute(
 }
 
 // ─── On-chain match index tracking ──────────────────────────────────────────
-// The contract uses sequential match indices starting from 1.
-// We track the next index locally so we can map DB matchId → on-chain index.
-let _nextMatchIndex: number | null = null;
+// The contract uses sequential match indices (0-based in the vector).
+// We query the contract to get the current count, which becomes the next index.
 
 async function getNextMatchIndex(): Promise<number> {
-  if (_nextMatchIndex !== null) return _nextMatchIndex;
   try {
     const moduleAddr = getModuleAddress();
     const res = await fetch(
@@ -120,50 +120,10 @@ async function getNextMatchIndex(): Promise<number> {
     );
     if (res.ok) {
       const data = (await res.json()) as { data?: string };
-      _nextMatchIndex = parseInt(data.data ?? "0", 10);
-      return _nextMatchIndex;
+      return parseInt(data.data ?? "0", 10);
     }
   } catch { /* fall through */ }
-  _nextMatchIndex = 0;
   return 0;
-}
-
-// ─── Standalone on-chain settlement helpers (draw / refund) ─────────────────
-// These call contract entry functions not in the OnchainAdapter interface.
-
-/**
- * Call settle_draw on-chain — refunds both players from vault.
- * match_index must map to the on-chain index (0-based).
- */
-export async function initiaSettleDrawOnchain(matchIndex: number, label: string): Promise<string | null> {
-  try {
-    return await sendMoveExecute(
-      "settle_draw",
-      [],
-      [matchIndex.toString()],
-      `draw_${label}`,
-    );
-  } catch (error) {
-    console.error("Initia settle_draw on-chain error:", error);
-    return null;
-  }
-}
-
-/**
- * Call refund_match on-chain — cancels and refunds deposits from vault.
- */
-export async function initiaRefundMatchOnchain(matchIndex: number, label: string): Promise<string | null> {
-  try {
-    return await sendMoveExecute(
-      "refund_match",
-      [],
-      [matchIndex.toString()],
-      `refund_${label}`,
-    );
-  } catch (error) {
-    console.error("Initia refund_match on-chain error:", error);
-    return null;
-  }
 }
 
 export const initiaAdapter: OnchainAdapter = {
@@ -174,8 +134,10 @@ export const initiaAdapter: OnchainAdapter = {
       const stakeUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
       const hostAddress = intent.actorWallet || "";
 
-      // 1. Create match record on-chain
+      // Query the current match count — this becomes the 0-based index for the new match
       const matchIndex = await getNextMatchIndex();
+
+      // 1. Create match record on-chain
       const txHash1 = await sendMoveExecute(
         "create_match",
         [],
@@ -193,11 +155,10 @@ export const initiaAdapter: OnchainAdapter = {
         );
       }
 
-      _nextMatchIndex = matchIndex + 1;
-
       return buildReceipt(
         `Escrow Initia creado (match #${matchIndex}). Host: ${hostAddress}. Monto: ${intent.amount} ${intent.token}. Fondos custodiados en vault.`,
         txHash1,
+        matchIndex,
       );
     } catch (error) {
       console.error("Initia createEscrow error:", error);
@@ -211,10 +172,15 @@ export const initiaAdapter: OnchainAdapter = {
     try {
       const stakeUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
       const guestAddress = intent.actorWallet || "";
+      const matchIndex = intent.onchainMatchIndex ?? null;
 
-      // Deposit guest's stake to vault (match should already exist)
-      // The match_index needs to come from the match metadata
-      const matchIndex = await getNextMatchIndex() - 1; // latest match
+      if (matchIndex === null) {
+        console.warn("joinEscrow: no onchainMatchIndex provided, skipping on-chain deposit");
+        return buildReceipt(
+          `Join escrow Initia (sin index on-chain) para partida ${intent.matchId}.`,
+        );
+      }
+
       const txHash = await sendMoveExecute(
         "deposit_funds",
         [],
@@ -223,38 +189,103 @@ export const initiaAdapter: OnchainAdapter = {
       );
 
       return buildReceipt(
-        `Guest unió a escrow Initia (match #${matchIndex}). Depósito: ${intent.amount} ${intent.token} custodiado en vault.`,
+        `Guest unio a escrow Initia (match #${matchIndex}). Deposito: ${intent.amount} ${intent.token} custodiado en vault.`,
         txHash,
+        matchIndex,
       );
     } catch (error) {
       console.error("Initia joinEscrow error:", error);
       return buildReceipt(
-        `Unión a escrow Initia preparada (modo mock) para partida ${intent.matchId}.`,
+        `Union a escrow Initia preparada (modo mock) para partida ${intent.matchId}.`,
       );
     }
   },
 
   async settleEscrow(intent: SettlementIntent) {
+    const matchIndex = intent.onchainMatchIndex;
+
+    // If no on-chain index, the match was never created on-chain — skip
+    if (matchIndex === null || matchIndex === undefined) {
+      console.warn(`settleEscrow: no onchainMatchIndex for match ${intent.matchId}, settlement is DB-only`);
+      return buildReceipt(
+        `Liquidacion Initia (DB-only) para partida ${intent.matchId}. Ganador: ${intent.winnerId}.`,
+      );
+    }
+
+    if (!intent.winnerAddress) {
+      console.error(`settleEscrow: no winnerAddress for match ${intent.matchId}`);
+      return buildReceipt(
+        `Liquidacion Initia (sin wallet ganador) para partida ${intent.matchId}.`,
+      );
+    }
+
     try {
       const prizeUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
-      // settle_to_winner(admin, match_index, winner, prize_amount)
-      // 6-layer validation happens on-chain in the contract
+      // settle_to_winner(admin, match_index, winner_address, prize_amount)
       const txHash = await sendMoveExecute(
         "settle_to_winner",
         [],
-        ["0", intent.winnerId, prizeUinit.toString()],
+        [matchIndex.toString(), intent.winnerAddress, prizeUinit.toString()],
         `settle_${intent.matchId}`,
       );
 
       return buildReceipt(
-        `Liquidación Initia completada on-chain. Ganador: ${intent.winnerId}. Premio: ${intent.amount} ${intent.token} transferido desde vault.`,
+        `Liquidacion Initia on-chain completada. Match #${matchIndex}. Ganador: ${intent.winnerAddress}. Premio: ${intent.amount} ${intent.token}.`,
         txHash,
+        matchIndex,
       );
     } catch (error) {
-      console.error("Initia settleEscrow error:", error);
+      console.error("Initia settleEscrow on-chain error:", error);
+      // Even if on-chain fails, we still return a receipt so DB settlement proceeds
       return buildReceipt(
-        `Liquidación Initia preparada (modo mock) para partida ${intent.matchId}.`,
+        `Liquidacion Initia fallida on-chain (match #${matchIndex}). Error registrado. DB settlement procede.`,
       );
+    }
+  },
+
+  async settleDrawOnchain(intent: DrawRefundIntent) {
+    const matchIndex = intent.onchainMatchIndex;
+    if (matchIndex === null || matchIndex === undefined) {
+      return buildReceipt(`Draw refund Initia (DB-only) para partida ${intent.matchId}.`);
+    }
+    try {
+      const txHash = await sendMoveExecute(
+        "settle_draw",
+        [],
+        [matchIndex.toString()],
+        `draw_${intent.matchId}`,
+      );
+      return buildReceipt(
+        `Draw refund Initia on-chain completado. Match #${matchIndex}.`,
+        txHash,
+        matchIndex,
+      );
+    } catch (error) {
+      console.error("Initia settle_draw on-chain error:", error);
+      return buildReceipt(`Draw refund Initia fallido on-chain (match #${matchIndex}).`);
+    }
+  },
+
+  async refundMatchOnchain(intent: CancelRefundIntent) {
+    const matchIndex = intent.onchainMatchIndex;
+    if (matchIndex === null || matchIndex === undefined) {
+      return buildReceipt(`Cancel refund Initia (DB-only) para partida ${intent.matchId}.`);
+    }
+    try {
+      const txHash = await sendMoveExecute(
+        "refund_match",
+        [],
+        [matchIndex.toString()],
+        `refund_${intent.matchId}`,
+      );
+      return buildReceipt(
+        `Cancel refund Initia on-chain completado. Match #${matchIndex}.`,
+        txHash,
+        matchIndex,
+      );
+    } catch (error) {
+      console.error("Initia refund_match on-chain error:", error);
+      return buildReceipt(`Cancel refund Initia fallido on-chain (match #${matchIndex}).`);
     }
   },
 

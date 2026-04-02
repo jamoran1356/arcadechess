@@ -244,10 +244,7 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
               <span>Total a bloquear</span>
               <span className="text-cyan-200">{preview.total} {preview.token}</span>
             </div>
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>Tu saldo ({preview.network})</span>
-              <span>{preview.walletBalance} {preview.token}</span>
-            </div>
+
           </div>
         )}
       </DialogModal>

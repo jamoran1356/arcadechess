@@ -1,5 +1,5 @@
 import { TransactionNetwork } from "@prisma/client";
-import { BetIntent, BetPayoutIntent, EscrowIntent, OnchainAdapter, OnchainReceipt, SettlementIntent } from "./types";
+import { BetIntent, BetPayoutIntent, CancelRefundIntent, DrawRefundIntent, EscrowIntent, OnchainAdapter, OnchainReceipt, SettlementIntent } from "./types";
 
 function buildReceipt(description: string): OnchainReceipt {
   const configured = Boolean(process.env.SOLANA_RPC_URL);
@@ -24,6 +24,12 @@ export const solanaAdapter: OnchainAdapter = {
   },
   async settleEscrow(intent: SettlementIntent) {
     return buildReceipt(`Liquidacion Solana preparada para ${intent.matchId} y ganador ${intent.winnerId}.`);
+  },
+  async settleDrawOnchain(intent: DrawRefundIntent) {
+    return buildReceipt(`Draw refund Solana para ${intent.matchId}.`);
+  },
+  async refundMatchOnchain(intent: CancelRefundIntent) {
+    return buildReceipt(`Cancel refund Solana para ${intent.matchId}.`);
   },
   async placeBet(intent: BetIntent) {
     return buildReceipt(`Apuesta Solana registrada para ${intent.matchId} sobre ${intent.predictedWinnerId}.`);

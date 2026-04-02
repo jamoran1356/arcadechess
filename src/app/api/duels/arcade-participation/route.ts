@@ -135,6 +135,7 @@ async function resolveDuelWithPenalty(
       entryFee: { toString(): string; mul(value: number): { toString(): string } };
       guestId: string | null;
       stakeToken: string;
+      onchainMatchIndex: number | null;
     };
   },
   winnerId: string,
@@ -269,9 +270,17 @@ async function resolveDuelWithPenalty(
       const stakePool = match.stakeAmount.mul(participantCount);
       const feePool = match.entryFee.mul(participantCount);
 
+      // Resolve winner wallet address for on-chain settlement
+      const winnerWallet = await prisma.wallet.findFirst({
+        where: { userId: matchWinnerId, network: match.preferredNetwork },
+        select: { address: true },
+      });
+
       const receipt = await adapter.settleEscrow({
         matchId: match.id,
         winnerId: matchWinnerId,
+        winnerAddress: winnerWallet?.address ?? "",
+        onchainMatchIndex: match.onchainMatchIndex ?? null,
         amount: stakePool.toString(),
         token: match.stakeToken,
       });
@@ -314,6 +323,7 @@ async function resolveDuelWithPenalty(
       preferredNetwork: match.preferredNetwork,
       stakeAmount: match.stakeAmount as unknown as Prisma.Decimal,
       stakeToken: match.stakeToken,
+      onchainMatchIndex: match.onchainMatchIndex ?? null,
     });
   }
 }
@@ -335,6 +345,7 @@ async function resolveDuelByScores(
       entryFee: { toString(): string; mul(value: number): { toString(): string } };
       guestId: string | null;
       stakeToken: string;
+      onchainMatchIndex: number | null;
     };
   },
   attackerScore: number,
@@ -474,9 +485,18 @@ async function resolveDuelByScores(
       const participantCount = match.guestId ? 2 : 1;
       const stakePool = match.stakeAmount.mul(participantCount);
       const feePool = match.entryFee.mul(participantCount);
+
+      // Resolve winner wallet address for on-chain settlement
+      const winnerWallet = await prisma.wallet.findFirst({
+        where: { userId: matchWinnerId, network: match.preferredNetwork },
+        select: { address: true },
+      });
+
       const receipt = await adapter.settleEscrow({
         matchId: match.id,
         winnerId: matchWinnerId,
+        winnerAddress: winnerWallet?.address ?? "",
+        onchainMatchIndex: match.onchainMatchIndex ?? null,
         amount: stakePool.toString(),
         token: match.stakeToken,
       });
@@ -519,6 +539,7 @@ async function resolveDuelByScores(
       preferredNetwork: match.preferredNetwork,
       stakeAmount: match.stakeAmount as unknown as Prisma.Decimal,
       stakeToken: match.stakeToken,
+      onchainMatchIndex: match.onchainMatchIndex ?? null,
     });
   }
 }

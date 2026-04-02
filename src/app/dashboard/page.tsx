@@ -189,8 +189,6 @@ export default async function DashboardPage() {
                         <p className="font-mono text-xs uppercase tracking-[0.18em] opacity-80">{wallet.network}</p>
                         <span className="rounded-full border border-current/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] opacity-80">Live</span>
                       </div>
-                      <p className="mt-1 text-xs opacity-60">Plataforma</p>
-                      <p className="text-3xl font-semibold">{formatAmount(wallet.balance)}</p>
                       <OnchainBalance address={wallet.address} network={wallet.network} walletId={wallet.id} />
                       <p className="mt-3 break-all text-xs opacity-75">
                         {addrUrl ? (

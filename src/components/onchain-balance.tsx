@@ -81,8 +81,8 @@ export function OnchainBalance({ address, network, walletId }: Props) {
   }
 
   return (
-    <p className="mt-1 text-sm opacity-70">
-      On-chain: <span className="font-semibold">{balance.toFixed(6)}</span>
+    <p className="mt-1 text-3xl font-semibold">
+      {balance.toFixed(6)}
     </p>
   );
 }

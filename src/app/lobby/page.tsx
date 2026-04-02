@@ -89,7 +89,6 @@ export default async function LobbyPage({
             {me?.wallets.filter((w) => enabledSet.has(w.network)).map((wallet) => (
               <article key={wallet.id} className="rounded-[1.5rem] border border-white/[0.06] bg-white/[0.03] p-4 transition hover:border-cyan-400/10">
                 <p className="eyebrow text-[9px]">{wallet.network}</p>
-                <p className="mt-2 text-xl font-bold text-white">{wallet.balance}</p>
                 <p className="mt-2 text-xs text-slate-500 break-all">{wallet.address}</p>
               </article>
             ))}

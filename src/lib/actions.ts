@@ -177,6 +177,7 @@ export async function createMatchAction(formData: FormData) {
   let receiptTxHash: string;
   let receiptMode: "mock" | "configured";
   let receiptDescription: string;
+  let onchainMatchIndex: number | undefined;
 
   if (clientTxHash) {
     receiptTxHash = clientTxHash;
@@ -187,12 +188,14 @@ export async function createMatchAction(formData: FormData) {
     const receipt = await adapter.createEscrow({
       matchId,
       actorId: currentUser.id,
+      actorWallet: hostWallet.address,
       amount: hostTotalLock,
       token: parsed.data.stakeToken,
     });
     receiptTxHash = receipt.txHash;
     receiptMode = receipt.mode;
     receiptDescription = receipt.description;
+    onchainMatchIndex = receipt.onchainMatchIndex;
   }
 
   const match = await prisma.match.create({
@@ -215,6 +218,7 @@ export async function createMatchAction(formData: FormData) {
         arcadeGamePool: parsed.data.arcadeGamePool.length > 0 ? parsed.data.arcadeGamePool : (await prisma.arcadeGame.findMany({ where: { isEnabled: true }, select: { gameType: true } })).map(g => g.gameType),
       hostId: currentUser.id,
       isSolo,
+      onchainMatchIndex: onchainMatchIndex ?? null,
       status: isSolo ? MatchStatus.IN_PROGRESS : MatchStatus.OPEN,
     },
   });
@@ -279,6 +283,8 @@ export async function joinMatchAction(formData: FormData) {
     const receipt = await adapter.joinEscrow({
       matchId,
       actorId: currentUser.id,
+      actorWallet: guestWallet.address,
+      onchainMatchIndex: match.onchainMatchIndex,
       amount: guestTotalLock,
       token: match.stakeToken,
     });
@@ -344,6 +350,7 @@ export async function startSoloMatchAction(formData: FormData) {
   let receiptMode: "mock" | "configured" = "mock";
   let receiptDescription = "";
   let soloWallet: Awaited<ReturnType<typeof getWalletOrFail>> | null = null;
+  let onchainMatchIndex: number | undefined;
 
   if (requiresLock) {
     soloWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, Number(totalLock));
@@ -357,12 +364,14 @@ export async function startSoloMatchAction(formData: FormData) {
       const receipt = await adapter.createEscrow({
         matchId,
         actorId: currentUser.id,
+        actorWallet: soloWallet.address,
         amount: totalLock,
         token: match.stakeToken,
       });
       receiptTxHash = receipt.txHash;
       receiptMode = receipt.mode;
       receiptDescription = receipt.description;
+      onchainMatchIndex = receipt.onchainMatchIndex;
     }
   }
 
@@ -380,6 +389,7 @@ export async function startSoloMatchAction(formData: FormData) {
         whiteClockMs: match.gameClockMs,
         blackClockMs: match.gameClockMs,
         turnStartedAt: new Date(),
+        onchainMatchIndex: onchainMatchIndex ?? null,
       },
     });
 
@@ -590,6 +600,7 @@ export async function resignMatchAction(formData: FormData) {
       entryFee: true,
       stakeToken: true,
       preferredNetwork: true,
+      onchainMatchIndex: true,
     },
   });
 

@@ -126,6 +126,7 @@ model Match {
   moveHistory      Json
   arcadeGamePool   Json
   isSolo           Boolean            @default(false)
+  onchainMatchIndex Int?
   gameClockMs      Int                @default(300000)
   whiteClockMs     Int                @default(300000)
   blackClockMs     Int                @default(300000)
