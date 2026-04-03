@@ -479,6 +479,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
                 }}
                 onComplete={() => void submitAttemptRef.current?.()}
                 disabled={phase !== "active"}
+                multiplayer={duel.attackerId !== duel.defenderId ? { duelId: duel.id, role: playerRole as "attacker" | "defender" } : undefined}
               />
             ) : null}
 

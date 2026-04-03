@@ -14,6 +14,11 @@ type Props = {
   onAction: (value: string) => void;
   onComplete: () => void;
   disabled?: boolean;
+  /** When provided the game runs in real-time multiplayer mode. */
+  multiplayer?: {
+    duelId: string;
+    role: 'attacker' | 'defender';
+  };
 };
 
 const W = 480;
@@ -21,27 +26,39 @@ const H = 300;
 const PADDLE_W = 10;
 const BALL_R = 6;
 const TICK = 16; // ~60fps
+const SYNC_MS = 80; // network sync interval
 
-export function PingPongGame({ scenario, onAction, onComplete, disabled }: Props) {
+export function PingPongGame({ scenario, onAction, onComplete, disabled, multiplayer }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const isMultiplayer = !!multiplayer;
+  // "host" runs the authoritative physics. In singleplayer the local player is always host.
+  const isHost = !multiplayer || multiplayer.role === 'attacker';
+
+  /* ---- shared game state ---- */
   const stateRef = useRef({
-    playerY: H / 2,
-    cpuY: H / 2,
+    leftY: H / 2,       // attacker / singleplayer paddle
+    rightY: H / 2,      // defender / CPU paddle
     ballX: W / 2,
     ballY: H / 2,
     dx: scenario.ballSpeed,
     dy: scenario.ballSpeed * 0.6,
-    playerScore: 0,
-    cpuScore: 0,
+    leftScore: 0,
+    rightScore: 0,
     over: false,
   });
+
   const inputRef = useRef<'up' | 'down' | null>(null);
-  const [scores, setScores] = useState({ player: 0, cpu: 0 });
+  const [scores, setScores] = useState({ left: 0, right: 0 });
   const completedRef = useRef(false);
+  const remotePaddleRef = useRef(H / 2);
+  const defenderReadyRef = useRef(false);
+  const [waiting, setWaiting] = useState(isMultiplayer && isHost);
 
   const paddleH = Math.round(H * scenario.paddleH);
 
-  const reset = useCallback(() => {
+  /* ---- reset ball after a point ---- */
+  const resetBall = useCallback(() => {
     const s = stateRef.current;
     s.ballX = W / 2;
     s.ballY = H / 2;
@@ -49,17 +66,98 @@ export function PingPongGame({ scenario, onAction, onComplete, disabled }: Props
     s.dy = scenario.ballSpeed * 0.6 * (Math.random() > 0.5 ? 1 : -1);
   }, [scenario.ballSpeed]);
 
+  /* ---- keyboard input ---- */
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const down = (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') inputRef.current = 'up';
       else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') inputRef.current = 'down';
     };
     const up = () => { inputRef.current = null; };
-    window.addEventListener('keydown', handler);
+    window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
-    return () => { window.removeEventListener('keydown', handler); window.removeEventListener('keyup', up); };
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
   }, []);
 
+  /* ---- multiplayer network sync ---- */
+  useEffect(() => {
+    if (!isMultiplayer || disabled) return;
+    let active = true;
+
+    const sync = async () => {
+      while (active) {
+        const s = stateRef.current;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const body: Record<string, any> = {
+          role: multiplayer.role,
+          paddleY: isHost ? s.leftY : s.rightY,
+        };
+
+        if (isHost) {
+          body.state = {
+            ball: { x: s.ballX, y: s.ballY },
+            attackerScore: s.leftScore,
+            defenderScore: s.rightScore,
+            over: s.over,
+          };
+        }
+
+        try {
+          const res = await fetch(`/api/duels/${multiplayer.duelId}/pong-sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+
+          if (!res.ok) { await delay(SYNC_MS); continue; }
+
+          const data = await res.json();
+
+          if (isHost) {
+            remotePaddleRef.current = data.defenderPaddleY;
+            if (data.defenderConnected && !defenderReadyRef.current) {
+              defenderReadyRef.current = true;
+              setWaiting(false);
+            }
+          } else {
+            // Defender: consume authoritative state
+            remotePaddleRef.current = data.attackerPaddleY;
+            defenderReadyRef.current = true;
+
+            s.ballX = data.ball.x;
+            s.ballY = data.ball.y;
+            s.leftY = data.attackerPaddleY;
+
+            // Detect score changes → fire onAction from defender's perspective
+            // defender's "player" score = rightScore, "cpu" score = leftScore
+            if (data.defenderScore !== s.rightScore) {
+              s.rightScore = data.defenderScore;
+              onAction(`player-score:${s.rightScore}`);
+            }
+            if (data.attackerScore !== s.leftScore) {
+              s.leftScore = data.attackerScore;
+              onAction(`cpu-score:${s.leftScore}`);
+            }
+            setScores({ left: s.leftScore, right: s.rightScore });
+
+            if (data.over && !s.over && !completedRef.current) {
+              s.over = true;
+              completedRef.current = true;
+              onAction(`final:${s.rightScore}-${s.leftScore}`);
+              setTimeout(() => onComplete(), 100);
+            }
+          }
+        } catch { /* network hiccup, retry */ }
+
+        await delay(SYNC_MS);
+      }
+    };
+
+    void sync();
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMultiplayer, disabled, multiplayer?.duelId, multiplayer?.role]);
+
+  /* ---- main game loop (physics + render) ---- */
   useEffect(() => {
     if (disabled) return;
     const canvas = canvasRef.current;
@@ -69,64 +167,79 @@ export function PingPongGame({ scenario, onAction, onComplete, disabled }: Props
 
     const interval = setInterval(() => {
       const s = stateRef.current;
-      if (s.over) return;
 
-      // Move player paddle
-      const speed = 5;
-      if (inputRef.current === 'up') s.playerY = Math.max(paddleH / 2, s.playerY - speed);
-      if (inputRef.current === 'down') s.playerY = Math.min(H - paddleH / 2, s.playerY + speed);
+      // ---------- PHYSICS (only when host) ----------
+      if (!s.over && isHost) {
+        // Move my paddle (left)
+        const speed = 5;
+        if (inputRef.current === 'up') s.leftY = Math.max(paddleH / 2, s.leftY - speed);
+        if (inputRef.current === 'down') s.leftY = Math.min(H - paddleH / 2, s.leftY + speed);
 
-      // CPU AI: follow ball with slight lag
-      const cpuSpeed = 3.2;
-      if (s.ballY < s.cpuY - 4) s.cpuY = Math.max(paddleH / 2, s.cpuY - cpuSpeed);
-      else if (s.ballY > s.cpuY + 4) s.cpuY = Math.min(H - paddleH / 2, s.cpuY + cpuSpeed);
+        if (isMultiplayer) {
+          // Right paddle from network
+          s.rightY = remotePaddleRef.current;
+        } else {
+          // CPU AI: follow ball with slight lag
+          const cpuSpeed = 3.2;
+          if (s.ballY < s.rightY - 4) s.rightY = Math.max(paddleH / 2, s.rightY - cpuSpeed);
+          else if (s.ballY > s.rightY + 4) s.rightY = Math.min(H - paddleH / 2, s.rightY + cpuSpeed);
+        }
 
-      // Move ball
-      s.ballX += s.dx;
-      s.ballY += s.dy;
+        // Ball only moves when opponent is ready (or singleplayer)
+        const canPlay = !isMultiplayer || defenderReadyRef.current;
+        if (canPlay) {
+          s.ballX += s.dx;
+          s.ballY += s.dy;
 
-      // Bounce top/bottom
-      if (s.ballY <= BALL_R || s.ballY >= H - BALL_R) s.dy = -s.dy;
+          // Bounce top/bottom
+          if (s.ballY <= BALL_R || s.ballY >= H - BALL_R) s.dy = -s.dy;
 
-      // Player paddle (left)
-      if (s.ballX - BALL_R <= PADDLE_W + 12 && s.ballX - BALL_R > PADDLE_W + 4 &&
-          s.ballY >= s.playerY - paddleH / 2 && s.ballY <= s.playerY + paddleH / 2) {
-        s.dx = Math.abs(s.dx);
-        const offset = (s.ballY - s.playerY) / (paddleH / 2);
-        s.dy = offset * scenario.ballSpeed;
-        onAction('hit');
+          // Left paddle collision
+          if (s.ballX - BALL_R <= PADDLE_W + 12 && s.ballX - BALL_R > PADDLE_W + 4 &&
+              s.ballY >= s.leftY - paddleH / 2 && s.ballY <= s.leftY + paddleH / 2) {
+            s.dx = Math.abs(s.dx);
+            s.dy = ((s.ballY - s.leftY) / (paddleH / 2)) * scenario.ballSpeed;
+            onAction('hit');
+          }
+
+          // Right paddle collision
+          if (s.ballX + BALL_R >= W - PADDLE_W - 12 && s.ballX + BALL_R < W - PADDLE_W - 4 &&
+              s.ballY >= s.rightY - paddleH / 2 && s.ballY <= s.rightY + paddleH / 2) {
+            s.dx = -Math.abs(s.dx);
+            s.dy = ((s.ballY - s.rightY) / (paddleH / 2)) * scenario.ballSpeed;
+          }
+
+          // Scoring
+          if (s.ballX < 0) {
+            s.rightScore++;
+            setScores({ left: s.leftScore, right: s.rightScore });
+            onAction(`cpu-score:${s.rightScore}`);
+            resetBall();
+          } else if (s.ballX > W) {
+            s.leftScore++;
+            setScores({ left: s.leftScore, right: s.rightScore });
+            onAction(`player-score:${s.leftScore}`);
+            resetBall();
+          }
+
+          // Win check
+          if ((s.leftScore >= scenario.winScore || s.rightScore >= scenario.winScore) && !completedRef.current) {
+            s.over = true;
+            completedRef.current = true;
+            onAction(`final:${s.leftScore}-${s.rightScore}`);
+            setTimeout(() => onComplete(), 100);
+          }
+        }
       }
 
-      // CPU paddle (right)
-      if (s.ballX + BALL_R >= W - PADDLE_W - 12 && s.ballX + BALL_R < W - PADDLE_W - 4 &&
-          s.ballY >= s.cpuY - paddleH / 2 && s.ballY <= s.cpuY + paddleH / 2) {
-        s.dx = -Math.abs(s.dx);
-        const offset = (s.ballY - s.cpuY) / (paddleH / 2);
-        s.dy = offset * scenario.ballSpeed;
+      // ---------- DEFENDER: update own paddle locally ----------
+      if (!s.over && !isHost) {
+        const speed = 5;
+        if (inputRef.current === 'up') s.rightY = Math.max(paddleH / 2, s.rightY - speed);
+        if (inputRef.current === 'down') s.rightY = Math.min(H - paddleH / 2, s.rightY + speed);
       }
 
-      // Score
-      if (s.ballX < 0) {
-        s.cpuScore++;
-        setScores({ player: s.playerScore, cpu: s.cpuScore });
-        onAction(`cpu-score:${s.cpuScore}`);
-        reset();
-      } else if (s.ballX > W) {
-        s.playerScore++;
-        setScores({ player: s.playerScore, cpu: s.cpuScore });
-        onAction(`player-score:${s.playerScore}`);
-        reset();
-      }
-
-      // Win check
-      if ((s.playerScore >= scenario.winScore || s.cpuScore >= scenario.winScore) && !completedRef.current) {
-        s.over = true;
-        completedRef.current = true;
-        onAction(`final:${s.playerScore}-${s.cpuScore}`);
-        setTimeout(() => onComplete(), 100);
-      }
-
-      // Draw
+      // ---------- RENDER ----------
       ctx.fillStyle = '#0a1220';
       ctx.fillRect(0, 0, W, H);
 
@@ -141,9 +254,9 @@ export function PingPongGame({ scenario, onAction, onComplete, disabled }: Props
 
       // Paddles
       ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(12, s.playerY - paddleH / 2, PADDLE_W, paddleH);
+      ctx.fillRect(12, s.leftY - paddleH / 2, PADDLE_W, paddleH);
       ctx.fillStyle = '#f87171';
-      ctx.fillRect(W - 12 - PADDLE_W, s.cpuY - paddleH / 2, PADDLE_W, paddleH);
+      ctx.fillRect(W - 12 - PADDLE_W, s.rightY - paddleH / 2, PADDLE_W, paddleH);
 
       // Ball
       ctx.fillStyle = '#fff';
@@ -155,21 +268,41 @@ export function PingPongGame({ scenario, onAction, onComplete, disabled }: Props
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.font = 'bold 28px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`${s.playerScore}`, W / 4, 36);
-      ctx.fillText(`${s.cpuScore}`, (3 * W) / 4, 36);
+      ctx.fillText(`${s.leftScore}`, W / 4, 36);
+      ctx.fillText(`${s.rightScore}`, (3 * W) / 4, 36);
+
+      // Waiting overlay
+      if (waiting) {
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#67e8f9';
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Esperando al rival...', W / 2, H / 2);
+      }
     }, TICK);
 
     return () => clearInterval(interval);
-  }, [disabled, onAction, onComplete, paddleH, reset, scenario.ballSpeed, scenario.winScore]);
+  }, [disabled, isHost, isMultiplayer, onAction, onComplete, paddleH, resetBall, scenario.ballSpeed, scenario.winScore, waiting]);
 
-  // Touch controls
+  /* ---- touch controls ---- */
   const handleTouch = useCallback((e: React.TouchEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const y = e.touches[0].clientY - rect.top;
     const ratio = y / rect.height;
-    stateRef.current.playerY = Math.max(paddleH / 2, Math.min(H - paddleH / 2, ratio * H));
-  }, [paddleH]);
+    const clamped = Math.max(paddleH / 2, Math.min(H - paddleH / 2, ratio * H));
+    if (isHost) {
+      stateRef.current.leftY = clamped;
+    } else {
+      stateRef.current.rightY = clamped;
+    }
+  }, [paddleH, isHost]);
+
+  /* ---- derive "my" vs "rival" scores ---- */
+  const myScore = isHost ? scores.left : scores.right;
+  const rivalScore = isHost ? scores.right : scores.left;
+  const rivalLabel = isMultiplayer ? 'Rival' : 'CPU';
 
   return (
     <div className="space-y-3">
@@ -184,11 +317,15 @@ export function PingPongGame({ scenario, onAction, onComplete, disabled }: Props
         />
       </div>
       <div className="flex justify-between px-4 text-sm">
-        <span className="text-amber-300 font-semibold">Tu: {scores.player}</span>
+        <span className="text-amber-300 font-semibold">Tú: {myScore}</span>
         <span className="text-slate-400">Primero a {scenario.winScore}</span>
-        <span className="text-rose-400 font-semibold">CPU: {scores.cpu}</span>
+        <span className="text-rose-400 font-semibold">{rivalLabel}: {rivalScore}</span>
       </div>
       <p className="text-center text-xs text-slate-500 max-sm:hidden">Usa ↑ ↓ o W/S para mover la paleta</p>
     </div>
   );
+}
+
+function delay(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
 }

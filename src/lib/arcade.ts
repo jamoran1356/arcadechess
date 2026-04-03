@@ -110,7 +110,7 @@ export const arcadeLibrary: ArcadeLibraryItem[] = [
     id: ArcadeGameType.PING_PONG,
     slug: "ping-pong",
     name: "Ping Pong",
-    blurb: "Gana la partida de ping pong contra la maquina para sumar puntos.",
+    blurb: "Enfrenta a tu rival en un duelo de ping pong en tiempo real.",
     timeLimitMs: 30000,
     antiCheat: "Score y golpes registrados con timestamps. Se valida secuencia.",
   },
