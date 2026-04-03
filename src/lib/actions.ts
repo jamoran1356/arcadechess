@@ -37,11 +37,10 @@ function defaultWalletAddress(network: TransactionNetwork, userId: string) {
   return `${network.toLowerCase()}_${userId}`;
 }
 
-function generateMatchTitle(network: TransactionNetwork, isSolo: boolean) {
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  return `${isSolo ? "Solo" : "Versus"} ${network} ${hh}:${mm}`;
+async function generateMatchTitle(network: TransactionNetwork, isSolo: boolean) {
+  const count = await prisma.match.count();
+  const seq = String(count + 1).padStart(4, "0");
+  return `${isSolo ? "Solo" : "Versus"} ${network} #${seq}`;
 }
 
 async function resolveSessionUser(session: { id: string; email: string; name: string; role: UserRole }) {
@@ -215,7 +214,7 @@ export async function createMatchAction(formData: FormData) {
   const match = await prisma.match.create({
     data: {
       id: matchId,
-      title: generateMatchTitle(parsed.data.network, isSolo),
+      title: await generateMatchTitle(parsed.data.network, isSolo),
       theme: isSolo
         ? "Partida rápida en solitario"
         : "Partida rápida contra rival",
