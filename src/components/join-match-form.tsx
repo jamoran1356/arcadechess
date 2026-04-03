@@ -34,7 +34,7 @@ export function JoinMatchForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [escrowTxHash, setEscrowTxHash] = useState<string | null>(null);
-  const { sendToEscrow, isWalletConnected } = useEscrowTx();
+  const { sendToEscrow, isWalletConnected, walletAddress } = useEscrowTx();
 
   const stake = Number(stakeAmount);
   const fee = Number(entryFee);
@@ -57,6 +57,7 @@ export function JoinMatchForm({
       try {
         const fd = new FormData();
         fd.set("matchId", matchId);
+        if (walletAddress) fd.set("walletAddress", walletAddress);
 
         // Sign real on-chain tx for INITIA network
         if (network === "INITIA" && isWalletConnected) {
@@ -83,6 +84,7 @@ export function JoinMatchForm({
         const fd = new FormData();
         fd.set("matchId", matchId);
         fd.set("escrowTxHash", escrowTxHash!);
+        if (walletAddress) fd.set("walletAddress", walletAddress);
 
         if (isSolo) {
           await startSoloMatchAction(fd);

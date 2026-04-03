@@ -172,6 +172,16 @@ export async function createMatchAction(formData: FormData) {
   const hostTotalLock = (parsed.data.stakeAmount + effectiveEntryFee).toFixed(6);
   const hostWallet = await getWalletOrFail(currentUser.id, parsed.data.network, Number(hostTotalLock));
 
+  // Use the real wallet address from the client (init1...) if available,
+  // otherwise fall back to the DB address (may be a placeholder).
+  const clientWalletAddress = String(formData.get("walletAddress") ?? "").trim();
+  const effectiveHostAddress = clientWalletAddress.startsWith("init1") ? clientWalletAddress : hostWallet.address;
+
+  // Update the wallet record in DB with the real address if provided
+  if (clientWalletAddress.startsWith("init1") && hostWallet.address !== clientWalletAddress) {
+    await prisma.wallet.update({ where: { id: hostWallet.id }, data: { address: clientWalletAddress } });
+  }
+
   // Always register the match on-chain via server adapter to get onchainMatchIndex
   // and deposit funds into the contract vault.
   // The client-signed MsgSend (if any) sends tokens to the admin account;
@@ -181,7 +191,7 @@ export async function createMatchAction(formData: FormData) {
   const receipt = await adapter.createEscrow({
     matchId,
     actorId: currentUser.id,
-    actorWallet: hostWallet.address,
+    actorWallet: effectiveHostAddress,
     amount: hostTotalLock,
     token: parsed.data.stakeToken,
     stakeAmount: parsed.data.stakeAmount.toFixed(6),
@@ -262,13 +272,22 @@ export async function joinMatchAction(formData: FormData) {
   const guestTotalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
   const guestWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, Number(guestTotalLock));
 
+  // Use the real wallet address from the client (init1...) if available
+  const clientWalletAddress = String(formData.get("walletAddress") ?? "").trim();
+  const effectiveGuestAddress = clientWalletAddress.startsWith("init1") ? clientWalletAddress : guestWallet.address;
+
+  // Update the wallet record in DB with the real address if provided
+  if (clientWalletAddress.startsWith("init1") && guestWallet.address !== clientWalletAddress) {
+    await prisma.wallet.update({ where: { id: guestWallet.id }, data: { address: clientWalletAddress } });
+  }
+
   // Always deposit on-chain via server adapter so funds enter the contract vault
   const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
   const adapter = getOnchainAdapter(match.preferredNetwork);
   const receipt = await adapter.joinEscrow({
     matchId,
     actorId: currentUser.id,
-    actorWallet: guestWallet.address,
+    actorWallet: effectiveGuestAddress,
     onchainMatchIndex: match.onchainMatchIndex,
     amount: guestTotalLock,
     token: match.stakeToken,
@@ -339,12 +358,21 @@ export async function startSoloMatchAction(formData: FormData) {
   if (requiresLock) {
     soloWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, Number(totalLock));
 
+    // Use the real wallet address from the client (init1...) if available
+    const clientWalletAddress = String(formData.get("walletAddress") ?? "").trim();
+    const effectiveSoloAddress = clientWalletAddress.startsWith("init1") ? clientWalletAddress : soloWallet.address;
+
+    // Update the wallet record in DB with the real address if provided
+    if (clientWalletAddress.startsWith("init1") && soloWallet.address !== clientWalletAddress) {
+      await prisma.wallet.update({ where: { id: soloWallet.id }, data: { address: clientWalletAddress } });
+    }
+
     // Always register on-chain via server adapter
     const adapter = getOnchainAdapter(match.preferredNetwork);
     const receipt = await adapter.createEscrow({
       matchId,
       actorId: currentUser.id,
-      actorWallet: soloWallet.address,
+      actorWallet: effectiveSoloAddress,
       amount: totalLock,
       token: match.stakeToken,
       stakeAmount: match.stakeAmount.toString(),

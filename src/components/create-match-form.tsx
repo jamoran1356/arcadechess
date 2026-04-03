@@ -42,7 +42,7 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
   const defaultNetwork = enabledNetworks[0] ?? "INITIA";
   const [preview, setPreview] = useState({ stake: "0", fee: "0", total: "0", token: "INIT", network: defaultNetwork, walletBalance: "0" });
   const filteredWallets = wallets.filter((w) => enabledNetworks.includes(w.network));
-  const { sendToEscrow, isWalletConnected } = useEscrowTx();
+  const { sendToEscrow, isWalletConnected, walletAddress } = useEscrowTx();
 
   function handleSubmitClick(e: React.FormEvent) {
     e.preventDefault();
@@ -83,6 +83,7 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
     startTransition(async () => {
       try {
         const fd = new FormData(form);
+        if (walletAddress) fd.set("walletAddress", walletAddress);
         const network = String(fd.get("network") ?? defaultNetwork);
 
         // Sign real on-chain tx for INITIA network
@@ -110,6 +111,7 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
       try {
         const fd = new FormData(form);
         fd.set("escrowTxHash", escrowTxHash!);
+        if (walletAddress) fd.set("walletAddress", walletAddress);
         await createMatchAction(fd);
       } catch (err: unknown) {
         setShowConfirm(false);

@@ -186,6 +186,9 @@ export const initiaAdapter: OnchainAdapter = {
       console.error("Initia createEscrow error:", error);
       return buildReceipt(
         `Escrow Initia preparado (modo mock) para partida ${intent.matchId}.`,
+        undefined,
+        undefined,
+        false,
       );
     }
   },
@@ -226,6 +229,9 @@ export const initiaAdapter: OnchainAdapter = {
       console.error("Initia joinEscrow error:", error);
       return buildReceipt(
         `Union a escrow Initia preparada (modo mock) para partida ${intent.matchId}.`,
+        undefined,
+        undefined,
+        false,
       );
     }
   },
