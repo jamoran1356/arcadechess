@@ -142,7 +142,9 @@ async function getNextMatchIndex(): Promise<number> {
   return 0;
 }
 
-export const initiaAdapter: OnchainAdapter = {
+export const initiaAdapter: OnchainAdapter & {
+  sendTokens(toAddress: string, amountHuman: number, memo?: string): Promise<{ txHash: string }>;
+} = {
   network: TransactionNetwork.INITIA,
 
   async createEscrow(intent: EscrowIntent) {
@@ -380,5 +382,41 @@ export const initiaAdapter: OnchainAdapter = {
     }
 
     return null;
+  },
+
+  /**
+   * Send tokens from the admin/platform wallet to any address.
+   * Used for admin withdrawals of platform fees.
+   */
+  async sendTokens(toAddress: string, amountHuman: number, memo?: string): Promise<{ txHash: string }> {
+    if (!isConfigured()) {
+      throw new Error("Initia admin seed not configured.");
+    }
+    if (!toAddress.startsWith("init1")) {
+      throw new Error("Dirección de destino inválida. Debe comenzar con init1.");
+    }
+    const microAmount = Math.round(amountHuman * 1_000_000);
+    if (microAmount <= 0) {
+      throw new Error("El monto debe ser mayor a 0.");
+    }
+
+    const { MsgSend, Coin } = await getSDK();
+    const wallet = await getWallet();
+    const senderAddr = getModuleAddress();
+
+    const msg = new MsgSend(senderAddr, toAddress, [new Coin("uinit", microAmount)]);
+
+    const signedTx = await wallet.createAndSignTx({
+      msgs: [msg],
+      memo: memo || "playchess::admin_withdraw",
+    });
+
+    const result = await (wallet as unknown as { rest: { tx: { broadcast(tx: unknown): Promise<{ txhash: string; code: number; raw_log?: string }> } } }).rest.tx.broadcast(signedTx);
+
+    if (result.code !== 0) {
+      throw new Error(`Tx failed (code ${result.code}): ${result.raw_log ?? "unknown"}`);
+    }
+
+    return { txHash: result.txhash };
   },
 };

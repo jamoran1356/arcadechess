@@ -1,5 +1,6 @@
 import { upsertPlatformConfigAction } from "@/lib/actions";
 import { getAdminRevenueSnapshot } from "@/lib/data";
+import { AdminPlatformWallet } from "@/components/admin-platform-wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -46,20 +47,12 @@ export default async function AdminIngresosPage() {
 
           <form action={upsertPlatformConfigAction} className="mt-6 grid gap-4 sm:grid-cols-2">
             <label className="grid gap-2 text-sm text-slate-300">
-              <span>Match fee (bps)</span>
+              <span>Match fee (bps) — {(revenue.config.matchFeeBps / 100).toFixed(1)}%</span>
               <input name="matchFeeBps" type="number" min="0" max="10000" defaultValue={revenue.config.matchFeeBps} className="input" required />
             </label>
             <label className="grid gap-2 text-sm text-slate-300">
-              <span>Bet fee (bps)</span>
+              <span>Bet fee (bps) — {(revenue.config.betFeeBps / 100).toFixed(1)}%</span>
               <input name="betFeeBps" type="number" min="0" max="10000" defaultValue={revenue.config.betFeeBps} className="input" required />
-            </label>
-            <label className="grid gap-2 text-sm text-slate-300">
-              <span>Arcade fee fixed</span>
-              <input name="arcadeFeeFixed" type="number" min="0" step="0.000001" defaultValue={revenue.config.arcadeFeeFixed} className="input" required />
-            </label>
-            <label className="grid gap-2 text-sm text-slate-300">
-              <span>Minimum entry fee</span>
-              <input name="minEntryFee" type="number" min="0" step="0.000001" defaultValue={revenue.config.minEntryFee} className="input" required />
             </label>
             <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300 sm:col-span-2">
               <input type="checkbox" name="isActive" value="true" defaultChecked={revenue.config.isActive} />
@@ -70,7 +63,7 @@ export default async function AdminIngresosPage() {
               <textarea name="notes" defaultValue={revenue.config.notes} className="input min-h-28" placeholder="Describe the economics policy for operators and future audits." />
             </label>
             <button type="submit" className="button-primary px-5 py-3 text-sm sm:col-span-2">
-              Guardar configuracion de fees
+              Guardar configuración de fees
             </button>
           </form>
         </section>
@@ -108,6 +101,8 @@ export default async function AdminIngresosPage() {
           ))}
         </div>
       </section>
+
+      <AdminPlatformWallet />
     </div>
   );
 }

@@ -9,10 +9,10 @@ import { getInitiaExplorerTxUrl } from "@/lib/explorer";
 
 type WalletInfo = { id: string; network: string; balance: string };
 
-type FeeConfig = { matchFeeBps: number; arcadeFeeFixed: number; minEntryFee: number };
+type FeeConfig = { matchFeeBps: number };
 
 function computeFee(stake: number, cfg: FeeConfig) {
-  return Math.max(cfg.minEntryFee, (stake * cfg.matchFeeBps) / 10_000 + cfg.arcadeFeeFixed);
+  return (stake * cfg.matchFeeBps) / 10_000;
 }
 
 type Props = {

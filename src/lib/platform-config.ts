@@ -26,11 +26,6 @@ export async function getPlatformConfig() {
 
 export function calculateMatchEntryFee(stakeAmount: number, config: {
   matchFeeBps: number;
-  arcadeFeeFixed: { toString(): string } | string;
-  minEntryFee: { toString(): string } | string;
 }) {
-  const percentageFee = (stakeAmount * config.matchFeeBps) / 10_000;
-  const arcadeFeeFixed = Number(config.arcadeFeeFixed.toString());
-  const minEntryFee = Number(config.minEntryFee.toString());
-  return Math.max(minEntryFee, percentageFee + arcadeFeeFixed);
+  return (stakeAmount * config.matchFeeBps) / 10_000;
 }

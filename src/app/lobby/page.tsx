@@ -52,8 +52,6 @@ export default async function LobbyPage({
             arcadeLibrary={arcadeLibrary.map((g) => ({ id: g.id, name: g.name, blurb: g.blurb }))}
             feeConfig={{
               matchFeeBps: platformConfig.matchFeeBps,
-              arcadeFeeFixed: Number(platformConfig.arcadeFeeFixed.toString()),
-              minEntryFee: Number(platformConfig.minEntryFee.toString()),
             }}
             labels={{
               publishEyebrow: t.publishEyebrow,
