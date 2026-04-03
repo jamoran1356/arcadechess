@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db";
 import { getOnchainAdapter } from "@/lib/onchain/service";
 import { calculateMatchEntryFee, getPlatformConfig } from "@/lib/platform-config";
 import { createMatchSchema, FormState, loginSchema, placeBetSchema, registerSchema } from "@/lib/validators";
-import { creditWallet, debitWallet, getOrCreateWalletForNetwork, getWalletOrFail } from "@/lib/wallet";
+import { creditWallet, getOrCreateWalletForNetwork } from "@/lib/wallet";
 import { refundPlayer, settleWinner } from "@/lib/match-engine";
 import { getEnabledNetworks } from "@/lib/networks";
 
@@ -170,10 +170,10 @@ export async function createMatchAction(formData: FormData) {
 
   const matchId = randomUUID();
   const hostTotalLock = (parsed.data.stakeAmount + effectiveEntryFee).toFixed(6);
-  const hostWallet = await getWalletOrFail(currentUser.id, parsed.data.network, Number(hostTotalLock));
+  const hostWallet = await getOrCreateWalletForNetwork(currentUser.id, parsed.data.network);
 
   // Use the real wallet address from the client (init1...) if available,
-  // otherwise fall back to the DB address (may be a placeholder).
+  // otherwise fall back to the DB address.
   const clientWalletAddress = String(formData.get("walletAddress") ?? "").trim();
   const effectiveHostAddress = clientWalletAddress.startsWith("init1") ? clientWalletAddress : hostWallet.address;
 
@@ -182,12 +182,22 @@ export async function createMatchAction(formData: FormData) {
     await prisma.wallet.update({ where: { id: hostWallet.id }, data: { address: clientWalletAddress } });
   }
 
+  // Validate balance on-chain (not from DB)
+  const adapter = getOnchainAdapter(parsed.data.network);
+  if (effectiveHostAddress.startsWith("init1")) {
+    const onchainBal = await adapter.queryBalance(effectiveHostAddress);
+    if (!onchainBal || onchainBal.amount < Number(hostTotalLock)) {
+      throw new Error(
+        `Fondos insuficientes on-chain. Necesitas ${hostTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+      );
+    }
+  }
+
   // Always register the match on-chain via server adapter to get onchainMatchIndex
   // and deposit funds into the contract vault.
   // The client-signed MsgSend (if any) sends tokens to the admin account;
   // deposit_funds then moves them from admin into the vault.
   const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
-  const adapter = getOnchainAdapter(parsed.data.network);
   const receipt = await adapter.createEscrow({
     matchId,
     actorId: currentUser.id,
@@ -252,8 +262,6 @@ export async function createMatchAction(formData: FormData) {
     },
   });
 
-  await debitWallet(hostWallet.id, Number(hostTotalLock));
-
   revalidatePath("/");
   revalidatePath("/lobby");
   redirect(`/match/${match.id}`);
@@ -270,7 +278,7 @@ export async function joinMatchAction(formData: FormData) {
   }
 
   const guestTotalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
-  const guestWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, Number(guestTotalLock));
+  const guestWallet = await getOrCreateWalletForNetwork(currentUser.id, match.preferredNetwork);
 
   // Use the real wallet address from the client (init1...) if available
   const clientWalletAddress = String(formData.get("walletAddress") ?? "").trim();
@@ -281,9 +289,19 @@ export async function joinMatchAction(formData: FormData) {
     await prisma.wallet.update({ where: { id: guestWallet.id }, data: { address: clientWalletAddress } });
   }
 
+  // Validate balance on-chain
+  const adapter = getOnchainAdapter(match.preferredNetwork);
+  if (effectiveGuestAddress.startsWith("init1")) {
+    const onchainBal = await adapter.queryBalance(effectiveGuestAddress);
+    if (!onchainBal || onchainBal.amount < Number(guestTotalLock)) {
+      throw new Error(
+        `Fondos insuficientes on-chain. Necesitas ${guestTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+      );
+    }
+  }
+
   // Always deposit on-chain via server adapter so funds enter the contract vault
   const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
-  const adapter = getOnchainAdapter(match.preferredNetwork);
   const receipt = await adapter.joinEscrow({
     matchId,
     actorId: currentUser.id,
@@ -327,8 +345,6 @@ export async function joinMatchAction(formData: FormData) {
     }),
   ]);
 
-  await debitWallet(guestWallet.id, Number(guestTotalLock));
-
   revalidatePath("/");
   revalidatePath("/lobby");
   redirect(`/match/${matchId}`);
@@ -352,11 +368,11 @@ export async function startSoloMatchAction(formData: FormData) {
   let receiptTxHash: string | null = null;
   let receiptMode: "mock" | "configured" = "mock";
   let receiptDescription = "";
-  let soloWallet: Awaited<ReturnType<typeof getWalletOrFail>> | null = null;
+  let soloWallet: Awaited<ReturnType<typeof getOrCreateWalletForNetwork>> | null = null;
   let onchainMatchIndex: number | undefined;
 
   if (requiresLock) {
-    soloWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, Number(totalLock));
+    soloWallet = await getOrCreateWalletForNetwork(currentUser.id, match.preferredNetwork);
 
     // Use the real wallet address from the client (init1...) if available
     const clientWalletAddress = String(formData.get("walletAddress") ?? "").trim();
@@ -367,8 +383,18 @@ export async function startSoloMatchAction(formData: FormData) {
       await prisma.wallet.update({ where: { id: soloWallet.id }, data: { address: clientWalletAddress } });
     }
 
-    // Always register on-chain via server adapter
+    // Validate balance on-chain
     const adapter = getOnchainAdapter(match.preferredNetwork);
+    if (effectiveSoloAddress.startsWith("init1")) {
+      const onchainBal = await adapter.queryBalance(effectiveSoloAddress);
+      if (!onchainBal || onchainBal.amount < Number(totalLock)) {
+        throw new Error(
+          `Fondos insuficientes on-chain. Necesitas ${totalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+        );
+      }
+    }
+
+    // Always register on-chain via server adapter
     const receipt = await adapter.createEscrow({
       matchId,
       actorId: currentUser.id,
@@ -429,10 +455,6 @@ export async function startSoloMatchAction(formData: FormData) {
     }
   });
 
-  if (requiresLock && soloWallet) {
-    await debitWallet(soloWallet.id, Number(totalLock));
-  }
-
   revalidatePath("/");
   revalidatePath("/lobby");
   redirect(`/match/${matchId}`);
@@ -485,8 +507,19 @@ export async function placeMatchBetAction(formData: FormData) {
   }
 
   const betAmount = parsed.data.amount;
-  const betWallet = await getWalletOrFail(currentUser.id, match.preferredNetwork, betAmount);
+  const betWallet = await getOrCreateWalletForNetwork(currentUser.id, match.preferredNetwork);
+
+  // Validate balance on-chain
   const adapter = getOnchainAdapter(match.preferredNetwork);
+  if (betWallet.address.startsWith("init1")) {
+    const onchainBal = await adapter.queryBalance(betWallet.address);
+    if (!onchainBal || onchainBal.amount < betAmount) {
+      throw new Error(
+        `Fondos insuficientes on-chain. Necesitas ${betAmount.toFixed(6)} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+      );
+    }
+  }
+
   const amount = betAmount.toFixed(6);
   const receipt = await adapter.placeBet({
     matchId: match.id,
@@ -495,8 +528,6 @@ export async function placeMatchBetAction(formData: FormData) {
     amount,
     token: match.stakeToken,
   });
-
-  await debitWallet(betWallet.id, betAmount);
 
   await prisma.$transaction([
     prisma.matchBet.create({
