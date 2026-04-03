@@ -62,6 +62,7 @@ function buildReceipt(
   description: string,
   transactionHash?: string,
   onchainMatchIndex?: number,
+  settled = true,
 ): OnchainReceipt {
   const hash = transactionHash || `initia_mock_${Date.now().toString(36)}`;
   return {
@@ -69,6 +70,7 @@ function buildReceipt(
     txHash: hash,
     explorerUrl: isConfigured() ? `${EXPLORER_BASE}/txs/${hash}` : undefined,
     mode: isConfigured() ? "configured" : "mock",
+    settled,
     description,
     onchainMatchIndex,
   };
@@ -145,7 +147,13 @@ export const initiaAdapter: OnchainAdapter = {
 
   async createEscrow(intent: EscrowIntent) {
     try {
-      const stakeUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
+      const totalUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
+      const stakeUinit = intent.stakeAmount
+        ? Math.round(parseFloat(intent.stakeAmount) * 1_000_000)
+        : totalUinit;
+      const feeUinit = intent.entryFee
+        ? Math.round(parseFloat(intent.entryFee) * 1_000_000)
+        : 0;
       const hostAddress = intent.actorWallet || "";
 
       // Query the current match count — this becomes the 0-based index for the new match
@@ -155,16 +163,16 @@ export const initiaAdapter: OnchainAdapter = {
       const txHash1 = await sendMoveExecute(
         "create_match",
         [],
-        [await bcsAddress(hostAddress), await bcsU64(stakeUinit), await bcsU64(0)],
+        [await bcsAddress(hostAddress), await bcsU64(stakeUinit), await bcsU64(feeUinit)],
         `create_${intent.matchId}`,
       );
 
-      // 2. Deposit host's stake from admin treasury to vault
-      if (stakeUinit > 0) {
+      // 2. Deposit host's full amount (stake + fee) from admin treasury to vault
+      if (totalUinit > 0) {
         await sendMoveExecute(
           "deposit_funds",
           [],
-          [await bcsU64(matchIndex), await bcsAddress(hostAddress), await bcsU64(stakeUinit)],
+          [await bcsU64(matchIndex), await bcsAddress(hostAddress), await bcsU64(totalUinit)],
           `deposit_host_${intent.matchId}`,
         );
       }
@@ -192,6 +200,13 @@ export const initiaAdapter: OnchainAdapter = {
         console.warn("joinEscrow: no onchainMatchIndex provided, skipping on-chain deposit");
         return buildReceipt(
           `Join escrow Initia (sin index on-chain) para partida ${intent.matchId}.`,
+        );
+      }
+
+      if (stakeUinit <= 0) {
+        console.warn("joinEscrow: amount is 0, skipping on-chain deposit");
+        return buildReceipt(
+          `Join escrow Initia (monto 0) para partida ${intent.matchId}.`,
         );
       }
 
@@ -223,6 +238,9 @@ export const initiaAdapter: OnchainAdapter = {
       console.warn(`settleEscrow: no onchainMatchIndex for match ${intent.matchId}, settlement is DB-only`);
       return buildReceipt(
         `Liquidacion Initia (DB-only) para partida ${intent.matchId}. Ganador: ${intent.winnerId}.`,
+        undefined,
+        undefined,
+        false,
       );
     }
 
@@ -230,11 +248,23 @@ export const initiaAdapter: OnchainAdapter = {
       console.error(`settleEscrow: no winnerAddress for match ${intent.matchId}`);
       return buildReceipt(
         `Liquidacion Initia (sin wallet ganador) para partida ${intent.matchId}.`,
+        undefined,
+        undefined,
+        false,
       );
     }
 
     try {
       const prizeUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
+      if (prizeUinit <= 0) {
+        console.error(`settleEscrow: prize amount is 0 for match ${intent.matchId}`);
+        return buildReceipt(
+          `Liquidacion Initia (premio 0) para partida ${intent.matchId}.`,
+          undefined,
+          matchIndex,
+          false,
+        );
+      }
       // settle_to_winner(admin, match_index, winner_address, prize_amount)
       const txHash = await sendMoveExecute(
         "settle_to_winner",
@@ -250,9 +280,11 @@ export const initiaAdapter: OnchainAdapter = {
       );
     } catch (error) {
       console.error("Initia settleEscrow on-chain error:", error);
-      // Even if on-chain fails, we still return a receipt so DB settlement proceeds
       return buildReceipt(
-        `Liquidacion Initia fallida on-chain (match #${matchIndex}). Error registrado. DB settlement procede.`,
+        `Liquidacion Initia fallida on-chain (match #${matchIndex}). Error registrado.`,
+        undefined,
+        matchIndex,
+        false,
       );
     }
   },
@@ -260,7 +292,7 @@ export const initiaAdapter: OnchainAdapter = {
   async settleDrawOnchain(intent: DrawRefundIntent) {
     const matchIndex = intent.onchainMatchIndex;
     if (matchIndex === null || matchIndex === undefined) {
-      return buildReceipt(`Draw refund Initia (DB-only) para partida ${intent.matchId}.`);
+      return buildReceipt(`Draw refund Initia (DB-only) para partida ${intent.matchId}.`, undefined, undefined, false);
     }
     try {
       const txHash = await sendMoveExecute(
@@ -276,14 +308,14 @@ export const initiaAdapter: OnchainAdapter = {
       );
     } catch (error) {
       console.error("Initia settle_draw on-chain error:", error);
-      return buildReceipt(`Draw refund Initia fallido on-chain (match #${matchIndex}).`);
+      return buildReceipt(`Draw refund Initia fallido on-chain (match #${matchIndex}).`, undefined, matchIndex, false);
     }
   },
 
   async refundMatchOnchain(intent: CancelRefundIntent) {
     const matchIndex = intent.onchainMatchIndex;
     if (matchIndex === null || matchIndex === undefined) {
-      return buildReceipt(`Cancel refund Initia (DB-only) para partida ${intent.matchId}.`);
+      return buildReceipt(`Cancel refund Initia (DB-only) para partida ${intent.matchId}.`, undefined, undefined, false);
     }
     try {
       const txHash = await sendMoveExecute(
@@ -299,7 +331,7 @@ export const initiaAdapter: OnchainAdapter = {
       );
     } catch (error) {
       console.error("Initia refund_match on-chain error:", error);
-      return buildReceipt(`Cancel refund Initia fallido on-chain (match #${matchIndex}).`);
+      return buildReceipt(`Cancel refund Initia fallido on-chain (match #${matchIndex}).`, undefined, matchIndex, false);
     }
   },
 

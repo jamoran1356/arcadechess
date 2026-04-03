@@ -302,13 +302,14 @@ export async function settleWinner(match: {
       matchId: match.id,
       network: match.preferredNetwork,
       type: TransactionType.PRIZE_PAYOUT,
-      status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+      status: receipt.settled ? TransactionStatus.SETTLED : TransactionStatus.PENDING,
       amount: settlement.prize.toString(),
       token: match.stakeToken,
       txHash: receipt.txHash,
       metadata: {
         description: receipt.description,
         mode: receipt.mode,
+        settled: receipt.settled,
         participantCount: settlement.participantCount,
         grossStakePool: settlement.prize.toString(),
         retainedFeePool: settlement.retainedFee.toString(),
@@ -316,7 +317,11 @@ export async function settleWinner(match: {
     },
   });
 
-  await creditWallet(winnerId, match.preferredNetwork, Number(settlement.prize.toString()));
+  if (receipt.settled) {
+    await creditWallet(winnerId, match.preferredNetwork, Number(settlement.prize.toString()));
+  } else {
+    console.error(`settleWinner: on-chain settlement failed for match ${match.id}. Tokens NOT credited to winner ${winnerId}.`);
+  }
 
   await settleSpectatorBets(match.id, winnerId, match.preferredNetwork, match.stakeToken);
 }
@@ -364,18 +369,23 @@ export async function settleDraw(match: {
         matchId: match.id,
         network: match.preferredNetwork,
         type: TransactionType.PRIZE_PAYOUT,
-        status: onchainReceipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+        status: onchainReceipt.settled ? TransactionStatus.SETTLED : TransactionStatus.PENDING,
         amount: stakeNum.toFixed(6),
         token: match.stakeToken,
         txHash: onchainReceipt.txHash || `draw_refund_${match.id}_${userId}`,
         metadata: {
           description: onchainReceipt.description,
           mode: onchainReceipt.mode,
+          settled: onchainReceipt.settled,
           category: "draw-refund",
         },
       },
     });
-    await creditWallet(userId, match.preferredNetwork, stakeNum);
+    if (onchainReceipt.settled) {
+      await creditWallet(userId, match.preferredNetwork, stakeNum);
+    } else {
+      console.error(`settleDraw: on-chain settlement failed for match ${match.id}. Tokens NOT credited to ${userId}.`);
+    }
   }
 
   // Refund all open bets
@@ -411,18 +421,23 @@ export async function refundPlayer(match: {
       matchId: match.id,
       network: match.preferredNetwork,
       type: TransactionType.PRIZE_PAYOUT,
-      status: onchainReceipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+      status: onchainReceipt.settled ? TransactionStatus.SETTLED : TransactionStatus.PENDING,
       amount: refundAmount.toFixed(6),
       token: match.stakeToken,
       txHash: onchainReceipt.txHash || `cancel_refund_${match.id}_${userId}`,
       metadata: {
         description: onchainReceipt.description,
         mode: onchainReceipt.mode,
+        settled: onchainReceipt.settled,
         category: "cancel-refund",
       },
     },
   });
-  await creditWallet(userId, match.preferredNetwork, refundAmount);
+  if (onchainReceipt.settled) {
+    await creditWallet(userId, match.preferredNetwork, refundAmount);
+  } else {
+    console.error(`refundPlayer: on-chain refund failed for match ${match.id}. Tokens NOT credited to ${userId}.`);
+  }
 }
 
 async function refundOpenBets(

@@ -9,6 +9,8 @@ export type EscrowIntent = {
   onchainMatchIndex?: number | null;
   amount: string;
   token: string;
+  stakeAmount?: string;
+  entryFee?: string;
 };
 
 export type SettlementIntent = {
@@ -52,6 +54,7 @@ export type OnchainReceipt = {
   txHash: string;
   explorerUrl?: string;
   mode: "mock" | "configured";
+  settled: boolean;
   description: string;
   onchainMatchIndex?: number;
 };

@@ -367,6 +367,7 @@ async function resolveDuelByScores(
   const scoreTag = `${attackerScore} vs ${defenderScore}`;
   let settledMatchWinnerId: string | null = null;
   let matchEndedAsDraw = false;
+  let receiptSettled = false;
 
   await prisma.$transaction(async (tx) => {
     // Guard against race with submitArcadeAttempt — if it already resolved, bail.
@@ -515,19 +516,22 @@ async function resolveDuelByScores(
         });
       }
 
+      receiptSettled = receipt.settled;
+
       await tx.transaction.create({
         data: {
           userId: matchWinnerId,
           matchId: match.id,
           network: match.preferredNetwork,
           type: "PRIZE_PAYOUT",
-          status: receipt.mode === "configured" ? "PENDING" : "SETTLED",
+          status: receipt.settled ? "SETTLED" : "PENDING",
           amount: stakePool.toString(),
           token: match.stakeToken,
           txHash: receipt.txHash,
           metadata: {
             description: receipt.description,
             mode: receipt.mode,
+            settled: receipt.settled,
             penaltyResolved: true,
             participantCount,
             grossStakePool: stakePool.toString(),
@@ -540,11 +544,13 @@ async function resolveDuelByScores(
     }
   });
 
-  if (settledMatchWinnerId) {
+  if (settledMatchWinnerId && receiptSettled) {
     const participantCount = match.guestId ? 2 : 1;
     const prizeAmount = Number(match.stakeAmount.mul(participantCount).toString());
     await creditWallet(settledMatchWinnerId, match.preferredNetwork, prizeAmount);
     await settleSpectatorBets(match.id, settledMatchWinnerId, match.preferredNetwork, match.stakeToken);
+  } else if (settledMatchWinnerId && !receiptSettled) {
+    console.error(`resolveDuelByScores: on-chain settlement failed for match ${match.id}. Tokens NOT credited to ${settledMatchWinnerId}.`);
   } else if (matchEndedAsDraw) {
     await settleDraw({
       id: match.id,

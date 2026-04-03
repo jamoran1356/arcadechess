@@ -1,0 +1,10 @@
+node_modules
+.next
+.env.local
+.env.*.local
+.git
+.gitignore
+README.md
+CHANGELOG.md
+AGENTS.md
+CLAUDE.md

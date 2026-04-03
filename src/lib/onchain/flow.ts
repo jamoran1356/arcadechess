@@ -11,6 +11,7 @@ function buildReceipt(description: string): OnchainReceipt {
     explorerUrl: configured ? `${process.env.FLOW_ACCESS_NODE}/tx/${txHash}` : undefined,
     mode: configured ? "configured" : "mock",
     description,
+    settled: true,
   };
 }
 

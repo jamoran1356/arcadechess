@@ -11,10 +11,13 @@ export const dynamic = "force-dynamic";
 
 type MatchPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ autoJoin?: string }>;
 };
 
-export default async function MatchPage({ params }: MatchPageProps) {
+export default async function MatchPage({ params, searchParams }: MatchPageProps) {
   const { id } = await params;
+  const sp = await searchParams;
+  const autoJoin = sp.autoJoin === "true";
   const session = await getSession();
   const match = await getMatchSnapshot(id, session?.id);
   const locale = await getLocale();
@@ -86,6 +89,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
             isSolo={false}
             joinLabel={t.joinBtn}
             startSoloLabel={t.startSoloBtn}
+            autoJoin={autoJoin}
           />
         ) : canStartSolo ? (
           <JoinMatchForm
@@ -97,6 +101,7 @@ export default async function MatchPage({ params }: MatchPageProps) {
             isSolo={true}
             joinLabel={t.joinBtn}
             startSoloLabel={t.startSoloBtn}
+            autoJoin={autoJoin}
           />
         ) : null}
       </section>

@@ -156,7 +156,7 @@ export default async function LobbyPage({
                     {t.viewBtn}
                   </Link>
                   {match.status === "OPEN" && !match.isSolo && match.host !== session.name ? (
-                    <Link href={`/match/${match.id}`} className="button-primary px-4 py-2 text-sm">
+                    <Link href={`/match/${match.id}?autoJoin=true`} className="button-primary px-4 py-2 text-sm">
                       {t.joinBtn}
                     </Link>
                   ) : null}

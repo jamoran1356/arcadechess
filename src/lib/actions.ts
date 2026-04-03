@@ -184,6 +184,8 @@ export async function createMatchAction(formData: FormData) {
     actorWallet: hostWallet.address,
     amount: hostTotalLock,
     token: parsed.data.stakeToken,
+    stakeAmount: parsed.data.stakeAmount.toFixed(6),
+    entryFee: effectiveEntryFee.toFixed(6),
   });
   const receiptTxHash = clientTxHash || receipt.txHash;
   const receiptMode = receipt.mode;
@@ -345,6 +347,8 @@ export async function startSoloMatchAction(formData: FormData) {
       actorWallet: soloWallet.address,
       amount: totalLock,
       token: match.stakeToken,
+      stakeAmount: match.stakeAmount.toString(),
+      entryFee: match.entryFee.toString(),
     });
     receiptTxHash = clientTxHash || receipt.txHash;
     receiptMode = receipt.mode;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { joinMatchAction, startSoloMatchAction } from "@/lib/actions";
 import { DialogModal } from "@/components/dialog-modal";
 import { useEscrowTx } from "@/hooks/use-escrow-tx";
@@ -15,6 +15,7 @@ type Props = {
   isSolo: boolean;
   joinLabel: string;
   startSoloLabel: string;
+  autoJoin?: boolean;
 };
 
 export function JoinMatchForm({
@@ -26,8 +27,10 @@ export function JoinMatchForm({
   isSolo,
   joinLabel,
   startSoloLabel,
+  autoJoin,
 }: Props) {
   const [showConfirm, setShowConfirm] = useState(false);
+  const autoJoinTriggered = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [escrowTxHash, setEscrowTxHash] = useState<string | null>(null);
@@ -36,6 +39,13 @@ export function JoinMatchForm({
   const stake = Number(stakeAmount);
   const fee = Number(entryFee);
   const total = (stake + fee).toFixed(6);
+
+  useEffect(() => {
+    if (autoJoin && !autoJoinTriggered.current) {
+      autoJoinTriggered.current = true;
+      setShowConfirm(true);
+    }
+  }, [autoJoin]);
 
   function handleClick() {
     setError(null);

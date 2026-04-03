@@ -21,8 +21,14 @@ export function useEscrowTx() {
     if (!ESCROW_ADDRESS) {
       throw new Error("Dirección de contrato escrow no configurada (NEXT_PUBLIC_INITIA_CONTRACT_ADDRESS).");
     }
+    if (!ESCROW_ADDRESS.startsWith("init1")) {
+      throw new Error("Dirección de escrow inválida. Contacta al administrador.");
+    }
 
-    const microAmount = Math.round(amountHuman * 1_000_000).toString();
+    const microAmount = Math.round(amountHuman * 1_000_000);
+    if (microAmount <= 0) {
+      throw new Error("El monto a enviar debe ser mayor a 0.");
+    }
 
     const messages = [
       {
@@ -30,7 +36,7 @@ export function useEscrowTx() {
         value: {
           fromAddress: initiaAddress,
           toAddress: ESCROW_ADDRESS,
-          amount: [{ amount: microAmount, denom: DENOM }],
+          amount: [{ amount: microAmount.toString(), denom: DENOM }],
         },
       },
     ];
