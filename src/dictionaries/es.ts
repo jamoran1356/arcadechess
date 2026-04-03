@@ -11,6 +11,7 @@ export const es = {
     login: "Ingresar",
     register: "Crear cuenta",
     createPlay: "Crear / Jugar",
+    minigames: "Minijuegos",
   },
   home: {
     heroEyebrow: "Initia x Flow x Solana",
@@ -296,6 +297,18 @@ export const es = {
     activeClockLabel: "Tiempo para mover",
     whiteClockLabel: "Reloj blancas",
     blackClockLabel: "Reloj negras",
+  },
+  minigames: {
+    eyebrow: "Biblioteca arcade",
+    title: "Minijuegos",
+    subtitle: "Cada captura en el tablero abre un duelo arcade. Conoce todos los juegos disponibles, sus reglas y sistemas anti-trampas.",
+    timeLabel: "Tiempo",
+    typeLabel: "Tipo",
+    antiCheatLabel: "Anti-trampas",
+    howTitle: "¿Cómo funcionan?",
+    howStep1: "Cuando un jugador intenta capturar una pieza rival, el sistema selecciona un minijuego al azar del pool de la partida.",
+    howStep2: "Ambos jugadores compiten simultáneamente. El atacante necesita ganar para confirmar la captura; el defensor, para bloquearla.",
+    howStep3: "Los resultados se validan con sistemas anti-trampas y se registran onchain para garantizar transparencia.",
   },
   arcade: {
     attackerRole: "Ataques: Completa el juego para avanzar tu pieza.",

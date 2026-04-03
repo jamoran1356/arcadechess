@@ -35,6 +35,7 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
     { href: "/", label: dict.nav.home },
     { href: "/lobby", label: dict.nav.lobby },
     { href: "/dashboard", label: dict.nav.dashboard },
+    { href: "/minigames", label: dict.nav.minigames },
     ...(session?.role === "ADMIN" ? [{ href: "/admin", label: dict.nav.admin }] : []),
   ];
 

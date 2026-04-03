@@ -11,6 +11,7 @@ export const en = {
     login: "Sign in",
     register: "Sign up",
     createPlay: "Create / Play",
+    minigames: "Minigames",
   },
   home: {
     heroEyebrow: "Initia x Flow x Solana",
@@ -296,6 +297,18 @@ export const en = {
     activeClockLabel: "Time to move",
     whiteClockLabel: "White clock",
     blackClockLabel: "Black clock",
+  },
+  minigames: {
+    eyebrow: "Arcade Library",
+    title: "Minigames",
+    subtitle: "Every capture on the board opens an arcade duel. Discover all available games, their rules, and anti-cheat systems.",
+    timeLabel: "Time",
+    typeLabel: "Type",
+    antiCheatLabel: "Anti-cheat",
+    howTitle: "How do they work?",
+    howStep1: "When a player tries to capture a rival piece, the system picks a random minigame from the match pool.",
+    howStep2: "Both players compete simultaneously. The attacker must win to confirm the capture; the defender, to block it.",
+    howStep3: "Results are validated with anti-cheat systems and recorded onchain for full transparency.",
   },
   arcade: {
     attackerRole: "Attack: Complete the game to advance your piece.",

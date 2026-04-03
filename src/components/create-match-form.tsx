@@ -164,10 +164,9 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{t.arcadeLibrary}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {arcadeLibrary.map((game) => (
-              <label key={game.id} className="rounded-[1.25rem] border border-white/10 bg-slate-950/80 p-4 text-sm text-slate-200">
-                <input type="checkbox" name="arcadeGamePool" value={game.id as ArcadeGameType} defaultChecked={game.id !== ArcadeGameType.KEY_CLASH} className="mr-2" />
+              <label key={game.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-slate-200 cursor-pointer hover:border-amber-400/30 transition-colors">
+                <input type="checkbox" name="arcadeGamePool" value={game.id as ArcadeGameType} defaultChecked={game.id !== ArcadeGameType.KEY_CLASH} className="accent-amber-400" />
                 {game.name}
-                <p className="mt-2 text-xs leading-6 text-slate-400">{game.blurb}</p>
               </label>
             ))}
           </div>
