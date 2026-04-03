@@ -54,8 +54,9 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
     const stake = Number(fd.get("stakeAmount") ?? 0);
     const token = String(fd.get("stakeToken") ?? "INIT");
     const network = String(fd.get("network") ?? "INITIA");
+    const solo = fd.get("isSolo") === "true";
 
-    if (stake <= 0) {
+    if (stake < 0 || (!solo && stake <= 0)) {
       setError("Debes establecer un monto de stake mayor a 0.");
       return;
     }
@@ -86,9 +87,9 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
         if (walletAddress) fd.set("walletAddress", walletAddress);
         const network = String(fd.get("network") ?? defaultNetwork);
 
-        // Sign real on-chain tx for INITIA network
-        if (network === "INITIA" && isWalletConnected) {
-          const total = Number(preview.total);
+        // Sign real on-chain tx for INITIA network (skip when total is 0, e.g. free solo)
+        const total = Number(preview.total);
+        if (network === "INITIA" && isWalletConnected && total > 0) {
           const txHash = await sendToEscrow(total, `playchess:create`);
           setEscrowTxHash(txHash);
           // Show explorer link, wait for user to continue

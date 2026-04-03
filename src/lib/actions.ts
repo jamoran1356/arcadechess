@@ -143,6 +143,76 @@ export async function logoutAction() {
   redirect("/");
 }
 
+/* ── Wallet-based authentication ── */
+
+export async function walletAuthAction(address: string): Promise<{ needsProfile: boolean } | { error: string }> {
+  if (!address || !address.startsWith("init1") || address.length < 30) {
+    return { error: "Dirección de wallet inválida." };
+  }
+
+  // Check if wallet already linked to a user
+  const existingWallet = await prisma.wallet.findFirst({
+    where: { address, network: TransactionNetwork.INITIA },
+    include: { user: { select: { id: true, name: true, email: true, role: true } } },
+  });
+
+  if (existingWallet?.user) {
+    const u = existingWallet.user;
+    await createSession({ id: u.id, name: u.name, email: u.email, role: u.role });
+    const needsProfile = u.email.endsWith("@wallet.playchess");
+    return { needsProfile };
+  }
+
+  // Create new user with placeholder email
+  const placeholderEmail = `${address}@wallet.playchess`;
+  const truncName = `${address.slice(0, 8)}…${address.slice(-4)}`;
+
+  const user = await prisma.user.create({
+    data: {
+      name: truncName,
+      email: placeholderEmail,
+      passwordHash: await hashPassword(randomUUID()),
+      wallets: {
+        create: [{ network: TransactionNetwork.INITIA, address, balance: "0" }],
+      },
+    },
+  });
+
+  await createSession({ id: user.id, name: user.name, email: user.email, role: user.role });
+  return { needsProfile: true };
+}
+
+export async function completeProfileAction(
+  _: FormState | void | undefined,
+  formData: FormData,
+): Promise<FormState | void> {
+  const session = await requireUser();
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name || name.length < 2) {
+    return { errors: { name: ["El nombre debe tener al menos 2 caracteres."] } };
+  }
+
+  const rawEmail = String(formData.get("email") ?? "").trim();
+  const updates: { name: string; email?: string } = { name };
+
+  if (rawEmail && rawEmail.includes("@") && !rawEmail.endsWith("@wallet.playchess")) {
+    const taken = await prisma.user.findUnique({ where: { email: rawEmail } });
+    if (taken && taken.id !== session.id) {
+      return { errors: { email: ["Ese correo ya está registrado."] } };
+    }
+    updates.email = rawEmail;
+  }
+
+  const user = await prisma.user.update({
+    where: { id: session.id },
+    data: updates,
+  });
+
+  await createSession({ id: user.id, name: user.name, email: user.email, role: user.role });
+  redirect("/dashboard");
+}
+
 export async function createMatchAction(formData: FormData) {
   const session = await requireUser();
   const currentUser = await resolveSessionUser(session);

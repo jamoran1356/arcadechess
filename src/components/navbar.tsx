@@ -89,9 +89,10 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
             ))}
           </nav>
 
-          {/* Right: auth only */}
+          {/* Right: auth + wallet */}
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
+            <InterwovenKitConnectButton />
 
             {session ? (
               <div className="hidden items-center gap-2.5 sm:flex">
@@ -139,23 +140,6 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
           </div>
         </div>
       </div>
-
-      {/* ── Secondary bar: wallet connect (only when logged in) ── */}
-      {session && (
-        <div className="border-b border-white/[0.04] bg-[rgba(3,7,17,0.6)] backdrop-blur-lg">
-          <div className="mx-auto flex w-full max-w-7xl items-center justify-end gap-3 px-4 py-2 sm:px-6 lg:px-8">
-            <span className="mr-auto text-[11px] font-mono uppercase tracking-wider text-slate-500">{dict.nav.brand}</span>
-            <InterwovenKitConnectButton />
-          </div>
-        </div>
-      )}
-      {!session && (
-        <div className="border-b border-white/[0.04] bg-[rgba(3,7,17,0.6)] backdrop-blur-lg">
-          <div className="mx-auto flex w-full max-w-7xl items-center justify-end gap-3 px-4 py-2 sm:px-6 lg:px-8">
-            <InterwovenKitConnectButton />
-          </div>
-        </div>
-      )}
 
       {/* Mobile drawer */}
       <div
