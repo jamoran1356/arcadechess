@@ -74,6 +74,9 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [showResignDialog, setShowResignDialog] = useState(false);
   const [showWinDialog, setShowWinDialog] = useState(false);
   const [winDialogText, setWinDialogText] = useState("Ganaste la partida.");
+  const [prizePhase, setPrizePhase] = useState<"sending" | "sent" | null>(null);
+  const [prizeTxHash, setPrizeTxHash] = useState<string | null>(null);
+  const [prizeAmount, setPrizeAmount] = useState<string | null>(null);
   const previousStatusRef = useRef(status);
 
   const syncMatchState = useCallback(async () => {
@@ -131,17 +134,51 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     if (justFinished && currentUserId && winnerId === currentUserId) {
       const lastEvent = moveHistory[moveHistory.length - 1] ?? "";
       if (lastEvent.includes("[resign]")) {
-        setWinDialogText("Tu oponente se rindió. Ganaste la partida.");
+        setWinDialogText("Tu oponente se rindió. ¡Ganaste la partida!");
       } else if (lastEvent.includes("timeout")) {
-        setWinDialogText("Ganaste por tiempo. El reloj del rival llegó a 0.");
+        setWinDialogText("¡Ganaste por tiempo! El reloj del rival llegó a 0.");
       } else {
-        setWinDialogText("Ganaste la partida.");
+        setWinDialogText("¡Ganaste la partida!");
       }
+      setPrizePhase("sending");
+      setPrizeTxHash(null);
+      setPrizeAmount(null);
       setShowWinDialog(true);
     }
 
     previousStatusRef.current = status;
   }, [currentUserId, moveHistory, status, winnerId]);
+
+  // Poll for prize settlement transaction once the win dialog is open
+  useEffect(() => {
+    if (prizePhase !== "sending") return;
+
+    let cancelled = false;
+    const poll = async () => {
+      for (let attempt = 0; attempt < 20 && !cancelled; attempt++) {
+        try {
+          const res = await fetch(`/api/matches/${match.id}/state`, { cache: "no-store" });
+          if (!res.ok) break;
+          const data = await res.json();
+          const payoutTx = (data.transactions ?? []).find(
+            (t: { type: string; status: string }) => t.type === "PRIZE_PAYOUT" && t.status === "SETTLED",
+          );
+          if (payoutTx) {
+            setPrizeAmount(payoutTx.amount ?? null);
+            setPrizeTxHash(payoutTx.txHash ?? null);
+            setPrizePhase("sent");
+            return;
+          }
+        } catch { /* retry */ }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      // After timeout, show as sent anyway (settlement may have been DB-only)
+      if (!cancelled) setPrizePhase("sent");
+    };
+
+    void poll();
+    return () => { cancelled = true; };
+  }, [prizePhase, match.id]);
 
   const isMyTurn =
     (match.viewerRole === "host" && turn === "w") ||
@@ -450,13 +487,53 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
 
       <DialogModal
         open={showWinDialog}
-        title="Victoria"
-        description={winDialogText}
+        title="¡Victoria!"
         tone="success"
-        confirmLabel="Entendido"
+        confirmLabel={prizePhase === "sent" ? "Entendido" : undefined}
         hideCancel
-        onClose={() => setShowWinDialog(false)}
-      />
+        isBusy={prizePhase === "sending"}
+        onClose={() => { setShowWinDialog(false); setPrizePhase(null); }}
+      >
+        <div className="mt-2 space-y-4 text-sm text-slate-200">
+          <p>{winDialogText}</p>
+
+          {prizePhase === "sending" && (
+            <div className="flex items-center gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-4">
+              <svg className="h-5 w-5 animate-spin text-cyan-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              <span className="text-cyan-200">Enviando premio a tu wallet...</span>
+            </div>
+          )}
+
+          {prizePhase === "sent" && (
+            <div className="space-y-3 rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4">
+              <div className="flex items-center gap-2">
+                <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="font-semibold text-emerald-300">¡Premio enviado!</span>
+              </div>
+              {prizeAmount && (
+                <p className="text-lg font-bold text-emerald-200">
+                  +{prizeAmount} {match.stakeToken}
+                </p>
+              )}
+              {prizeTxHash && (
+                <a
+                  href={`https://scan.testnet.initia.xyz/initiation-2/txs/${prizeTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-cyan-300 underline hover:text-cyan-200"
+                >
+                  Ver transacción en explorador ↗
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </DialogModal>
     </div>
   );
 }
