@@ -298,7 +298,7 @@ export async function createMatchAction(formData: FormData) {
       turnStartedAt: isSolo ? new Date() : null,
       fen: new Chess().fen(),
       moveHistory: [],
-        arcadeGamePool: parsed.data.arcadeGamePool.length > 0 ? parsed.data.arcadeGamePool : (await prisma.arcadeGame.findMany({ where: { isEnabled: true }, select: { gameType: true } })).map(g => g.gameType),
+        arcadeGamePool: parsed.data.arcadeGamePool,
       hostId: currentUser.id,
       isSolo,
       onchainMatchIndex: onchainMatchIndex ?? null,

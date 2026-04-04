@@ -138,23 +138,35 @@ async function checkAndResolveTimeoutVictory(
     return null;
   }
 
-  // Timeout detected: opponent wins
-  const winnerId = whiteTimeExpired ? match.guestId ?? match.hostId : match.hostId;
+  // Timeout detected: the OTHER player wins.
+  // Solo: host = player (white), guestId = null.
+  //   White expires → player loses → no winner (draw/forfeit treated as loss).
+  //   Black expires → hostId wins.
+  // PvP: normal — opponent of the timed-out side wins.
+  let winnerId: string;
+  if (whiteTimeExpired) {
+    winnerId = match.guestId ?? ""; // solo: empty string → no winner
+  } else {
+    winnerId = match.hostId;
+  }
 
   await prisma.match.update({
     where: { id: match.id },
     data: {
       status: MatchStatus.FINISHED,
-      winnerId,
+      winnerId: winnerId || null,
       whiteClockMs: currentTurnClocks.whiteClockMs,
       blackClockMs: currentTurnClocks.blackClockMs,
       turnStartedAt: null,
     },
   });
 
-  await settleWinner(match, winnerId);
+  if (winnerId) {
+    await settleWinner(match, winnerId);
+  }
+  // Solo timeout with no guestId: player loses, vault keeps the deposit.
 
-  return winnerId;
+  return winnerId || match.hostId; // return hostId as sentinel so caller knows game ended
 }
 
 export async function syncMatchTimeoutIfNeeded(matchId: string) {
@@ -653,9 +665,9 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
   }
 
   const isCapture = legalMove.flags.includes("c") || legalMove.flags.includes("e");
-  if (isCapture) {
+  const gamePool = asGameTypes(match.arcadeGamePool);
+  if (isCapture && gamePool.length > 0) {
     const defenderId = (userId === match.hostId ? match.guestId : match.hostId) ?? userId;
-    const gamePool = asGameTypes(match.arcadeGamePool);
     const gameType = gamePool[Math.floor(Math.random() * gamePool.length)] ?? ArcadeGameType.TARGET_RUSH;
 
     const duel = await prisma.$transaction(async (tx) => {

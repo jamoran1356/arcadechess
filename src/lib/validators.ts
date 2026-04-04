@@ -42,7 +42,7 @@ export const duelAttemptSchema = z.object({
   actions: z.array(
     z.object({
       at: z.number().nonnegative().transform(Math.round),
-      value: z.string().min(1).max(12),
+      value: z.string().min(1).max(24),
     }),
   ),
 });

@@ -29,6 +29,7 @@ type Props = {
     clockLabel: string;
     clockNote: string;
     arcadeLibrary: string;
+    arcadeHint?: string;
     createBtn: string;
   };
 };
@@ -171,6 +172,9 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
               </label>
             ))}
           </div>
+          <p className="mt-3 text-xs text-slate-500">
+            {t.arcadeHint ?? "Desmarca todos para crear una partida clásica sin minijuegos."}
+          </p>
         </div>
 
         {error ? (

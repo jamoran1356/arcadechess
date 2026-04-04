@@ -6,7 +6,7 @@ import { getEnabledNetworks } from "@/lib/networks";
 import { getSupportedNetworks } from "@/lib/onchain/service";
 import { getPlatformConfig } from "@/lib/platform-config";
 
-const AUTO_SOLO_TARGET = 4;
+const AUTO_SOLO_TARGET = 9;
 const AUTO_SOLO_EMAIL = "arena-bot@playchess.local";
 
 async function ensureAutoSoloMatches() {
@@ -31,11 +31,21 @@ async function ensureAutoSoloMatches() {
   }
 
   const toCreate = AUTO_SOLO_TARGET - openSoloCount;
+
+  // Presets: first 3 are classic (no blockchain, no arcade), rest have arcade/stake
   const presets = [
-    { title: "Solo Flash 1m", theme: "Ritmo extremo", clock: 60_000, stake: "0.000000", fee: "0.000000" },
-    { title: "Solo Blitz 5m", theme: "Capturas con arcade", clock: 300_000, stake: "0.250000", fee: "0.050000" },
-    { title: "Solo Rapid 10m", theme: "Control clasico", clock: 600_000, stake: "0.500000", fee: "0.050000" },
-    { title: "Solo Custom 3m", theme: "Partida gratuita para amigos", clock: 180_000, stake: "0.000000", fee: "0.000000" },
+    // ── Classic: sin blockchain, sin minijuegos ──
+    { title: "Clásica Rápida 3m",  theme: "Ajedrez clásico sin blockchain", clock: 180_000,  stake: "0.000000", fee: "0.000000", arcade: [] as string[] },
+    { title: "Clásica Blitz 5m",   theme: "Ajedrez clásico sin blockchain", clock: 300_000,  stake: "0.000000", fee: "0.000000", arcade: [] as string[] },
+    { title: "Clásica Rapid 10m",  theme: "Ajedrez clásico sin blockchain", clock: 600_000,  stake: "0.000000", fee: "0.000000", arcade: [] as string[] },
+    // ── Arcade gratuitas (con minijuego, sin stake) ──
+    { title: "Solo Flash 1m",      theme: "Ritmo extremo con arcade",       clock: 60_000,   stake: "0.000000", fee: "0.000000", arcade: ["TARGET_RUSH", "MEMORY_GRID"] },
+    { title: "Solo Arcade 3m",     theme: "Minijuegos en cada captura",     clock: 180_000,  stake: "0.000000", fee: "0.000000", arcade: ["TARGET_RUSH", "MEMORY_GRID", "REACTION_DUEL"] },
+    { title: "Solo Custom 5m",     theme: "Partida gratuita con arcade",    clock: 300_000,  stake: "0.000000", fee: "0.000000", arcade: ["TARGET_RUSH", "MEMORY_GRID"] },
+    // ── Arcade con stake (requiere blockchain) ──
+    { title: "Solo Blitz 5m",      theme: "Capturas con arcade y apuesta",  clock: 300_000,  stake: "0.250000", fee: "0.050000", arcade: ["TARGET_RUSH", "MEMORY_GRID"] },
+    { title: "Solo Rapid 10m",     theme: "Control clásico con apuesta",    clock: 600_000,  stake: "0.500000", fee: "0.050000", arcade: ["TARGET_RUSH", "MEMORY_GRID", "MAZE_RUNNER"] },
+    { title: "Solo Pro 15m",       theme: "Partida avanzada con apuesta",   clock: 900_000,  stake: "1.000000", fee: "0.100000", arcade: ["TARGET_RUSH", "MEMORY_GRID", "PING_PONG", "MAZE_RUNNER"] },
   ];
 
   for (let i = 0; i < toCreate; i += 1) {
@@ -53,12 +63,12 @@ async function ensureAutoSoloMatches() {
         fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
         turn: "w",
         moveHistory: [],
-        arcadeGamePool: ["TARGET_RUSH", "MEMORY_GRID"],
+        arcadeGamePool: preset.arcade,
         isSolo: true,
         gameClockMs: preset.clock,
-          whiteClockMs: preset.clock,
-          blackClockMs: preset.clock,
-          turnStartedAt: null,
+        whiteClockMs: preset.clock,
+        blackClockMs: preset.clock,
+        turnStartedAt: null,
         status: "OPEN",
         hostId: bot.id,
       },
@@ -159,6 +169,7 @@ export async function getDashboardSnapshot(userId: string) {
       },
       hostedMatches: { include: { guest: true }, orderBy: { createdAt: "desc" }, take: 6 },
       joinedMatches: { include: { host: true }, orderBy: { createdAt: "desc" }, take: 6 },
+      _count: { select: { hostedMatches: true, joinedMatches: true, transactions: true } },
     },
   });
 

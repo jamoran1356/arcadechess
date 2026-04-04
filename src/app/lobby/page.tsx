@@ -56,6 +56,7 @@ export default async function LobbyPage({
             clockLabel: t.clockLabel,
             clockNote: t.clockNote,
             arcadeLibrary: t.arcadeLibrary,
+            arcadeHint: t.arcadeHint,
             createBtn: t.createBtn,
           }}
           buttonLabel={t.createBtn}
@@ -122,11 +123,17 @@ export default async function LobbyPage({
 
               {/* Arcade games */}
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {match.arcadeGamePool.map((game) => (
-                  <span key={game} className="rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-slate-500">
-                    {game.replaceAll("_", " ")}
+                {match.arcadeGamePool.length === 0 ? (
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/5 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-emerald-400">
+                    {locale === "es" ? "Clásica" : "Classic"}
                   </span>
-                ))}
+                ) : (
+                  match.arcadeGamePool.map((game) => (
+                    <span key={game} className="rounded-full border border-white/[0.06] bg-white/[0.03] px-2.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-slate-500">
+                      {game.replaceAll("_", " ")}
+                    </span>
+                  ))
+                )}
               </div>
 
               {/* Actions */}

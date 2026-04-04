@@ -13,6 +13,7 @@ export const en = {
     createPlay: "Create / Play",
     minigames: "Minigames",
     transactions: "Transactions",
+    help: "Help",
   },
   home: {
     heroEyebrow: "Initia x Flow x Solana",
@@ -159,8 +160,7 @@ export const en = {
     clockLabel: "Main clock (minutes per side)",
     clockNote:
       "The clock only ticks during chess moves; it pauses during arcade mini-games.",
-    arcadeLibrary: "Arcade library",
-    createBtn: "Create table with escrow",
+    arcadeLibrary: "Arcade library",    arcadeHint: "Uncheck all to create a classic match without minigames.",    createBtn: "Create table with escrow",
     connectedEyebrow: "Connected player",
     connectedDesc:
       "You can create public tables or join as a rival. If an occupied square is attacked, both players receive the same mini-game and the server validates the result.",
@@ -356,5 +356,60 @@ export const en = {
     validating: "Validating attempt and resolving board...",
     submitError: "Could not submit the result.",
     submitSuccess: "Result submitted.",
+  },
+  help: {
+    eyebrow: "Help center",
+    title: "Frequently asked questions",
+    subtitle: "Everything you need to know to start playing on PlayChess Arena, even if you've never used blockchain.",
+    faq: [
+      {
+        q: "What is PlayChess Arena?",
+        a: "It's an online chess platform where captures are resolved with arcade minigames. You can play free classic games or wager INIT tokens on the Initia blockchain.",
+      },
+      {
+        q: "Do I need a crypto wallet to play?",
+        a: "No. You can create an account with email and password and play classic games without any blockchain interaction. If you want to wager or join staked matches, you'll need to connect an Initia wallet.",
+      },
+      {
+        q: "How do I create an Initia wallet?",
+        a: "1. Install the Initia Wallet extension from initia.xyz/wallet on Chrome or Brave.\n2. Create a new wallet and save your seed phrase in a safe place.\n3. Once installed, click \"Connect Wallet\" on PlayChess to link it to your account.",
+      },
+      {
+        q: "How do I get testnet INIT tokens?",
+        a: "1. Go to the official faucet: faucet.testnet.initia.xyz\n2. Connect your wallet or paste your init1... address.\n3. Request test tokens (they're free and only used on the test network).\n4. Tokens will arrive in your wallet within seconds.",
+      },
+      {
+        q: "How do I add balance to my PlayChess account?",
+        a: "Your PlayChess balance reflects your on-chain balance. When you connect your Initia wallet with funds, you can create or join staked matches. You don't need to deposit into the platform: funds are locked in a smart contract during the match.",
+      },
+      {
+        q: "How do I create a match?",
+        a: "1. Go to the Lobby and click \"Create match with escrow\".\n2. Choose the mode: Solo (vs computer) or Versus (vs another player).\n3. Set the stake (you can set 0 for free games), the clock, and the minigames.\n4. Confirm and your match will appear in the lobby.",
+      },
+      {
+        q: "What happens when I capture a piece?",
+        a: "If the match has minigames enabled, each capture opens an arcade duel. You must win the minigame to confirm the capture. If you lose, your piece is removed instead of the rival's. In classic matches (no arcade), captures work like standard chess.",
+      },
+      {
+        q: "How does betting work?",
+        a: "Spectators can bet on active Versus matches. Visit a live match page, choose which player to bet on, and the amount. If your player wins, you receive your bet plus a proportional share of the losing pool (minus platform fee).",
+      },
+      {
+        q: "What is a classic match?",
+        a: "It's a match without arcade minigames and without blockchain interaction. Captures work like standard chess. They're ideal for players who want to practice or who don't have crypto experience.",
+      },
+      {
+        q: "Is it safe? Where do my funds go?",
+        a: "Your funds are locked in a verifiable smart contract on the Initia blockchain. No one can move your tokens while the match is in progress. When it ends, the contract automatically settles to the winner. Everything is transparent and verifiable on the network explorer.",
+      },
+      {
+        q: "How do I verify a transaction?",
+        a: "Go to the Transactions page from the menu. Each operation shows a link to the Initia explorer where you can verify the transaction hash, amount, and address involved.",
+      },
+      {
+        q: "What blockchain networks does the platform support?",
+        a: "We currently support the Initia testnet (initiation-2). More networks like Flow and Solana will be added in the future.",
+      },
+    ],
   },
 } as const;

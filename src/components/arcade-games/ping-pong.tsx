@@ -34,6 +34,8 @@ export function PingPongGame({ scenario, onAction, onComplete, disabled, multipl
   const isMultiplayer = !!multiplayer;
   // "host" runs the authoritative physics. In singleplayer the local player is always host.
   const isHost = !multiplayer || multiplayer.role === 'attacker';
+  // Mirror rendering for defender so every player sees their own paddle on the left.
+  const mirrored = isMultiplayer && !isHost;
 
   /* ---- shared game state ---- */
   const stateRef = useRef({
@@ -84,7 +86,7 @@ export function PingPongGame({ scenario, onAction, onComplete, disabled, multipl
     let active = true;
 
     const sync = async () => {
-      while (active) {
+      while (active && !stateRef.current.over) {
         const s = stateRef.current;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const body: Record<string, any> = {
@@ -252,24 +254,29 @@ export function PingPongGame({ scenario, onAction, onComplete, disabled, multipl
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Paddles
+      // Paddles – in mirrored mode the defender sees their own paddle on the left
+      const myPaddleY = mirrored ? s.rightY : s.leftY;
+      const opPaddleY = mirrored ? s.leftY : s.rightY;
       ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(12, s.leftY - paddleH / 2, PADDLE_W, paddleH);
+      ctx.fillRect(12, myPaddleY - paddleH / 2, PADDLE_W, paddleH);
       ctx.fillStyle = '#f87171';
-      ctx.fillRect(W - 12 - PADDLE_W, s.rightY - paddleH / 2, PADDLE_W, paddleH);
+      ctx.fillRect(W - 12 - PADDLE_W, opPaddleY - paddleH / 2, PADDLE_W, paddleH);
 
-      // Ball
+      // Ball – mirror X for defender
+      const renderBallX = mirrored ? W - s.ballX : s.ballX;
       ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.arc(s.ballX, s.ballY, BALL_R, 0, Math.PI * 2);
+      ctx.arc(renderBallX, s.ballY, BALL_R, 0, Math.PI * 2);
       ctx.fill();
 
-      // Scores
+      // Scores – each player sees their own score on the left
+      const leftDisplayScore = mirrored ? s.rightScore : s.leftScore;
+      const rightDisplayScore = mirrored ? s.leftScore : s.rightScore;
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.font = 'bold 28px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`${s.leftScore}`, W / 4, 36);
-      ctx.fillText(`${s.rightScore}`, (3 * W) / 4, 36);
+      ctx.fillText(`${leftDisplayScore}`, W / 4, 36);
+      ctx.fillText(`${rightDisplayScore}`, (3 * W) / 4, 36);
 
       // Waiting overlay
       if (waiting) {
@@ -283,7 +290,7 @@ export function PingPongGame({ scenario, onAction, onComplete, disabled, multipl
     }, TICK);
 
     return () => clearInterval(interval);
-  }, [disabled, isHost, isMultiplayer, onAction, onComplete, paddleH, resetBall, scenario.ballSpeed, scenario.winScore, waiting]);
+  }, [disabled, isHost, isMultiplayer, mirrored, onAction, onComplete, paddleH, resetBall, scenario.ballSpeed, scenario.winScore, waiting]);
 
   /* ---- touch controls ---- */
   const handleTouch = useCallback((e: React.TouchEvent) => {

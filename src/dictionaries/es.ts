@@ -13,6 +13,7 @@ export const es = {
     createPlay: "Crear / Jugar",
     minigames: "Minijuegos",
     transactions: "Transacciones",
+    help: "Ayuda",
   },
   home: {
     heroEyebrow: "Initia x Flow x Solana",
@@ -160,6 +161,7 @@ export const es = {
     clockNote:
       "El reloj solo cuenta durante jugadas de ajedrez; se pausa durante minijuegos arcade.",
     arcadeLibrary: "Biblioteca arcade",
+    arcadeHint: "Desmarca todos para crear una partida clásica sin minijuegos.",
     createBtn: "Crear mesa con escrow",
     connectedEyebrow: "Jugador conectado",
     connectedDesc:
@@ -356,5 +358,60 @@ export const es = {
     validating: "Validando intento y resolviendo tablero...",
     submitError: "No se pudo enviar el resultado.",
     submitSuccess: "Resultado enviado.",
+  },
+  help: {
+    eyebrow: "Centro de ayuda",
+    title: "Preguntas frecuentes",
+    subtitle: "Todo lo que necesitas saber para empezar a jugar en PlayChess Arena, incluso si nunca has usado blockchain.",
+    faq: [
+      {
+        q: "¿Qué es PlayChess Arena?",
+        a: "Es una plataforma de ajedrez online donde las capturas se resuelven con minijuegos arcade. Puedes jugar partidas clásicas gratuitas o apostar tokens INIT en la blockchain de Initia.",
+      },
+      {
+        q: "¿Necesito una billetera crypto para jugar?",
+        a: "No. Puedes crear una cuenta con email y contraseña y jugar partidas clásicas sin interactuar con la blockchain. Si quieres apostar o participar en partidas con stake, necesitarás conectar una billetera Initia.",
+      },
+      {
+        q: "¿Cómo creo una billetera Initia?",
+        a: "1. Instala la extensión Initia Wallet desde initia.xyz/wallet en tu navegador Chrome o Brave.\n2. Crea una nueva billetera y guarda tu frase semilla en un lugar seguro.\n3. Una vez instalada, haz clic en \"Conectar Wallet\" en PlayChess para vincularla a tu cuenta.",
+      },
+      {
+        q: "¿Cómo obtengo tokens INIT de prueba (testnet)?",
+        a: "1. Ve al faucet oficial: faucet.testnet.initia.xyz\n2. Conecta tu billetera o pega tu dirección init1...\n3. Solicita tokens de prueba (son gratuitos y se usan solo en la red de pruebas).\n4. Los tokens llegarán a tu billetera en unos segundos.",
+      },
+      {
+        q: "¿Cómo agrego saldo a mi cuenta de PlayChess?",
+        a: "Tu saldo en PlayChess refleja tu balance on-chain. Al conectar tu billetera Initia con fondos, podrás crear o unirte a partidas con stake. No necesitas depositar en la plataforma: los fondos se bloquean en un contrato inteligente durante la partida.",
+      },
+      {
+        q: "¿Cómo creo una partida?",
+        a: "1. Ve al Lobby y haz clic en \"Crear mesa con escrow\".\n2. Elige el modo: Solo (contra la máquina) o Versus (contra otro jugador).\n3. Configura el stake (puedes poner 0 para jugar gratis), el reloj y los minijuegos.\n4. Confirma y tu partida aparecerá en el lobby.",
+      },
+      {
+        q: "¿Qué pasa cuando capturo una pieza?",
+        a: "Si la partida tiene minijuegos activados, cada captura abre un duelo arcade. Debes ganar el minijuego para confirmar la captura. Si pierdes, tu pieza es removida en lugar de la del rival. En partidas clásicas (sin arcade), las capturas funcionan como en ajedrez normal.",
+      },
+      {
+        q: "¿Cómo funcionan las apuestas?",
+        a: "Los espectadores pueden apostar en partidas Versus activas. Visita la página de una partida en curso, elige a qué jugador apostar y el monto. Si tu jugador gana, recibes tu apuesta más una parte proporcional del pool perdedor (menos comisión de la plataforma).",
+      },
+      {
+        q: "¿Qué es una partida clásica?",
+        a: "Es una partida sin minijuegos arcade y sin interacción con la blockchain. Las capturas funcionan como en ajedrez estándar. Son ideales para jugadores que quieren practicar o que no tienen experiencia con crypto.",
+      },
+      {
+        q: "¿Es seguro? ¿Dónde van mis fondos?",
+        a: "Tus fondos se bloquean en un contrato inteligente verificable en la blockchain de Initia. Nadie puede mover tus tokens mientras la partida está en curso. Al terminar, el contrato liquida automáticamente al ganador. Todo es transparente y verificable en el explorador de la red.",
+      },
+      {
+        q: "¿Cómo verifico una transacción?",
+        a: "Ve a la página de Transacciones desde el menú. Cada operación muestra un enlace al explorador de Initia donde puedes verificar el hash de la transacción, el monto y la dirección involucrada.",
+      },
+      {
+        q: "¿Qué redes blockchain soporta la plataforma?",
+        a: "Actualmente soportamos la red de pruebas de Initia (initiation-2). En el futuro se agregarán más redes como Flow y Solana.",
+      },
+    ],
   },
 } as const;

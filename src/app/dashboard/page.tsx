@@ -134,11 +134,11 @@ export default async function DashboardPage() {
                 <div className="mt-7 grid gap-4 md:grid-cols-3">
                   <article className="rounded-[1.6rem] border border-white/10 bg-white/6 p-5 backdrop-blur">
                     <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{t.hostedMatchesLabel}</p>
-                    <p className="mt-3 text-4xl font-semibold text-white">{user.hostedMatches.length}</p>
+                    <p className="mt-3 text-4xl font-semibold text-white">{user._count.hostedMatches}</p>
                   </article>
                   <article className="rounded-[1.6rem] border border-white/10 bg-white/6 p-5 backdrop-blur">
                     <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">{t.joinedMatchesLabel}</p>
-                    <p className="mt-3 text-4xl font-semibold text-cyan-100">{user.joinedMatches.length}</p>
+                    <p className="mt-3 text-4xl font-semibold text-cyan-100">{user._count.joinedMatches}</p>
                   </article>
                   <article className="rounded-[1.6rem] border border-white/10 bg-white/6 p-5 backdrop-blur">
                     <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">Amigos</p>
@@ -151,16 +151,16 @@ export default async function DashboardPage() {
                 <article className="rounded-[1.75rem] border border-white/10 bg-black/20 p-5 backdrop-blur">
                   <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">Actividad</p>
                   <div className="mt-4 grid gap-3 text-sm text-slate-300">
-                    <div className="flex items-center justify-between"><span>Partidas abiertas o activas</span><span className="font-semibold text-white">{user.hostedMatches.length + user.joinedMatches.length}</span></div>
+                    <div className="flex items-center justify-between"><span>Partidas abiertas o activas</span><span className="font-semibold text-white">{user._count.hostedMatches + user._count.joinedMatches}</span></div>
                     <div className="flex items-center justify-between"><span>Invitaciones pendientes</span><span className="font-semibold text-white">{friends.filter((friend) => friend.status === "PENDING").length}</span></div>
-                    <div className="flex items-center justify-between"><span>Últimos movimientos</span><span className="font-semibold text-white">{user.transactions.length}</span></div>
+                    <div className="flex items-center justify-between"><span>Últimos movimientos</span><span className="font-semibold text-white">{user._count.transactions}</span></div>
                   </div>
                 </article>
                 <article className="rounded-[1.75rem] border border-white/10 bg-black/20 p-5 backdrop-blur">
                   <p className="font-mono text-xs uppercase tracking-[0.18em] text-slate-400">Estado de mesa</p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Wallets activas: {new Set(user.wallets.map((wallet) => wallet.network)).size}</span>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Partidas hoy: {user.hostedMatches.length + user.joinedMatches.length}</span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Partidas hoy: {user._count.hostedMatches + user._count.joinedMatches}</span>
                     <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">Amigos: {friends.filter((friend) => friend.status === "ACCEPTED").length}</span>
                   </div>
                 </article>
