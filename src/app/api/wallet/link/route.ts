@@ -23,6 +23,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Red inválida" }, { status: 400 });
   }
 
+  // Prevent claiming a wallet address already linked to a different user
+  const conflicting = await prisma.wallet.findFirst({
+    where: { address, network: network as TransactionNetwork, userId: { not: session.id } },
+    select: { id: true },
+  });
+  if (conflicting) {
+    return NextResponse.json({ error: "Esta dirección ya está vinculada a otra cuenta." }, { status: 409 });
+  }
+
   const existing = await prisma.wallet.findFirst({
     where: { userId: session.id, network: network as TransactionNetwork },
   });

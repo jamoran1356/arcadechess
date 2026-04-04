@@ -310,6 +310,12 @@ export const en = {
     pagePrev: "Previous",
     pageNext: "Next",
   },
+  chat: {
+    title: "Chat",
+    empty: "No messages yet. Say hi!",
+    placeholder: "Type a message…",
+    send: "Send",
+  },
   chess: {
     liveEyebrow: "Live table",
     turnWhite: "White's turn",

@@ -312,6 +312,12 @@ export const es = {
     pagePrev: "Anterior",
     pageNext: "Siguiente",
   },
+  chat: {
+    title: "Chat",
+    empty: "Sin mensajes aún. ¡Saluda!",
+    placeholder: "Escribe un mensaje…",
+    send: "Enviar",
+  },
   chess: {
     liveEyebrow: "Mesa en vivo",
     turnWhite: "Turno blancas",

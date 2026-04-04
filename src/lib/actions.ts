@@ -37,6 +37,23 @@ function defaultWalletAddress(network: TransactionNetwork, userId: string) {
   return `${network.toLowerCase()}_${userId}`;
 }
 
+/**
+ * Validate that a client-provided wallet address actually belongs to the
+ * authenticated user.  Prevents MITM / address injection attacks where
+ * an attacker could submit someone else's address via FormData.
+ */
+async function validateWalletOwnership(userId: string, address: string, network: TransactionNetwork): Promise<string> {
+  if (!address || !address.startsWith("init1")) return "";
+  const owned = await prisma.wallet.findFirst({
+    where: { userId, network, address },
+    select: { id: true },
+  });
+  if (!owned) {
+    throw new Error("La wallet proporcionada no pertenece a tu cuenta. Vincúlala primero desde el dashboard.");
+  }
+  return address;
+}
+
 async function generateMatchTitle(network: TransactionNetwork, isSolo: boolean) {
   const count = await prisma.match.count();
   const seq = String(count + 1).padStart(4, "0");
@@ -135,7 +152,30 @@ export async function loginAction(_: FormState | void | undefined, formData: For
   }
 
   await createSession({ id: user.id, name: user.name, email: user.email, role: user.role });
-  redirect(user.role === "ADMIN" ? "/admin" : "/dashboard");
+  redirect("/dashboard");
+}
+
+export async function adminLoginAction(_: FormState | void | undefined, formData: FormData): Promise<FormState | void> {
+  const parsed = loginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors };
+  }
+
+  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+    return { message: "Credenciales invalidas." };
+  }
+
+  if (!hasAdminAccess({ id: user.id, name: user.name, email: user.email, role: user.role })) {
+    return { message: "Credenciales invalidas." };
+  }
+
+  await createSession({ id: user.id, name: user.name, email: user.email, role: user.role });
+  redirect("/admin");
 }
 
 export async function logoutAction() {
@@ -243,11 +283,15 @@ export async function createMatchAction(formData: FormData) {
 
   // Use the real wallet address from the client (init1...) if available,
   // otherwise fall back to the DB address.
-  const clientWalletAddress = String(formData.get("walletAddress") ?? "").trim();
-  const effectiveHostAddress = clientWalletAddress.startsWith("init1") ? clientWalletAddress : hostWallet.address;
+  const clientWalletAddress = await validateWalletOwnership(
+    currentUser.id,
+    String(formData.get("walletAddress") ?? "").trim(),
+    parsed.data.network,
+  );
+  const effectiveHostAddress = clientWalletAddress || hostWallet.address;
 
   // Update the wallet record in DB with the real address if provided
-  if (clientWalletAddress.startsWith("init1") && hostWallet.address !== clientWalletAddress) {
+  if (clientWalletAddress && hostWallet.address !== clientWalletAddress) {
     await prisma.wallet.update({ where: { id: hostWallet.id }, data: { address: clientWalletAddress } });
   }
 
@@ -350,11 +394,15 @@ export async function joinMatchAction(formData: FormData) {
   const guestWallet = await getOrCreateWalletForNetwork(currentUser.id, match.preferredNetwork);
 
   // Use the real wallet address from the client (init1...) if available
-  const clientWalletAddress = String(formData.get("walletAddress") ?? "").trim();
-  const effectiveGuestAddress = clientWalletAddress.startsWith("init1") ? clientWalletAddress : guestWallet.address;
+  const clientWalletAddress = await validateWalletOwnership(
+    currentUser.id,
+    String(formData.get("walletAddress") ?? "").trim(),
+    match.preferredNetwork,
+  );
+  const effectiveGuestAddress = clientWalletAddress || guestWallet.address;
 
   // Update the wallet record in DB with the real address if provided
-  if (clientWalletAddress.startsWith("init1") && guestWallet.address !== clientWalletAddress) {
+  if (clientWalletAddress && guestWallet.address !== clientWalletAddress) {
     await prisma.wallet.update({ where: { id: guestWallet.id }, data: { address: clientWalletAddress } });
   }
 
@@ -444,11 +492,15 @@ export async function startSoloMatchAction(formData: FormData) {
     soloWallet = await getOrCreateWalletForNetwork(currentUser.id, match.preferredNetwork);
 
     // Use the real wallet address from the client (init1...) if available
-    const clientWalletAddress = String(formData.get("walletAddress") ?? "").trim();
-    const effectiveSoloAddress = clientWalletAddress.startsWith("init1") ? clientWalletAddress : soloWallet.address;
+    const clientWalletAddress = await validateWalletOwnership(
+      currentUser.id,
+      String(formData.get("walletAddress") ?? "").trim(),
+      match.preferredNetwork,
+    );
+    const effectiveSoloAddress = clientWalletAddress || soloWallet.address;
 
     // Update the wallet record in DB with the real address if provided
-    if (clientWalletAddress.startsWith("init1") && soloWallet.address !== clientWalletAddress) {
+    if (clientWalletAddress && soloWallet.address !== clientWalletAddress) {
       await prisma.wallet.update({ where: { id: soloWallet.id }, data: { address: clientWalletAddress } });
     }
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Chessboard } from "react-chessboard";
 import { ArcadeDuelModal } from "@/components/arcade-duel-modal";
 import { DialogModal } from "@/components/dialog-modal";
+import { MatchChat } from "@/components/match-chat";
 import { MatchShareControls } from "@/components/match-share-controls";
 import { useDict } from "@/components/locale-provider";
 import { resignMatchAction } from "@/lib/actions";
@@ -467,6 +468,8 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
               : ch.waitingMsg}
           </p>
         </div>
+
+        <MatchChat matchId={match.id} currentUserId={currentUserId} />
       </aside>
 
       {pendingDuel && currentUserId ? (

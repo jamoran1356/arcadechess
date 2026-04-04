@@ -59,13 +59,16 @@ export function JoinMatchForm({
         fd.set("matchId", matchId);
         if (walletAddress) fd.set("walletAddress", walletAddress);
 
-        // Sign real on-chain tx for INITIA network
-        if (network === "INITIA" && isWalletConnected) {
-          const txHash = await sendToEscrow(Number(total), `playchess:${isSolo ? "solo" : "join"}:${matchId}`);
+        const totalNum = Number(total);
+
+        // Sign real on-chain tx for INITIA network only when there's something to lock
+        if (network === "INITIA" && isWalletConnected && totalNum > 0) {
+          const txHash = await sendToEscrow(totalNum, `playchess:${isSolo ? "solo" : "join"}:${matchId}`);
           setEscrowTxHash(txHash);
           return; // Show explorer link, wait for user to continue
         }
 
+        // stake=0 → skip blockchain, go straight to server action
         if (isSolo) {
           await startSoloMatchAction(fd);
         } else {
