@@ -307,6 +307,8 @@ export const es = {
     colMatch: "Partida",
     colTx: "Tx Hash",
     empty: "Aún no hay transacciones registradas.",
+    pagePrev: "Anterior",
+    pageNext: "Siguiente",
   },
   chess: {
     liveEyebrow: "Mesa en vivo",

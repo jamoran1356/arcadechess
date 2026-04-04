@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { getLocale } from "@/lib/i18n";
 import { getDictionary } from "@/dictionaries";
 import { getPublicTransactions } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
+
+const PER_PAGE = 20;
 
 const STATUS_COLOR: Record<string, string> = {
   SETTLED: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
@@ -27,18 +30,20 @@ function formatDate(d: Date) {
   }).format(d);
 }
 
-export default async function TransactionsPage() {
+export default async function TransactionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const params = await searchParams;
+  const currentPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+
   const locale = await getLocale();
   const dict = getDictionary(locale);
   const t = dict.transactions;
-  const txs = await getPublicTransactions();
 
-  const totalSettled = txs
-    .filter((tx) => tx.status === "SETTLED")
-    .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-  const totalCount = txs.length;
-  const settledCount = txs.filter((tx) => tx.status === "SETTLED").length;
+  const { items: txs, totalCount, settledCount, settledVolume, totalPages } =
+    await getPublicTransactions(currentPage, PER_PAGE);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
@@ -61,7 +66,7 @@ export default async function TransactionsPage() {
         </div>
         <div className="panel rounded-[1.5rem] p-5">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">{t.statVolume}</p>
-          <p className="mt-1 text-2xl font-bold text-amber-300">{totalSettled.toFixed(4)} INIT</p>
+          <p className="mt-1 text-2xl font-bold text-amber-300">{settledVolume.toFixed(4)} INIT</p>
         </div>
       </div>
 
@@ -142,6 +147,66 @@ export default async function TransactionsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <nav className="flex items-center justify-center gap-2">
+          {currentPage > 1 && (
+            <Link
+              href={`/transactions?page=${currentPage - 1}`}
+              className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-300 transition hover:border-white/20 hover:text-white"
+            >
+              ← {t.pagePrev}
+            </Link>
+          )}
+
+          {pageRange(currentPage, totalPages).map((p) =>
+            p === "..." ? (
+              <span key={`ellipsis-${p}`} className="px-1 text-sm text-slate-600">…</span>
+            ) : (
+              <Link
+                key={p}
+                href={`/transactions?page=${p}`}
+                className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
+                  p === currentPage
+                    ? "border border-cyan-400/30 bg-cyan-400/10 text-cyan-200"
+                    : "border border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-white"
+                }`}
+              >
+                {p}
+              </Link>
+            ),
+          )}
+
+          {currentPage < totalPages && (
+            <Link
+              href={`/transactions?page=${currentPage + 1}`}
+              className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-300 transition hover:border-white/20 hover:text-white"
+            >
+              {t.pageNext} →
+            </Link>
+          )}
+        </nav>
+      )}
     </div>
   );
+}
+
+/** Generate a compact page range: [1, '...', 4, 5, 6, '...', 20] */
+function pageRange(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const pages: (number | "...")[] = [1];
+
+  if (current > 3) pages.push("...");
+
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+
+  for (let i = start; i <= end; i++) pages.push(i);
+
+  if (current < total - 2) pages.push("...");
+
+  pages.push(total);
+  return pages;
 }

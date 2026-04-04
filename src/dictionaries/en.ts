@@ -307,6 +307,8 @@ export const en = {
     colMatch: "Match",
     colTx: "Tx Hash",
     empty: "No transactions recorded yet.",
+    pagePrev: "Previous",
+    pageNext: "Next",
   },
   chess: {
     liveEyebrow: "Live table",

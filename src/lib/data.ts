@@ -206,23 +206,44 @@ export async function getAdminTransactionsSnapshot() {
   });
 }
 
-export async function getPublicTransactions() {
-  return prisma.transaction.findMany({
-    select: {
-      id: true,
-      type: true,
-      network: true,
-      status: true,
-      amount: true,
-      token: true,
-      txHash: true,
-      createdAt: true,
-      user: { select: { wallets: { select: { address: true, network: true } } } },
-      match: { select: { title: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+export async function getPublicTransactions(page = 1, perPage = 20) {
+  const skip = (page - 1) * perPage;
+
+  const [items, totalCount, agg] = await Promise.all([
+    prisma.transaction.findMany({
+      select: {
+        id: true,
+        type: true,
+        network: true,
+        status: true,
+        amount: true,
+        token: true,
+        txHash: true,
+        createdAt: true,
+        user: { select: { wallets: { select: { address: true, network: true } } } },
+        match: { select: { title: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: perPage,
+    }),
+    prisma.transaction.count(),
+    prisma.transaction.aggregate({
+      where: { status: "SETTLED" },
+      _count: true,
+      _sum: { amount: true },
+    }),
+  ]);
+
+  return {
+    items,
+    totalCount,
+    settledCount: agg._count,
+    settledVolume: Number(agg._sum.amount ?? 0),
+    page,
+    perPage,
+    totalPages: Math.max(1, Math.ceil(totalCount / perPage)),
+  };
 }
 
 export async function getAdminNetworksSnapshot() {
