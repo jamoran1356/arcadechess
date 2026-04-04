@@ -206,6 +206,25 @@ export async function getAdminTransactionsSnapshot() {
   });
 }
 
+export async function getPublicTransactions() {
+  return prisma.transaction.findMany({
+    select: {
+      id: true,
+      type: true,
+      network: true,
+      status: true,
+      amount: true,
+      token: true,
+      txHash: true,
+      createdAt: true,
+      user: { select: { wallets: { select: { address: true, network: true } } } },
+      match: { select: { title: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+}
+
 export async function getAdminNetworksSnapshot() {
   return prisma.wallet.findMany({
     include: { user: true },

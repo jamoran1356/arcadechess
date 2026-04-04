@@ -321,41 +321,7 @@ export default async function Home() {
           ))}
         </div>
       </section>
-
-      {/* ── Divider ── */}
-      <div className="section-divider" />
-
-      {/* ── Plans ── */}
-      <section className="grid gap-8">
-        <div>
-          <p className="eyebrow">{t.plansEyebrow}</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">{t.plansTitle}</h2>
-        </div>
-        <div className="grid gap-5 lg:grid-cols-3">
-          {plans.map((plan, idx) => (
-            <article
-              key={plan.name}
-              className={`panel rounded-[2rem] p-7 transition-transform duration-300 hover:-translate-y-1 ${
-                idx === 1 ? "card-glow border-cyan-400/15 ring-1 ring-cyan-400/10" : ""
-              }`}
-            >
-              {idx === 1 && (
-                <span className="mb-4 inline-block rounded-full bg-gradient-to-r from-cyan-400/20 to-amber-400/20 border border-cyan-400/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-300">Popular</span>
-              )}
-              <h3 className="text-2xl font-bold text-white">{plan.name}</h3>
-              <p className="mt-2 text-2xl font-bold text-amber-300">{plan.price}</p>
-              <ul className="mt-6 grid gap-2.5 text-sm text-slate-400">
-                {plan.bullets.map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <span className="mt-0.5 text-cyan-400">✦</span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
-      </section>
+      
     </div>
   );
 }
