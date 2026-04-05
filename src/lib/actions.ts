@@ -295,35 +295,41 @@ export async function createMatchAction(formData: FormData) {
     await prisma.wallet.update({ where: { id: hostWallet.id }, data: { address: clientWalletAddress } });
   }
 
-  // Validate balance on-chain (not from DB)
-  const adapter = getOnchainAdapter(parsed.data.network);
-  if (effectiveHostAddress.startsWith("init1")) {
-    const onchainBal = await adapter.queryBalance(effectiveHostAddress);
-    if (!onchainBal || onchainBal.amount < Number(hostTotalLock)) {
-      throw new Error(
-        `Fondos insuficientes on-chain. Necesitas ${hostTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
-      );
-    }
-  }
+  // Solo matches skip all on-chain interactions — no escrow, no signing.
+  let receiptTxHash: string | null = null;
+  let receiptMode: "mock" | "configured" = "mock";
+  let receiptDescription = "";
+  let onchainMatchIndex: number | undefined;
 
-  // Always register the match on-chain via server adapter to get onchainMatchIndex
-  // and deposit funds into the contract vault.
-  // The client-signed MsgSend (if any) sends tokens to the admin account;
-  // deposit_funds then moves them from admin into the vault.
-  const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
-  const receipt = await adapter.createEscrow({
-    matchId,
-    actorId: currentUser.id,
-    actorWallet: effectiveHostAddress,
-    amount: hostTotalLock,
-    token: parsed.data.stakeToken,
-    stakeAmount: parsed.data.stakeAmount.toFixed(6),
-    entryFee: effectiveEntryFee.toFixed(6),
-  });
-  const receiptTxHash = clientTxHash || receipt.txHash;
-  const receiptMode = receipt.mode;
-  const receiptDescription = receipt.description;
-  const onchainMatchIndex = receipt.onchainMatchIndex;
+  if (!isSolo) {
+    // Validate balance on-chain (not from DB)
+    const adapter = getOnchainAdapter(parsed.data.network);
+    if (effectiveHostAddress.startsWith("init1")) {
+      const onchainBal = await adapter.queryBalance(effectiveHostAddress);
+      if (!onchainBal || onchainBal.amount < Number(hostTotalLock)) {
+        throw new Error(
+          `Fondos insuficientes on-chain. Necesitas ${hostTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+        );
+      }
+    }
+
+    // Register the match on-chain via server adapter to get onchainMatchIndex
+    // and deposit funds into the contract vault.
+    const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
+    const receipt = await adapter.createEscrow({
+      matchId,
+      actorId: currentUser.id,
+      actorWallet: effectiveHostAddress,
+      amount: hostTotalLock,
+      token: parsed.data.stakeToken,
+      stakeAmount: parsed.data.stakeAmount.toFixed(6),
+      entryFee: effectiveEntryFee.toFixed(6),
+    });
+    receiptTxHash = clientTxHash || receipt.txHash;
+    receiptMode = receipt.mode;
+    receiptDescription = receipt.description;
+    onchainMatchIndex = receipt.onchainMatchIndex;
+  }
 
   const match = await prisma.match.create({
     data: {
@@ -350,30 +356,33 @@ export async function createMatchAction(formData: FormData) {
     },
   });
 
-  await prisma.transaction.create({
-    data: {
-      userId: currentUser.id,
-      matchId: match.id,
-      network: parsed.data.network,
-      type: TransactionType.ESCROW_LOCK,
-      status: receiptMode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
-      amount: hostTotalLock,
-      token: parsed.data.stakeToken.toUpperCase(),
-      txHash: receiptTxHash,
-      metadata: {
-        description: receiptDescription,
-        mode: receiptMode,
-        stakeAmount: parsed.data.stakeAmount.toFixed(6),
-        entryFee: effectiveEntryFee.toFixed(6),
-        feePolicy: {
-          matchFeeBps: platformConfig.matchFeeBps,
-          betFeeBps: platformConfig.betFeeBps,
-          arcadeFeeFixed: platformConfig.arcadeFeeFixed.toString(),
-          minEntryFee: platformConfig.minEntryFee.toString(),
+  // Only create transaction record for PvP matches
+  if (!isSolo && receiptTxHash) {
+    await prisma.transaction.create({
+      data: {
+        userId: currentUser.id,
+        matchId: match.id,
+        network: parsed.data.network,
+        type: TransactionType.ESCROW_LOCK,
+        status: receiptMode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
+        amount: hostTotalLock,
+        token: parsed.data.stakeToken.toUpperCase(),
+        txHash: receiptTxHash,
+        metadata: {
+          description: receiptDescription,
+          mode: receiptMode,
+          stakeAmount: parsed.data.stakeAmount.toFixed(6),
+          entryFee: effectiveEntryFee.toFixed(6),
+          feePolicy: {
+            matchFeeBps: platformConfig.matchFeeBps,
+            betFeeBps: platformConfig.betFeeBps,
+            arcadeFeeFixed: platformConfig.arcadeFeeFixed.toString(),
+            minEntryFee: platformConfig.minEntryFee.toString(),
+          },
         },
       },
-    },
-  });
+    });
+  }
 
   revalidatePath("/");
   revalidatePath("/lobby");
@@ -477,60 +486,7 @@ export async function startSoloMatchAction(formData: FormData) {
     throw new Error("La partida solo ya no esta disponible.");
   }
 
-  const totalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
-  const requiresLock = Number(totalLock) > 0;
-
-  // Use client-signed tx hash if provided, otherwise fall back to server adapter
-  const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
-  let receiptTxHash: string | null = null;
-  let receiptMode: "mock" | "configured" = "mock";
-  let receiptDescription = "";
-  let soloWallet: Awaited<ReturnType<typeof getOrCreateWalletForNetwork>> | null = null;
-  let onchainMatchIndex: number | undefined;
-
-  if (requiresLock) {
-    soloWallet = await getOrCreateWalletForNetwork(currentUser.id, match.preferredNetwork);
-
-    // Use the real wallet address from the client (init1...) if available
-    const clientWalletAddress = await validateWalletOwnership(
-      currentUser.id,
-      String(formData.get("walletAddress") ?? "").trim(),
-      match.preferredNetwork,
-    );
-    const effectiveSoloAddress = clientWalletAddress || soloWallet.address;
-
-    // Update the wallet record in DB with the real address if provided
-    if (clientWalletAddress && soloWallet.address !== clientWalletAddress) {
-      await prisma.wallet.update({ where: { id: soloWallet.id }, data: { address: clientWalletAddress } });
-    }
-
-    // Validate balance on-chain
-    const adapter = getOnchainAdapter(match.preferredNetwork);
-    if (effectiveSoloAddress.startsWith("init1")) {
-      const onchainBal = await adapter.queryBalance(effectiveSoloAddress);
-      if (!onchainBal || onchainBal.amount < Number(totalLock)) {
-        throw new Error(
-          `Fondos insuficientes on-chain. Necesitas ${totalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
-        );
-      }
-    }
-
-    // Always register on-chain via server adapter
-    const receipt = await adapter.createEscrow({
-      matchId,
-      actorId: currentUser.id,
-      actorWallet: effectiveSoloAddress,
-      amount: totalLock,
-      token: match.stakeToken,
-      stakeAmount: match.stakeAmount.toString(),
-      entryFee: match.entryFee.toString(),
-    });
-    receiptTxHash = clientTxHash || receipt.txHash;
-    receiptMode = receipt.mode;
-    receiptDescription = receipt.description;
-    onchainMatchIndex = receipt.onchainMatchIndex;
-  }
-
+  // Solo matches skip all on-chain interactions — no escrow, no signing, no transaction records.
   await prisma.$transaction(async (tx) => {
     const claimed = await tx.match.updateMany({
       where: {
@@ -545,34 +501,11 @@ export async function startSoloMatchAction(formData: FormData) {
         whiteClockMs: match.gameClockMs,
         blackClockMs: match.gameClockMs,
         turnStartedAt: new Date(),
-        onchainMatchIndex: onchainMatchIndex ?? null,
       },
     });
 
     if (claimed.count === 0) {
       throw new Error("La partida solo fue tomada por otro jugador. Refresca e intenta de nuevo.");
-    }
-
-    if (requiresLock && receiptTxHash) {
-      await tx.transaction.create({
-        data: {
-          userId: currentUser.id,
-          matchId,
-          network: match.preferredNetwork,
-          type: TransactionType.ESCROW_LOCK,
-          status: receiptMode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
-          amount: totalLock,
-          token: match.stakeToken,
-          txHash: receiptTxHash,
-          metadata: {
-            description: receiptDescription,
-            mode: receiptMode,
-            stakeAmount: match.stakeAmount.toFixed(6),
-            entryFee: match.entryFee.toFixed(6),
-            source: "start-solo",
-          },
-        },
-      });
     }
   });
 

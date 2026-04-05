@@ -1,16 +1,23 @@
 import { TransactionStatus } from "@prisma/client";
 import { updateTransactionAction } from "@/lib/actions";
 import { getAdminTransactionsSnapshot } from "@/lib/data";
+import { ReconcileButton } from "./reconcile-button";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminTransaccionesPage() {
   const transactions = await getAdminTransactionsSnapshot();
+  const pendingCount = transactions.filter((t) => t.status === "PENDING").length;
 
   return (
     <div className="panel rounded-[2rem] p-6 lg:p-8">
-      <p className="eyebrow">Transacciones</p>
-      <h2 className="mt-2 text-3xl font-semibold text-white">Control de movimientos onchain</h2>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="eyebrow">Transacciones</p>
+          <h2 className="mt-2 text-3xl font-semibold text-white">Control de movimientos onchain</h2>
+        </div>
+        {pendingCount > 0 && <ReconcileButton pendingCount={pendingCount} />}
+      </div>
 
       <div className="mt-6 overflow-x-auto rounded-[1.5rem] border border-white/10">
         <table className="w-full min-w-[920px] text-left text-sm text-slate-300">

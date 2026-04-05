@@ -290,34 +290,26 @@ export async function settleWinner(match: {
   stakeToken: string;
   onchainMatchIndex?: number | null;
 }, winnerId: string) {
+  // Solo matches have no on-chain escrow — nothing to settle.
+  if (!match.guestId) return;
+
   const settlement = calculateSettlementAmounts(match);
   const adapter = getOnchainAdapter(match.preferredNetwork);
 
-  let receipt;
+  // PvP match: both players deposited → STATUS_FUNDED → settle_to_winner
+  const winnerWallet = await prisma.wallet.findFirst({
+    where: { userId: winnerId, network: match.preferredNetwork },
+    select: { address: true },
+  });
 
-  if (!match.guestId) {
-    // Solo match: contract is in OPEN status (only host deposited).
-    // Use refund_match to return the deposit from vault to the host.
-    receipt = await adapter.refundMatchOnchain({
-      matchId: match.id,
-      onchainMatchIndex: match.onchainMatchIndex ?? null,
-    });
-  } else {
-    // PvP match: both players deposited → STATUS_FUNDED → settle_to_winner
-    const winnerWallet = await prisma.wallet.findFirst({
-      where: { userId: winnerId, network: match.preferredNetwork },
-      select: { address: true },
-    });
-
-    receipt = await adapter.settleEscrow({
-      matchId: match.id,
-      winnerId,
-      winnerAddress: winnerWallet?.address ?? "",
-      onchainMatchIndex: match.onchainMatchIndex ?? null,
-      amount: settlement.prize.toString(),
-      token: match.stakeToken,
-    });
-  }
+  const receipt = await adapter.settleEscrow({
+    matchId: match.id,
+    winnerId,
+    winnerAddress: winnerWallet?.address ?? "",
+    onchainMatchIndex: match.onchainMatchIndex ?? null,
+    amount: settlement.prize.toString(),
+    token: match.stakeToken,
+  });
 
   await prisma.transaction.create({
     data: {
@@ -366,23 +358,16 @@ export async function settleDraw(match: {
   const stakeNum = Number(match.stakeAmount.toString());
   if (stakeNum <= 0) return;
 
+  // Solo matches have no on-chain escrow — nothing to settle.
+  if (!match.guestId) return;
+
   const adapter = getOnchainAdapter(match.preferredNetwork);
 
-  let onchainReceipt;
-
-  if (!match.guestId) {
-    // Solo match: contract in OPEN status → use refund_match
-    onchainReceipt = await adapter.refundMatchOnchain({
-      matchId: match.id,
-      onchainMatchIndex: match.onchainMatchIndex ?? null,
-    });
-  } else {
-    // PvP match: both deposited → STATUS_FUNDED → settle_draw
-    onchainReceipt = await adapter.settleDrawOnchain({
-      matchId: match.id,
-      onchainMatchIndex: match.onchainMatchIndex ?? null,
-    });
-  }
+  // PvP match: both deposited → STATUS_FUNDED → settle_draw
+  const onchainReceipt = await adapter.settleDrawOnchain({
+    matchId: match.id,
+    onchainMatchIndex: match.onchainMatchIndex ?? null,
+  });
 
   const participants = [match.hostId, match.guestId].filter(Boolean) as string[];
   for (const userId of participants) {
@@ -430,6 +415,9 @@ export async function refundPlayer(match: {
 }, userId: string) {
   const refundAmount = Number(match.stakeAmount.toString()) + Number(match.entryFee.toString());
   if (refundAmount <= 0) return;
+
+  // Solo matches (no on-chain escrow) — nothing to refund.
+  if (!match.onchainMatchIndex) return;
 
   // On-chain refund
   const adapter = getOnchainAdapter(match.preferredNetwork);

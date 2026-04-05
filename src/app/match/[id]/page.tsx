@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import { getLocale } from "@/lib/i18n";
 import { getDictionary } from "@/dictionaries";
-import { placeMatchBetAction } from "@/lib/actions";
 import { getSession } from "@/lib/auth";
 import { getMatchSnapshot } from "@/lib/data";
+import { BetForm } from "@/components/bet-form";
 import { ChessMatchClient } from "@/components/chess-match-client";
 import { JoinMatchForm } from "@/components/join-match-form";
 
@@ -166,24 +166,20 @@ export default async function MatchPage({ params, searchParams }: MatchPageProps
                 </p>
               </div>
             ) : canBet ? (
-              <form action={placeMatchBetAction} className="mt-4 space-y-4">
-                <input type="hidden" name="matchId" value={match.id} />
-                <label className="block text-sm text-slate-300">
-                  <span className="mb-2 block">{t.betPickLabel}</span>
-                  <select name="predictedWinnerId" className="input w-full" defaultValue={match.host.id}>
-                    <option value={match.host.id}>{match.host.name}</option>
-                    <option value={match.guest.id}>{match.guest.name}</option>
-                  </select>
-                </label>
-                <label className="block text-sm text-slate-300">
-                  <span className="mb-2 block">{t.betAmountLabel}</span>
-                  <input name="amount" type="number" min="0.01" step="0.01" className="input w-full" placeholder={`10 ${match.stakeToken}`} required />
-                </label>
-                <button type="submit" className="button-primary w-full px-5 py-3 text-sm">
-                  {t.betSubmitBtn}
-                </button>
-                <p className="text-xs leading-6 text-slate-400">{t.betHint}</p>
-              </form>
+              <BetForm
+                matchId={match.id}
+                hostId={match.host.id}
+                hostName={match.host.name}
+                guestId={match.guest.id}
+                guestName={match.guest.name}
+                stakeToken={match.stakeToken}
+                labels={{
+                  pickLabel: t.betPickLabel,
+                  amountLabel: t.betAmountLabel,
+                  submitBtn: t.betSubmitBtn,
+                  hint: t.betHint,
+                }}
+              />
             ) : (
               <div className="mt-4 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
                 <p>{t.betClosed}</p>
