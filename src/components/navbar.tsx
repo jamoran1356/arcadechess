@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -19,11 +19,25 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
   const pathname = usePathname();
   const dict = useDict();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpRef = useRef<HTMLDivElement>(null);
 
   // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
+    setHelpOpen(false);
   }, [pathname]);
+
+  // Close help dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
+        setHelpOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -34,11 +48,18 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
   const links = [
     { href: "/", label: dict.nav.home },
     { href: "/lobby", label: dict.nav.lobby },
-    { href: "/dashboard", label: dict.nav.dashboard },
-    { href: "/minigames", label: dict.nav.minigames },
-    { href: "/transactions", label: dict.nav.transactions },
-    { href: "/ayuda", label: dict.nav.help },
+    ...(session ? [
+      { href: "/dashboard", label: dict.nav.dashboard },
+      { href: "/minigames", label: dict.nav.minigames },
+      { href: "/transactions", label: dict.nav.transactions },
+    ] : []),
     ...(session?.role === "ADMIN" ? [{ href: "/admin", label: dict.nav.admin }] : []),
+  ];
+
+  const helpLinks = [
+    { href: "/ayuda", label: dict.nav.faq },
+    { href: "/minigames", label: dict.nav.minigames },
+    { href: "/ayuda#contacto", label: dict.nav.contactSupport },
   ];
 
   function isActive(href: string) {
@@ -89,6 +110,36 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                 {link.label}
               </Link>
             ))}
+
+            {/* Help dropdown */}
+            <div ref={helpRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setHelpOpen(!helpOpen)}
+                className={`flex items-center gap-1 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors ${
+                  pathname.startsWith("/ayuda")
+                    ? "bg-white/[0.08] text-white"
+                    : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                {dict.nav.help}
+                <svg className={`h-3.5 w-3.5 transition-transform ${helpOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {helpOpen && (
+                <div className="absolute left-0 top-full mt-1 w-48 rounded-xl border border-white/[0.08] bg-[rgba(3,7,17,0.97)] backdrop-blur-xl py-1.5 shadow-2xl">
+                  {helpLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setHelpOpen(false)}
+                      className="block px-4 py-2.5 text-[13px] text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* Right: auth + wallet */}
@@ -175,6 +226,22 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                 href={link.href}
                 className={`rounded-xl px-4 py-3 text-sm font-medium transition-all ${
                   isActive(link.href)
+                    ? "bg-white/[0.06] text-white border-l-2 border-cyan-400"
+                    : "text-slate-400 hover:bg-white/[0.04] hover:text-white"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+
+            {/* Help section in mobile */}
+            <p className="mt-3 px-4 text-[10px] font-semibold uppercase tracking-widest text-slate-500">{dict.nav.help}</p>
+            {helpLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`rounded-xl px-4 py-3 pl-6 text-sm font-medium transition-all ${
+                  pathname === link.href
                     ? "bg-white/[0.06] text-white border-l-2 border-cyan-400"
                     : "text-slate-400 hover:bg-white/[0.04] hover:text-white"
                 }`}

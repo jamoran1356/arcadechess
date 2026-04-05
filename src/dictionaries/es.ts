@@ -14,6 +14,8 @@ export const es = {
     minigames: "Minijuegos",
     transactions: "Transacciones",
     help: "Ayuda",
+    faq: "Preguntas frecuentes",
+    contactSupport: "Contactar soporte",
   },
   home: {
     heroEyebrow: "Initia x Flow x Solana",
