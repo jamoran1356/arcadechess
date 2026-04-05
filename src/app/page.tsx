@@ -255,7 +255,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ── Daily Challenges ── */}
+      {/* ── Ranking ── */}
       <section className="grid gap-8">
         <div>
           <p className="eyebrow">{t.rankingEyebrow}</p>
@@ -263,7 +263,9 @@ export default async function Home() {
         </div>
 
         {topPlayers.length === 0 ? (
-          <p className="text-sm text-slate-400">{t.rankingEmpty}</p>
+          <article className="panel rounded-[2rem] p-8 text-center">
+            <h3 className="text-xl font-bold text-white">{t.rankingEmpty}</h3>
+          </article>
         ) : (
           <div className="panel overflow-hidden rounded-[2rem]">
             <table className="w-full text-left text-sm">

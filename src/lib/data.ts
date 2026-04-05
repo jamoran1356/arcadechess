@@ -96,6 +96,12 @@ export async function getLandingSnapshot() {
     prisma.user.count(),
     prisma.transaction.count(),
     prisma.user.findMany({
+      where: {
+        OR: [
+          { hostedMatches: { some: {} } },
+          { joinedMatches: { some: {} } },
+        ],
+      },
       orderBy: { wonMatches: { _count: "desc" } },
       take: 10,
       select: {
