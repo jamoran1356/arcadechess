@@ -208,6 +208,15 @@ function advanceSoloBotTurn(state: MatchProgressState) {
     return { ...state, isBotCheckmate: false };
   }
 
+  // Consume the time elapsed on black's clock before the bot moves
+  const clocks = consumeActiveTurnClock({
+    status: state.status as MatchStatus,
+    turn: state.turn,
+    turnStartedAt: state.turnStartedAt,
+    whiteClockMs: state.whiteClockMs,
+    blackClockMs: state.blackClockMs,
+  });
+
   const botChess = new Chess(state.fen);
   const botMoves = botChess.moves({ verbose: true });
   const botMove = botMoves[Math.floor(Math.random() * botMoves.length)];
@@ -216,6 +225,8 @@ function advanceSoloBotTurn(state: MatchProgressState) {
     return {
       ...state,
       isBotCheckmate: false,
+      whiteClockMs: clocks.whiteClockMs,
+      blackClockMs: clocks.blackClockMs,
       turnStartedAt: state.status === MatchStatus.IN_PROGRESS ? new Date() : null,
     };
   }
@@ -236,8 +247,8 @@ function advanceSoloBotTurn(state: MatchProgressState) {
     winnerId: null,
     isBotCheckmate,
     moveHistory: [...state.moveHistory, `${appliedBot.san} [solo-bot]`],
-    whiteClockMs: state.whiteClockMs,
-    blackClockMs: state.blackClockMs,
+    whiteClockMs: clocks.whiteClockMs,
+    blackClockMs: clocks.blackClockMs,
     turnStartedAt: nextStatus === MatchStatus.IN_PROGRESS ? new Date() : null,
   };
 }
@@ -833,7 +844,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       resolved: false,
       message: evaluation.valid
         ? "Resultado registrado. Esperando al rival."
-        : "Intento registrado con score 0 por validacion fallida.",
+        : `Resultado registrado con score ${score}. Esperando al rival.`,
     };
   }
 

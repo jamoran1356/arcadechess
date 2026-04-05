@@ -85,7 +85,7 @@ export function MatchChat({ matchId, currentUserId }: { matchId: string; current
 
       {open && (
         <div className="mt-4">
-          <div className="flex max-h-60 flex-col gap-2 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/60 p-3">
+          <div className="flex h-64 flex-col gap-2 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/60 p-3">
             {messages.length === 0 && (
               <p className="text-center text-xs text-slate-500">{t.empty}</p>
             )}

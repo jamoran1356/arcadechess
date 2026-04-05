@@ -201,12 +201,20 @@ export async function getAdminSnapshot() {
   };
 }
 
-export async function getAdminUsersSnapshot() {
-  return prisma.user.findMany({
-    include: { wallets: true },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+export async function getAdminUsersSnapshot(page = 1, perPage = 12) {
+  const [items, totalCount] = await Promise.all([
+    prisma.user.findMany({
+      include: {
+        wallets: true,
+        _count: { select: { hostedMatches: true, joinedMatches: true, wonMatches: true, transactions: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * perPage,
+      take: perPage,
+    }),
+    prisma.user.count(),
+  ]);
+  return { items, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / perPage)) };
 }
 
 export async function getAdminTransactionsSnapshot() {

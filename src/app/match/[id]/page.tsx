@@ -107,7 +107,7 @@ export default async function MatchPage({ params, searchParams }: MatchPageProps
       </section>
 
       {match.guest ? (
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section id="betting" className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="panel rounded-[2rem] p-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>

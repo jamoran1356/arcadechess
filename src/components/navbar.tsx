@@ -94,12 +94,19 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
           {/* Right: auth + wallet */}
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
-            <InterwovenKitConnectButton />
 
             {session ? (
-              <div className="hidden items-center gap-2.5 sm:flex">
-                <span className="text-[13px] font-medium text-slate-300">{session.name}</span>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">{session.role}</span>
+              <div className="hidden items-center gap-2 sm:flex">
+                <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-400/15 text-[10px] font-bold text-cyan-200">
+                    {initials}
+                  </div>
+                  <span className="text-[13px] font-medium text-slate-300">{session.name}</span>
+                  {session.role !== "USER" && (
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-cyan-300/50">{session.role}</span>
+                  )}
+                </div>
+                <InterwovenKitConnectButton />
                 <form action={logoutAction}>
                   <button
                     type="submit"
@@ -186,10 +193,15 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-white">{session.name}</p>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-300/50">
-                      {session.role}
-                    </p>
+                    {session.role !== "USER" && (
+                      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-300/50">
+                        {session.role}
+                      </p>
+                    )}
                   </div>
+                </div>
+                <div className="flex items-center justify-center">
+                  <InterwovenKitConnectButton />
                 </div>
                 <form action={logoutAction}>
                   <button

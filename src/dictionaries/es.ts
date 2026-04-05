@@ -333,6 +333,13 @@ export const es = {
       "Puedes mover ahora. Si atacas una casilla ocupada, se abrirá un duelo arcade.",
     waitingMsg:
       "La mesa esta en espera, no es tu turno o falta un rival para comenzar.",
+    waitingTurnMsg: "Esperando turno del rival…",
+    arcadePendingMsg: "Duelo arcade en curso — resolviendo captura.",
+    youWon: "¡Ganaste la partida!",
+    youLost: "Tu rival ganó la partida.",
+    drawMsg: "Empate.",
+    statusReady: "Rival conectado — la partida está por comenzar.",
+    movesLabel: "Jugadas",
     moveError: "No se pudo procesar el movimiento.",
     backToLobby: "Volver al lobby",
     waitingRival: "Esperando rival",
@@ -341,6 +348,7 @@ export const es = {
     activeClockLabel: "Tiempo para mover",
     whiteClockLabel: "Reloj blancas",
     blackClockLabel: "Reloj negras",
+    placeBetBtn: "Apostar en esta partida",
   },
   minigames: {
     eyebrow: "Biblioteca arcade",

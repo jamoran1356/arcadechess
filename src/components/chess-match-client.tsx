@@ -3,6 +3,8 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Chess } from "chess.js";
+import type { Square } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { ArcadeDuelModal } from "@/components/arcade-duel-modal";
 import { DialogModal } from "@/components/dialog-modal";
@@ -79,6 +81,8 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [prizeTxHash, setPrizeTxHash] = useState<string | null>(null);
   const [prizeAmount, setPrizeAmount] = useState<string | null>(null);
   const previousStatusRef = useRef(status);
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
 
   const syncMatchState = useCallback(async () => {
     const response = await fetch(`/api/matches/${match.id}/state`, { cache: "no-store" });
@@ -97,6 +101,8 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     setTurnStartedAt(data.turnStartedAt);
     setGuest(data.guest ?? null);
     setWinnerId(data.winner?.id ?? null);
+    setSelectedSquare(null);
+    setLegalMoveSquares([]);
     if (data.status === "ARCADE_PENDING") {
       setPendingDuel(data.pendingDuel ?? null);
     } else {
@@ -127,6 +133,15 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     setWinnerId(match.winner?.id ?? null);
     setPendingDuel(match.status === "ARCADE_PENDING" ? (match.pendingDuel ?? null) : null);
   }, [match]);
+
+  // Refresh server page when guest joins so join form disappears
+  const prevGuestRef = useRef(guest);
+  useEffect(() => {
+    if (!prevGuestRef.current && guest) {
+      router.refresh();
+    }
+    prevGuestRef.current = guest;
+  }, [guest, router]);
 
   useEffect(() => {
     const wasFinished = previousStatusRef.current === "FINISHED";
@@ -351,14 +366,64 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     return false;
   }
 
+  function computeLegalMoves(square: string): string[] {
+    try {
+      const game = new Chess(fen);
+      const moves = game.moves({ square: square as Square, verbose: true });
+      return moves.map((m) => m.to);
+    } catch {
+      return [];
+    }
+  }
+
+  function handleSquareClick(square: string, piece: unknown) {
+    if (!canMove) {
+      setSelectedSquare(null);
+      setLegalMoveSquares([]);
+      return;
+    }
+
+    // If a square is already selected and this is a legal target, attempt the move
+    if (selectedSquare && legalMoveSquares.includes(square)) {
+      onPieceDrop(selectedSquare, square);
+      setSelectedSquare(null);
+      setLegalMoveSquares([]);
+      return;
+    }
+
+    // If clicking on own piece, select it and show legal moves
+    if (piece) {
+      const targets = computeLegalMoves(square);
+      if (targets.length > 0) {
+        setSelectedSquare(square);
+        setLegalMoveSquares(targets);
+        return;
+      }
+    }
+
+    // Clear selection
+    setSelectedSquare(null);
+    setLegalMoveSquares([]);
+  }
+
+  const highlightStyles = useMemo(() => {
+    const styles: Record<string, React.CSSProperties> = {};
+    if (selectedSquare) {
+      styles[selectedSquare] = { backgroundColor: "rgba(34, 211, 238, 0.35)" };
+    }
+    for (const sq of legalMoveSquares) {
+      styles[sq] = {
+        background: "radial-gradient(circle, rgba(34,211,238,0.45) 24%, transparent 25%)",
+      };
+    }
+    return styles;
+  }, [selectedSquare, legalMoveSquares]);
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="panel rounded-[2rem] p-4 sm:p-6">
         <div className="flex items-center justify-between gap-4 pb-4">
-          <div>
-            <p className="eyebrow">{ch.liveEyebrow}</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">{match.title}</h2>
-          </div>
+          <p className="eyebrow">{ch.liveEyebrow}</p>
           <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-200">
             {turn === "w" ? ch.turnWhite : ch.turnBlack}
           </span>
@@ -392,8 +457,13 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
                 if (!sourceSquare || !targetSquare) {
                   return false;
                 }
+                setSelectedSquare(null);
+                setLegalMoveSquares([]);
                 return onPieceDrop(sourceSquare, targetSquare);
               },
+              onSquareClick: ({ piece, square }) => handleSquareClick(square, piece),
+              onPieceClick: ({ square, piece }) => { if (square) handleSquareClick(square, piece); },
+              squareStyles: highlightStyles,
               darkSquareStyle: { backgroundColor: "#0f3857" },
               lightSquareStyle: { backgroundColor: "#d6f0ff" },
               boardStyle: { borderRadius: "1.25rem", overflow: "hidden" },
@@ -443,6 +513,14 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
               {isResigning ? "Rindiendo…" : "Rendirse"}
             </button>
           ) : null}
+          {match.viewerRole === "spectator" && guest && (
+            <a
+              href="#betting"
+              className="mt-3 block w-full rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-center text-sm text-amber-200 transition hover:border-amber-300/60 hover:bg-amber-400/20"
+            >
+              {ch.placeBetBtn}
+            </a>
+          )}
         </div>
 
         <div className="panel rounded-[2rem] p-6">
@@ -462,11 +540,36 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
 
         <div className="panel rounded-[2rem] p-6">
           <p className="eyebrow">{ch.statusEyebrow}</p>
-          <p className="mt-3 text-sm leading-7 text-slate-300">
-            {canMove
-              ? ch.canMoveMsg
-              : ch.waitingMsg}
-          </p>
+          <div className="mt-3 space-y-2 text-sm leading-7">
+            {status === "OPEN" && !guest && (
+              <p className="text-amber-200">{ch.waitingRival}…</p>
+            )}
+            {status === "OPEN" && guest && (
+              <p className="text-cyan-200">{ch.statusReady}</p>
+            )}
+            {status === "IN_PROGRESS" && canMove && (
+              <p className="text-emerald-300">{ch.canMoveMsg}</p>
+            )}
+            {status === "IN_PROGRESS" && !canMove && (
+              <p className="text-slate-400">{ch.waitingTurnMsg}</p>
+            )}
+            {status === "ARCADE_PENDING" && (
+              <p className="text-purple-300">{ch.arcadePendingMsg}</p>
+            )}
+            {status === "FINISHED" && winnerId && (
+              <p className="text-amber-200">
+                {winnerId === currentUserId ? ch.youWon : ch.youLost}
+              </p>
+            )}
+            {status === "FINISHED" && !winnerId && (
+              <p className="text-slate-300">{ch.drawMsg}</p>
+            )}
+            <div className="mt-2 flex items-center gap-3 text-xs text-slate-500">
+              <span>{ch.movesLabel}: {moveHistory.length}</span>
+              <span>·</span>
+              <span>{status.replaceAll("_", " ")}</span>
+            </div>
+          </div>
         </div>
 
         <MatchChat matchId={match.id} currentUserId={currentUserId} />

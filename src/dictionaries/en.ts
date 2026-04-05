@@ -331,6 +331,13 @@ export const en = {
       "You can move now. If you attack an occupied square, an arcade duel will open.",
     waitingMsg:
       "The table is on hold — it's not your turn or a rival is needed to start.",
+    waitingTurnMsg: "Waiting for your rival's move…",
+    arcadePendingMsg: "Arcade duel in progress — resolving capture.",
+    youWon: "You won the match!",
+    youLost: "Your rival won the match.",
+    drawMsg: "Draw.",
+    statusReady: "Rival connected — the match is about to begin.",
+    movesLabel: "Moves",
     moveError: "Could not process the move.",
     backToLobby: "Back to lobby",
     waitingRival: "Waiting for rival",
@@ -339,6 +346,7 @@ export const en = {
     activeClockLabel: "Time to move",
     whiteClockLabel: "White clock",
     blackClockLabel: "Black clock",
+    placeBetBtn: "Bet on this match",
   },
   minigames: {
     eyebrow: "Arcade Library",
