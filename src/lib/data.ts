@@ -86,7 +86,7 @@ function asStringArray(value: Prisma.JsonValue | null | undefined) {
 
 export async function getLandingSnapshot() {
   await ensureAutoSoloMatches();
-  const [openMatches, usersCount, transactionsCount] = await Promise.all([
+  const [openMatches, usersCount, transactionsCount, topPlayers] = await Promise.all([
     prisma.match.findMany({
       where: { status: { in: ["OPEN", "IN_PROGRESS", "ARCADE_PENDING"] } },
       include: { host: true, guest: true },
@@ -95,6 +95,21 @@ export async function getLandingSnapshot() {
     }),
     prisma.user.count(),
     prisma.transaction.count(),
+    prisma.user.findMany({
+      orderBy: { wonMatches: { _count: "desc" } },
+      take: 10,
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            wonMatches: true,
+            hostedMatches: true,
+            joinedMatches: true,
+          },
+        },
+      },
+    }),
   ]);
 
   return {
@@ -121,6 +136,12 @@ export async function getLandingSnapshot() {
     })),
     networks: getSupportedNetworks(await getEnabledNetworks()),
     arcadeLibrary,
+    topPlayers: topPlayers.map((p) => ({
+      id: p.id,
+      name: p.name,
+      wins: p._count.wonMatches,
+      matches: p._count.hostedMatches + p._count.joinedMatches,
+    })),
   };
 }
 

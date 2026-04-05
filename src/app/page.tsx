@@ -27,7 +27,7 @@ function buildDailyChallenges(
 
 export default async function Home() {
   const session = await getSession();
-  const { stats, openMatches, networks, arcadeLibrary } = await getLandingSnapshot();
+  const { stats, openMatches, networks, arcadeLibrary, topPlayers } = await getLandingSnapshot();
   const dateSeed = new Date().toISOString().slice(0, 10);
   const locale = await getLocale();
   const { home: t } = getDictionary(locale);
@@ -253,6 +253,48 @@ export default async function Home() {
             className="h-auto w-full rounded-[2rem]"
           />
         </div>
+      </section>
+
+      {/* ── Daily Challenges ── */}
+      <section className="grid gap-8">
+        <div>
+          <p className="eyebrow">{t.rankingEyebrow}</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">{t.rankingTitle}</h2>
+        </div>
+
+        {topPlayers.length === 0 ? (
+          <p className="text-sm text-slate-400">{t.rankingEmpty}</p>
+        ) : (
+          <div className="panel overflow-hidden rounded-[2rem]">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                  <th className="px-6 py-4 font-medium">{t.rankingPosition}</th>
+                  <th className="px-6 py-4 font-medium">{t.rankingPlayer}</th>
+                  <th className="px-6 py-4 text-right font-medium">{t.rankingWins}</th>
+                  <th className="px-6 py-4 text-right font-medium">{t.rankingMatches}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topPlayers.map((player, idx) => (
+                  <tr key={player.id} className="border-b border-white/[0.04] transition-colors hover:bg-white/[0.02]">
+                    <td className="px-6 py-3.5 font-mono text-slate-500">{idx + 1}</td>
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400/20 to-amber-400/20 text-xs font-bold text-white">
+                          {player.name?.charAt(0) ?? "?"}
+                        </div>
+                        <span className="font-medium text-white">{player.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3.5 text-right font-semibold text-amber-300">{player.wins}</td>
+                    <td className="px-6 py-3.5 text-right text-slate-400">{player.matches}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {/* ── Daily Challenges ── */}

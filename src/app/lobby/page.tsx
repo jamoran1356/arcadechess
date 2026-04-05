@@ -9,6 +9,7 @@ import { getPlatformConfig } from "@/lib/platform-config";
 import { MatchShareControls } from "@/components/match-share-controls";
 import { CreateMatchForm } from "@/components/create-match-form";
 import { LobbyClient } from "@/components/lobby-client";
+import { LobbyRefresher } from "@/components/lobby-refresher";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function LobbyPage({
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+      <LobbyRefresher />
       {/* ─── Header: titulo + boton crear ─── */}
       <section className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>

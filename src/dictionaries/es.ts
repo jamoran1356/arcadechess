@@ -108,6 +108,13 @@ export const es = {
         quote: "La curva de aprendizaje engancha porque aprendes táctica y reflejos al mismo tiempo.",
       },
     ] as const,
+    rankingEyebrow: "Ranking",
+    rankingTitle: "Mejores jugadores",
+    rankingPlayer: "Jugador",
+    rankingWins: "Victorias",
+    rankingMatches: "Partidas",
+    rankingPosition: "#",
+    rankingEmpty: "Aún no hay jugadores en el ranking.",
     plansEyebrow: "Planes",
     plansTitle: "Elige cómo quieres competir",
     plans: [

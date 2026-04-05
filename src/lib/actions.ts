@@ -14,6 +14,7 @@ import { createMatchSchema, FormState, loginSchema, placeBetSchema, registerSche
 import { creditWallet, getOrCreateWalletForNetwork } from "@/lib/wallet";
 import { refundPlayer, settleWinner } from "@/lib/match-engine";
 import { getEnabledNetworks } from "@/lib/networks";
+import { emitLobbyUpdate } from "@/lib/lobby-events";
 
 function parseBoolean(input: FormDataEntryValue | null | undefined) {
   return String(input ?? "").toLowerCase() === "true";
@@ -386,6 +387,7 @@ export async function createMatchAction(formData: FormData): Promise<{ error: st
 
   revalidatePath("/");
   revalidatePath("/lobby");
+  emitLobbyUpdate();
   redirect(`/match/${match.id}`);
 }
 

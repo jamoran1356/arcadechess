@@ -108,6 +108,13 @@ export const en = {
         quote: "The learning curve hooks you because you learn tactics and reflexes at the same time.",
       },
     ] as const,
+    rankingEyebrow: "Ranking",
+    rankingTitle: "Top players",
+    rankingPlayer: "Player",
+    rankingWins: "Wins",
+    rankingMatches: "Matches",
+    rankingPosition: "#",
+    rankingEmpty: "No ranked players yet.",
     plansEyebrow: "Plans",
     plansTitle: "Choose how you want to compete",
     plans: [
