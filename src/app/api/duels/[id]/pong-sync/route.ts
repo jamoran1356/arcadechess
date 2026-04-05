@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { enforceBan } from "@/lib/ban";
+import { prisma } from "@/lib/db";
 
 /* ------------------------------------------------------------------ */
 /*  In-memory room state for real-time pong sync between two players  */
@@ -50,7 +52,20 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
+  const banResp = await enforceBan(session.id);
+  if (banResp) return banResp;
+
   const { id } = await context.params;
+
+  // Validate the user is actually a participant in this duel
+  const duel = await prisma.arcadeDuel.findUnique({
+    where: { id },
+    select: { attackerId: true, defenderId: true },
+  });
+  if (!duel || (session.id !== duel.attackerId && session.id !== duel.defenderId)) {
+    return NextResponse.json({ error: "No eres participante de este duelo" }, { status: 403 });
+  }
+
   const body = await request.json();
   const { role, paddleY, state } = body as {
     role: "attacker" | "defender";
@@ -65,6 +80,12 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (role !== "attacker" && role !== "defender") {
     return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
+  }
+
+  // Enforce that the claimed role matches the actual participant
+  const expectedRole = session.id === duel.attackerId ? "attacker" : "defender";
+  if (role !== expectedRole) {
+    return NextResponse.json({ error: "Rol no coincide con tu participación" }, { status: 403 });
   }
 
   let room = rooms.get(id);

@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { enforceBan } from "@/lib/ban";
 import { submitArcadeAttempt } from "@/lib/match-engine";
 import { duelAttemptSchema } from "@/lib/validators";
 
@@ -13,6 +14,9 @@ export async function POST(request: Request, context: RouteContext) {
   if (!session) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
+
+  const banResp = await enforceBan(session.id);
+  if (banResp) return banResp;
 
   const payload = await request.json();
   const parsed = duelAttemptSchema.safeParse(payload);

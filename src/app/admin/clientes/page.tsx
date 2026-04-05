@@ -20,6 +20,7 @@ export default async function AdminClientesPage({
   const serialized = users.map((u) => ({
     ...u,
     createdAt: u.createdAt.toISOString(),
+    bannedAt: u.bannedAt?.toISOString() ?? null,
     wallets: u.wallets.map((w) => ({ id: w.id, network: w.network, address: w.address, balance: w.balance })),
   }));
 

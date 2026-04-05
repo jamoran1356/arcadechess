@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { enforceBan } from "@/lib/ban";
 import { prisma } from "@/lib/db";
 
 /**
@@ -14,6 +15,9 @@ export async function POST(
   if (!session?.id) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
+
+  const banResp = await enforceBan(session.id);
+  if (banResp) return banResp;
 
   try {
     const { id } = await context.params;

@@ -677,6 +677,35 @@ export async function deleteUserAction(formData: FormData) {
   revalidatePath("/admin/clientes");
 }
 
+export async function banUserAction(formData: FormData) {
+  const session = await requireUser();
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
+  const userId = String(formData.get("userId") ?? "");
+  const reason = String(formData.get("reason") ?? "Conducta abusiva").trim();
+  if (!userId) throw new Error("Usuario inválido.");
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { bannedAt: new Date(), banReason: reason },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/admin/clientes");
+}
+
+export async function unbanUserAction(formData: FormData) {
+  const session = await requireUser();
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
+  const userId = String(formData.get("userId") ?? "");
+  if (!userId) throw new Error("Usuario inválido.");
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { bannedAt: null, banReason: null },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/admin/clientes");
+}
+
 export async function updateTransactionAction(formData: FormData) {
   const session = await requireUser();
   if (!hasAdminAccess(session)) throw new Error("Unauthorized");

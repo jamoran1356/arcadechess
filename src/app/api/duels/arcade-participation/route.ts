@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Square } from "chess.js";
 import { ArcadeGameType, Prisma } from "@prisma/client";
 import { getSession } from "@/lib/auth";
+import { enforceBan } from "@/lib/ban";
 import { prisma } from "@/lib/db";
 import { settleDraw, settleSpectatorBets } from "@/lib/match-engine";
 import { getOnchainAdapter } from "@/lib/onchain/service";
@@ -21,6 +22,9 @@ export async function POST(request: Request) {
   if (!session?.id) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
+
+  const banResp = await enforceBan(session.id);
+  if (banResp) return banResp;
 
   try {
     const body = await request.json().catch(() => ({}));

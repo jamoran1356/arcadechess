@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { UserRole } from "@prisma/client";
-import { deleteUserAction, updateUserAction } from "@/lib/actions";
+import { deleteUserAction, updateUserAction, banUserAction, unbanUserAction } from "@/lib/actions";
 
 type UserRow = {
   id: string;
@@ -10,6 +10,8 @@ type UserRow = {
   email: string;
   role: UserRole;
   rating: number;
+  bannedAt: string | null;
+  banReason: string | null;
   createdAt: string;
   wallets: { id: string; network: string; address: string; balance: string }[];
   _count: { hostedMatches: number; joinedMatches: number; wonMatches: number; transactions: number };
@@ -54,7 +56,9 @@ const ROLE_COLORS: Record<string, string> = {
 export function AdminUsersTable({ users }: { users: UserRow[] }) {
   const [detailUser, setDetailUser] = useState<UserRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [banTarget, setBanTarget] = useState<UserRow | null>(null);
   const [isDeleting, startDeleteTransition] = useTransition();
+  const [isBanning, startBanTransition] = useTransition();
 
   function handleDelete() {
     if (!deleteTarget) return;
@@ -88,6 +92,11 @@ export function AdminUsersTable({ users }: { users: UserRow[] }) {
                 <td className="px-5 py-4">
                   <p className="font-medium text-white">{user.name}</p>
                   <p className="mt-0.5 text-xs text-slate-500">{user.email}</p>
+                  {user.bannedAt && (
+                    <span className="mt-1 inline-block rounded-full border border-rose-400/30 bg-rose-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-rose-300">
+                      BANEADO
+                    </span>
+                  )}
                 </td>
 
                 {/* Role */}
@@ -121,6 +130,20 @@ export function AdminUsersTable({ users }: { users: UserRow[] }) {
                       title="Ver detalle"
                     >
                       <EyeIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBanTarget(user)}
+                      className={`rounded-lg border p-2 transition ${
+                        user.bannedAt
+                          ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-400 hover:border-emerald-400/40"
+                          : "border-amber-400/20 bg-amber-400/5 text-amber-400 hover:border-amber-400/40"
+                      }`}
+                      title={user.bannedAt ? "Desbanear" : "Banear"}
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
                     </button>
                     <button
                       type="button"
@@ -234,6 +257,81 @@ export function AdminUsersTable({ users }: { users: UserRow[] }) {
                 {isDeleting ? "Eliminando…" : "Sí, eliminar"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Ban / Unban confirmation modal ---- */}
+      {banTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => !isBanning && setBanTarget(null)}>
+          <div className="relative mx-4 w-full max-w-sm rounded-[2rem] border border-amber-400/20 bg-slate-900 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {banTarget.bannedAt ? (
+              <>
+                <p className="text-lg font-semibold text-white">Desbanear usuario</p>
+                <p className="mt-2 text-sm text-slate-300">
+                  ¿Desbanear a <strong className="text-white">{banTarget.name}</strong>? Podrá volver a jugar normalmente.
+                </p>
+                {banTarget.banReason && (
+                  <p className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-400">
+                    Motivo del ban: {banTarget.banReason}
+                  </p>
+                )}
+                <div className="mt-5 flex justify-end gap-3">
+                  <button type="button" disabled={isBanning} onClick={() => setBanTarget(null)} className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300 transition hover:border-white/20">
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isBanning}
+                    onClick={() => {
+                      const fd = new FormData();
+                      fd.set("userId", banTarget.id);
+                      startBanTransition(async () => {
+                        await unbanUserAction(fd);
+                        setBanTarget(null);
+                      });
+                    }}
+                    className="rounded-full border border-emerald-400/30 bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/30 disabled:opacity-50"
+                  >
+                    {isBanning ? "Desbaneando…" : "Sí, desbanear"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-semibold text-white">Banear usuario</p>
+                <p className="mt-2 text-sm text-slate-300">
+                  ¿Banear a <strong className="text-white">{banTarget.name}</strong>? No podrá realizar acciones en partidas ni duelos arcade.
+                </p>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    fd.set("userId", banTarget.id);
+                    startBanTransition(async () => {
+                      await banUserAction(fd);
+                      setBanTarget(null);
+                    });
+                  }}
+                  className="mt-3"
+                >
+                  <label className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Motivo</label>
+                  <input name="reason" defaultValue="Conducta abusiva / sabotaje de minijuegos" className="input mt-1 w-full py-2 text-xs" />
+                  <div className="mt-5 flex justify-end gap-3">
+                    <button type="button" disabled={isBanning} onClick={() => setBanTarget(null)} className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300 transition hover:border-white/20">
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isBanning}
+                      className="rounded-full border border-amber-400/30 bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-200 transition hover:bg-amber-500/30 disabled:opacity-50"
+                    >
+                      {isBanning ? "Baneando…" : "Sí, banear"}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}

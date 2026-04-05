@@ -58,7 +58,9 @@ model User {
   email        String        @unique
   passwordHash String
   role         UserRole      @default(USER)
-  rating       Int           @default(1200)
+  rating       Int           @default(0)
+  bannedAt     DateTime?
+  banReason    String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   hostedMatches Match[]      @relation("HostMatches")
