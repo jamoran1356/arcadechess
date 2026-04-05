@@ -83,6 +83,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const previousStatusRef = useRef(status);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
+  const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
 
   const syncMatchState = useCallback(async () => {
     const response = await fetch(`/api/matches/${match.id}/state`, { cache: "no-store" });
@@ -318,11 +319,32 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }
 
+  function isPromotionMove(from: string, to: string): boolean {
+    try {
+      const game = new Chess(fen);
+      return game.moves({ verbose: true }).some(
+        (m) => m.from === from && m.to === to && m.promotion,
+      );
+    } catch {
+      return false;
+    }
+  }
+
   function onPieceDrop(sourceSquare: string, targetSquare: string) {
     if (!canMove || isPending) {
       return false;
     }
 
+    if (isPromotionMove(sourceSquare, targetSquare)) {
+      setPendingPromotion({ from: sourceSquare, to: targetSquare });
+      return false;
+    }
+
+    sendMove(sourceSquare, targetSquare);
+    return false;
+  }
+
+  function sendMove(from: string, to: string, promotion?: string) {
     setError(null);
     setIsPending(true);
 
@@ -330,7 +352,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
       void fetch(`/api/matches/${match.id}/move`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from: sourceSquare, to: targetSquare }),
+        body: JSON.stringify({ from, to, promotion }),
       })
         .then(async (response) => {
           const data = await response.json();
@@ -385,7 +407,11 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
 
     // If a square is already selected and this is a legal target, attempt the move
     if (selectedSquare && legalMoveSquares.includes(square)) {
-      onPieceDrop(selectedSquare, square);
+      if (isPromotionMove(selectedSquare, square)) {
+        setPendingPromotion({ from: selectedSquare, to: square });
+      } else {
+        sendMove(selectedSquare, square);
+      }
       setSelectedSquare(null);
       setLegalMoveSquares([]);
       return;
@@ -448,7 +474,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
           </div>
         </div>
 
-        <div className="rounded-[1.75rem] border border-white/10 bg-slate-950/85 p-3">
+        <div className="relative rounded-[1.75rem] border border-white/10 bg-slate-950/85 p-3">
           <Chessboard
             options={{
               position: fen,
@@ -469,6 +495,37 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
               boardStyle: { borderRadius: "1.25rem", overflow: "hidden" },
             }}
           />
+          {pendingPromotion && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[1.75rem] bg-black/70 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-sm font-medium text-white">{ch.promotionTitle}</p>
+                <div className="flex gap-2">
+                  {(["q", "r", "b", "n"] as const).map((piece) => (
+                    <button
+                      key={piece}
+                      type="button"
+                      onClick={() => {
+                        sendMove(pendingPromotion.from, pendingPromotion.to, piece);
+                        setPendingPromotion(null);
+                      }}
+                      className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-3xl transition hover:bg-white/25"
+                    >
+                      {turn === "w"
+                        ? { q: "♕", r: "♖", b: "♗", n: "♘" }[piece]
+                        : { q: "♛", r: "♜", b: "♝", n: "♞" }[piece]}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingPromotion(null)}
+                  className="mt-1 text-xs text-slate-400 hover:text-white"
+                >
+                  {ch.cancelLabel}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">

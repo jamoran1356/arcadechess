@@ -347,6 +347,8 @@ export const en = {
     whiteClockLabel: "White clock",
     blackClockLabel: "Black clock",
     placeBetBtn: "Bet on this match",
+    promotionTitle: "Promote pawn to:",
+    cancelLabel: "Cancel",
   },
   minigames: {
     eyebrow: "Arcade Library",

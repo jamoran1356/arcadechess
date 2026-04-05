@@ -349,6 +349,8 @@ export const es = {
     whiteClockLabel: "Reloj blancas",
     blackClockLabel: "Reloj negras",
     placeBetBtn: "Apostar en esta partida",
+    promotionTitle: "¿En qué pieza quieres convertir el peón?",
+    cancelLabel: "Cancelar",
   },
   minigames: {
     eyebrow: "Biblioteca arcade",
