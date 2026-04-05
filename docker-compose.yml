@@ -12,6 +12,7 @@ services:
       PRISMA_BASELINE_MIGRATION: 202603300001_init
     command: >-
       sh -c "
+      pnpm prisma migrate resolve --applied 20260405_rating_zero_and_ban_system 2>/dev/null;
       pnpm prisma migrate deploy ||
       (echo 'Intentando baseline de migracion inicial...' &&
       pnpm prisma migrate resolve --applied $${PRISMA_BASELINE_MIGRATION} &&
