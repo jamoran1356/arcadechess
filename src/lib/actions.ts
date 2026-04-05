@@ -253,7 +253,7 @@ export async function completeProfileAction(
   redirect("/dashboard");
 }
 
-export async function createMatchAction(formData: FormData) {
+export async function createMatchAction(formData: FormData): Promise<{ error: string } | void> {
   const session = await requireUser();
   const currentUser = await resolveSessionUser(session);
   const isSolo = parseBoolean(formData.get("isSolo"));
@@ -266,12 +266,12 @@ export async function createMatchAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    throw new Error(Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] ?? "No se pudo crear la partida.");
+    return { error: Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] ?? "No se pudo crear la partida." };
   }
 
   const enabledNetsForMatch = await getEnabledNetworks();
   if (!enabledNetsForMatch.includes(parsed.data.network)) {
-    throw new Error("Esta red no está habilitada actualmente.");
+    return { error: "Esta red no está habilitada actualmente." };
   }
 
   const platformConfig = await getPlatformConfig();
@@ -307,9 +307,9 @@ export async function createMatchAction(formData: FormData) {
     if (effectiveHostAddress.startsWith("init1")) {
       const onchainBal = await adapter.queryBalance(effectiveHostAddress);
       if (!onchainBal || onchainBal.amount < Number(hostTotalLock)) {
-        throw new Error(
-          `Fondos insuficientes on-chain. Necesitas ${hostTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
-        );
+        return {
+          error: `Fondos insuficientes on-chain. Necesitas ${hostTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+        };
       }
     }
 
@@ -389,14 +389,14 @@ export async function createMatchAction(formData: FormData) {
   redirect(`/match/${match.id}`);
 }
 
-export async function joinMatchAction(formData: FormData) {
+export async function joinMatchAction(formData: FormData): Promise<{ error: string } | void> {
   const session = await requireUser();
   const currentUser = await resolveSessionUser(session);
   const matchId = String(formData.get("matchId") ?? "");
 
   const match = await prisma.match.findUnique({ where: { id: matchId } });
   if (!match || match.isSolo || match.hostId === currentUser.id || match.guestId || match.status !== MatchStatus.OPEN) {
-    throw new Error("La partida ya no esta disponible.");
+    return { error: "La partida ya no esta disponible." };
   }
 
   const guestTotalLock = (Number(match.stakeAmount) + Number(match.entryFee)).toFixed(6);
@@ -420,9 +420,9 @@ export async function joinMatchAction(formData: FormData) {
   if (effectiveGuestAddress.startsWith("init1")) {
     const onchainBal = await adapter.queryBalance(effectiveGuestAddress);
     if (!onchainBal || onchainBal.amount < Number(guestTotalLock)) {
-      throw new Error(
-        `Fondos insuficientes on-chain. Necesitas ${guestTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
-      );
+      return {
+        error: `Fondos insuficientes on-chain. Necesitas ${guestTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+      };
     }
   }
 
@@ -476,45 +476,49 @@ export async function joinMatchAction(formData: FormData) {
   redirect(`/match/${matchId}`);
 }
 
-export async function startSoloMatchAction(formData: FormData) {
+export async function startSoloMatchAction(formData: FormData): Promise<{ error: string } | void> {
   const session = await requireUser();
   const currentUser = await resolveSessionUser(session);
   const matchId = String(formData.get("matchId") ?? "");
 
   const match = await prisma.match.findUnique({ where: { id: matchId } });
   if (!match || !match.isSolo || match.status !== MatchStatus.OPEN || match.guestId) {
-    throw new Error("La partida solo ya no esta disponible.");
+    return { error: "La partida solo ya no esta disponible." };
   }
 
   // Solo matches skip all on-chain interactions — no escrow, no signing, no transaction records.
-  await prisma.$transaction(async (tx) => {
-    const claimed = await tx.match.updateMany({
-      where: {
-        id: matchId,
-        isSolo: true,
-        status: MatchStatus.OPEN,
-        guestId: null,
-      },
-      data: {
-        hostId: currentUser.id,
-        status: MatchStatus.IN_PROGRESS,
-        whiteClockMs: match.gameClockMs,
-        blackClockMs: match.gameClockMs,
-        turnStartedAt: new Date(),
-      },
-    });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.match.updateMany({
+        where: {
+          id: matchId,
+          isSolo: true,
+          status: MatchStatus.OPEN,
+          guestId: null,
+        },
+        data: {
+          hostId: currentUser.id,
+          status: MatchStatus.IN_PROGRESS,
+          whiteClockMs: match.gameClockMs,
+          blackClockMs: match.gameClockMs,
+          turnStartedAt: new Date(),
+        },
+      });
 
-    if (claimed.count === 0) {
-      throw new Error("La partida solo fue tomada por otro jugador. Refresca e intenta de nuevo.");
-    }
-  });
+      if (claimed.count === 0) {
+        throw new Error("La partida solo fue tomada por otro jugador. Refresca e intenta de nuevo.");
+      }
+    });
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : "Error al iniciar partida solo." };
+  }
 
   revalidatePath("/");
   revalidatePath("/lobby");
   redirect(`/match/${matchId}`);
 }
 
-export async function placeMatchBetAction(formData: FormData) {
+export async function placeMatchBetAction(formData: FormData): Promise<{ error: string } | void> {
   const session = await requireUser();
   const currentUser = await resolveSessionUser(session);
   const parsed = placeBetSchema.safeParse({
@@ -524,7 +528,7 @@ export async function placeMatchBetAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    throw new Error(Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] ?? "No se pudo registrar la apuesta.");
+    return { error: Object.values(parsed.error.flatten().fieldErrors)[0]?.[0] ?? "No se pudo registrar la apuesta." };
   }
 
   const match = await prisma.match.findUnique({
@@ -538,50 +542,66 @@ export async function placeMatchBetAction(formData: FormData) {
   });
 
   if (!match) {
-    throw new Error("La partida no existe.");
+    return { error: "La partida no existe." };
   }
 
   if (
     !match.guestId ||
     (match.status !== MatchStatus.IN_PROGRESS && match.status !== MatchStatus.ARCADE_PENDING)
   ) {
-    throw new Error("Las apuestas solo se abren cuando la partida ya tiene dos jugadores activos.");
+    return { error: "Las apuestas solo se abren cuando la partida ya tiene dos jugadores activos." };
   }
 
   if (currentUser.id === match.hostId || currentUser.id === match.guestId) {
-    throw new Error("Los jugadores de la partida no pueden apostar en su propio match.");
+    return { error: "Los jugadores de la partida no pueden apostar en su propio match." };
   }
 
   if (![match.hostId, match.guestId].includes(parsed.data.predictedWinnerId)) {
-    throw new Error("Debes apostar por uno de los dos jugadores de la partida.");
+    return { error: "Debes apostar por uno de los dos jugadores de la partida." };
   }
 
   if (match.bets.length > 0) {
-    throw new Error("Ya registraste una apuesta para esta partida.");
+    return { error: "Ya registraste una apuesta para esta partida." };
   }
 
   const betAmount = parsed.data.amount;
   const betWallet = await getOrCreateWalletForNetwork(currentUser.id, match.preferredNetwork);
 
+  // Use real wallet address from client if provided
+  const clientWalletAddress = await validateWalletOwnership(
+    currentUser.id,
+    String(formData.get("walletAddress") ?? "").trim(),
+    match.preferredNetwork,
+  );
+  const effectiveBettorAddress = clientWalletAddress || betWallet.address;
+
+  if (clientWalletAddress && betWallet.address !== clientWalletAddress) {
+    await prisma.wallet.update({ where: { id: betWallet.id }, data: { address: clientWalletAddress } });
+  }
+
   // Validate balance on-chain
   const adapter = getOnchainAdapter(match.preferredNetwork);
-  if (betWallet.address.startsWith("init1")) {
-    const onchainBal = await adapter.queryBalance(betWallet.address);
+  if (effectiveBettorAddress.startsWith("init1")) {
+    const onchainBal = await adapter.queryBalance(effectiveBettorAddress);
     if (!onchainBal || onchainBal.amount < betAmount) {
-      throw new Error(
-        `Fondos insuficientes on-chain. Necesitas ${betAmount.toFixed(6)} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
-      );
+      return {
+        error: `Fondos insuficientes on-chain. Necesitas ${betAmount.toFixed(6)} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+      };
     }
   }
 
   const amount = betAmount.toFixed(6);
+  const clientTxHash = String(formData.get("escrowTxHash") ?? "").trim();
   const receipt = await adapter.placeBet({
     matchId: match.id,
     bettorId: currentUser.id,
+    bettorWallet: effectiveBettorAddress,
     predictedWinnerId: parsed.data.predictedWinnerId,
     amount,
     token: match.stakeToken,
+    onchainMatchIndex: match.onchainMatchIndex,
   });
+  const receiptTxHash = clientTxHash || receipt.txHash;
 
   await prisma.$transaction([
     prisma.matchBet.create({
@@ -592,7 +612,7 @@ export async function placeMatchBetAction(formData: FormData) {
         predictedWinnerId: parsed.data.predictedWinnerId,
         amount,
         token: match.stakeToken,
-        txHash: receipt.txHash,
+        txHash: receiptTxHash,
         metadata: {
           description: receipt.description,
           mode: receipt.mode,
@@ -608,7 +628,7 @@ export async function placeMatchBetAction(formData: FormData) {
         status: receipt.mode === "configured" ? TransactionStatus.PENDING : TransactionStatus.SETTLED,
         amount,
         token: match.stakeToken,
-        txHash: receipt.txHash,
+        txHash: receiptTxHash,
         metadata: {
           description: receipt.description,
           mode: receipt.mode,

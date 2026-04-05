@@ -97,7 +97,8 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
           return;
         }
 
-        await createMatchAction(fd);
+        const result = await createMatchAction(fd);
+        if (result?.error) throw new Error(result.error);
       } catch (err: unknown) {
         setShowConfirm(false);
         setError(err instanceof Error ? err.message : "Error al crear la partida.");
@@ -114,7 +115,8 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
         const fd = new FormData(form);
         fd.set("escrowTxHash", escrowTxHash!);
         if (walletAddress) fd.set("walletAddress", walletAddress);
-        await createMatchAction(fd);
+        const result = await createMatchAction(fd);
+        if (result?.error) throw new Error(result.error);
       } catch (err: unknown) {
         setShowConfirm(false);
         setEscrowTxHash(null);

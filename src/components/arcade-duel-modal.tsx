@@ -121,6 +121,9 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
       return;
     }
 
+    // Pong ends by reaching winScore, not by time — skip timer auto-submit.
+    if (duel.scenario.kind === "pong") return;
+
     const interval = window.setInterval(() => {
       const elapsed = performance.now() - startTimeRef.current!;
       const remaining = Math.max(0, duel.game.timeLimitMs - elapsed);
@@ -132,7 +135,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
     }, 100);
 
     return () => window.clearInterval(interval);
-  }, [duel.game.timeLimitMs, phase]);
+  }, [duel.game.timeLimitMs, duel.scenario.kind, phase]);
 
   const scenarioKeyLength = duel.scenario.kind === "keys" ? (duel.scenario as { sequence: string[] }).sequence.length : 0;
 
@@ -346,7 +349,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
             <p className="text-sm text-slate-300">
               {playerRole === "attacker" ? `vs ${duel.defenderName}` : `vs ${duel.attackerName}`}
             </p>
-            {phase === "active" && (
+            {phase === "active" && duel.scenario.kind !== "pong" && (
               <p className="mt-2 text-2xl font-bold text-amber-300" suppressHydrationWarning>
                 {Math.max(0, Math.ceil(timeLeft / 1000))}s
               </p>

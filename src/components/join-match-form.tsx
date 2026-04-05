@@ -70,9 +70,11 @@ export function JoinMatchForm({
 
         // stake=0 → skip blockchain, go straight to server action
         if (isSolo) {
-          await startSoloMatchAction(fd);
+          const result = await startSoloMatchAction(fd);
+          if (result?.error) { setShowConfirm(false); setError(result.error); return; }
         } else {
-          await joinMatchAction(fd);
+          const result = await joinMatchAction(fd);
+          if (result?.error) { setShowConfirm(false); setError(result.error); return; }
         }
       } catch (err: unknown) {
         setShowConfirm(false);

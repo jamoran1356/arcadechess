@@ -893,23 +893,44 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
     } else {
       const chess = new Chess(match.fen);
       // Attacker lost the duel — remove their piece from the starting square.
-      // boardMove.from is guaranteed to be a valid chess square (validated upstream).
       chess.remove(boardMove.from as Square);
-      const attackerLostKing = boardMove.san.includes("K") || boardMove.san.startsWith("K");
 
       // chess.remove() doesn't flip the turn in the FEN string — patch it manually.
       const newTurn = flipTurn(match.turn);
       const fenParts = chess.fen().split(" ");
       fenParts[1] = newTurn;
+      const resultFen = fenParts.join(" ");
 
       nextState = {
         ...nextState,
-        fen: fenParts.join(" "),
+        fen: resultFen,
         turn: newTurn,
         moveHistory: [...moveHistory, `${boardMove.san} [arcade-loss ${scoreTag}]`],
       };
 
-      if (attackerLostKing) {
+      // Check if the resulting position is game-over (discovered checkmate/stalemate)
+      let gameOverDetected = false;
+      try {
+        const resultChess = new Chess(resultFen);
+        if (resultChess.isGameOver()) {
+          gameOverDetected = true;
+          nextState = {
+            ...nextState,
+            status: MatchStatus.FINISHED,
+            turnStartedAt: null,
+          };
+          if (resultChess.isCheckmate()) {
+            // Side to move is mated; winner is the other side's player
+            nextState = {
+              ...nextState,
+              winnerId: match.turn === "w" ? duel.attackerId : (duel.match.isSolo ? null : duel.defenderId),
+            };
+          }
+        }
+      } catch { /* FEN without king — fall through to king check */ }
+
+      // Fallback: if the removed piece was the king, the attacker loses immediately.
+      if (!gameOverDetected && (boardMove.san.includes("K") || boardMove.san.startsWith("K"))) {
         nextState = {
           ...nextState,
           status: MatchStatus.FINISHED,

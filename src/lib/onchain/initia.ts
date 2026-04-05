@@ -344,10 +344,38 @@ export const initiaAdapter: OnchainAdapter & {
   },
 
   async placeBet(intent: BetIntent) {
-    // Bets remain DB-only for now — on-chain betting planned for v2
-    return buildReceipt(
-      `Apuesta registrada (DB) para partida ${intent.matchId} sobre ${intent.predictedWinnerId} por ${intent.amount} ${intent.token}.`,
-    );
+    const matchIndex = intent.onchainMatchIndex;
+    const bettorAddr = intent.bettorWallet || "";
+    const amountUinit = Math.round(parseFloat(intent.amount) * 1_000_000);
+
+    // If no on-chain index or zero amount, stay DB-only
+    if (matchIndex === null || matchIndex === undefined || amountUinit <= 0) {
+      return buildReceipt(
+        `Apuesta registrada (DB-only) para partida ${intent.matchId} sobre ${intent.predictedWinnerId} por ${intent.amount} ${intent.token}.`,
+      );
+    }
+
+    try {
+      const txHash = await sendMoveExecute(
+        "deposit_funds",
+        [],
+        [await bcsU64(matchIndex), await bcsAddress(bettorAddr), await bcsU64(amountUinit)],
+        `bet_${intent.matchId}_${intent.bettorId}`,
+      );
+      return buildReceipt(
+        `Apuesta on-chain depositada. Match #${matchIndex}. Apostador: ${bettorAddr}. Monto: ${intent.amount} ${intent.token}.`,
+        txHash,
+        matchIndex,
+      );
+    } catch (error) {
+      console.error("Initia placeBet on-chain error:", error);
+      return buildReceipt(
+        `Apuesta fallida on-chain (match #${matchIndex}). Error registrado.`,
+        undefined,
+        matchIndex,
+        false,
+      );
+    }
   },
 
   async settleBet(intent: BetPayoutIntent) {

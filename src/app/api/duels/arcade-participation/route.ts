@@ -204,6 +204,30 @@ async function resolveDuelWithPenalty(
       const fenParts = chess.fen().split(" ");
       fenParts[1] = nextTurn;
       nextFen = fenParts.join(" ");
+
+      // Check if the resulting position is game-over (e.g. discovered checkmate/stalemate)
+      try {
+        const resultChess = new Chess(nextFen);
+        if (resultChess.isGameOver()) {
+          nextStatus = "FINISHED";
+          if (resultChess.isCheckmate()) {
+            // The side to move is checkmated; winner is the other side's player.
+            matchWinnerId = match.turn === "w"
+              ? (duel.attackerId)   // White attacked, Black (defender turn) is mated → White wins
+              : (duel.defenderId);  // Black attacked, White (defender turn) is mated → Black player wins
+          }
+        }
+      } catch { /* FEN without king — handled below */ }
+
+      // If the removed piece was the king, the attacker loses immediately.
+      if (nextStatus !== "FINISHED") {
+        const pieceAtFrom = match.fen.split(" ")[0];
+        const isKingCapture = boardMove.san?.startsWith("K");
+        if (isKingCapture) {
+          nextStatus = "FINISHED";
+          matchWinnerId = duel.defenderId;
+        }
+      }
     } else {
       if (!boardMove) {
         // Fallback defensivo: si el payload del movimiento está corrupto, no mutamos tablero.
@@ -465,6 +489,24 @@ async function resolveDuelByScores(
       fenParts[1] = nextTurn;
       nextFen = fenParts.join(" ");
 
+      // Check if the resulting position is game-over (e.g. discovered checkmate/stalemate)
+      try {
+        const resultChess = new Chess(nextFen);
+        if (resultChess.isGameOver()) {
+          nextStatus = "FINISHED";
+          if (resultChess.isCheckmate()) {
+            matchWinnerId = match.turn === "w"
+              ? (duel.attackerId)
+              : (duel.defenderId);
+          }
+        }
+      } catch { /* FEN without king */ }
+
+      if (nextStatus !== "FINISHED" && boardMove.san?.startsWith("K")) {
+        nextStatus = "FINISHED";
+        matchWinnerId = duel.defenderId;
+      }
+
       await tx.match.update({
         where: { id: match.id },
         data: {
@@ -472,7 +514,7 @@ async function resolveDuelByScores(
           fen: nextFen,
           turn: nextTurn,
           winnerId: matchWinnerId,
-          turnStartedAt: new Date(),
+          turnStartedAt: nextStatus === "FINISHED" ? null : new Date(),
           moveHistory: [...moveHistory, `${boardMove.san ?? "move"} [arcade-loss ${scoreTag}]`],
         },
       });

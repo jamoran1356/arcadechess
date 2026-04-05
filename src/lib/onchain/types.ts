@@ -35,9 +35,11 @@ export type CancelRefundIntent = {
 export type BetIntent = {
   matchId: string;
   bettorId: string;
+  bettorWallet?: string;
   predictedWinnerId: string;
   amount: string;
   token: string;
+  onchainMatchIndex?: number | null;
 };
 
 export type BetPayoutIntent = {
