@@ -151,6 +151,60 @@ export async function getLandingSnapshot() {
   };
 }
 
+export async function getRanking(page: number, perPage: number) {
+  const skip = (page - 1) * perPage;
+
+  const [players, total] = await Promise.all([
+    prisma.user.findMany({
+      where: {
+        OR: [
+          { hostedMatches: { some: {} } },
+          { joinedMatches: { some: {} } },
+        ],
+      },
+      orderBy: { wonMatches: { _count: "desc" } },
+      skip,
+      take: perPage,
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            wonMatches: true,
+            hostedMatches: true,
+            joinedMatches: true,
+          },
+        },
+        transactions: {
+          where: { type: "PRIZE_PAYOUT", status: "SETTLED" },
+          select: { amount: true },
+        },
+      },
+    }),
+    prisma.user.count({
+      where: {
+        OR: [
+          { hostedMatches: { some: {} } },
+          { joinedMatches: { some: {} } },
+        ],
+      },
+    }),
+  ]);
+
+  return {
+    players: players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      wins: p._count.wonMatches,
+      matches: p._count.hostedMatches + p._count.joinedMatches,
+      earnings: p.transactions
+        .reduce((sum, tx) => sum + Number(tx.amount), 0)
+        .toFixed(2),
+    })),
+    total,
+  };
+}
+
 export async function getLobbySnapshot(userId?: string) {
   await ensureAutoSoloMatches();
   const [matches, me] = await Promise.all([

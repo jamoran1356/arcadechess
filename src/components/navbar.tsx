@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { InterwovenKitConnectButton } from "./interwovenkit-connect-button";
 import { LanguageSwitcher } from "./language-switcher";
 import { useDict } from "./locale-provider";
+import { useInterwovenKit } from "@initia/interwovenkit-react";
 
 type NavSession = { name: string; role: string } | null;
 
@@ -18,21 +19,28 @@ type NavbarProps = {
 export function Navbar({ session, logoutAction }: NavbarProps) {
   const pathname = usePathname();
   const dict = useDict();
+  const { disconnect: disconnectWallet } = useInterwovenKit();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [userOpen, setUserOpen] = useState(false);
   const helpRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
 
   // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
     setHelpOpen(false);
+    setUserOpen(false);
   }, [pathname]);
 
-  // Close help dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
         setHelpOpen(false);
+      }
+      if (userRef.current && !userRef.current.contains(e.target as Node)) {
+        setUserOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -51,6 +59,7 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
     ...(session ? [
       { href: "/dashboard", label: dict.nav.dashboard },
     ] : []),
+    { href: "/ranking", label: dict.nav.ranking },
     { href: "/transactions", label: dict.nav.transactions },
     ...(session?.role === "ADMIN" ? [{ href: "/admin", label: dict.nav.admin }] : []),
   ];
@@ -69,6 +78,11 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
   const initials = session?.name
     ? session.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
     : null;
+
+  function handleLogout() {
+    try { disconnectWallet(); } catch {}
+    logoutAction();
+  }
 
   return (
     <header className="sticky top-0 z-40">
@@ -146,8 +160,12 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
             <LanguageSwitcher />
 
             {session ? (
-              <div className="hidden items-center gap-2 sm:flex">
-                <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5">
+              <div ref={userRef} className="relative hidden sm:block">
+                <button
+                  type="button"
+                  onClick={() => setUserOpen(!userOpen)}
+                  className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 transition hover:border-white/15"
+                >
                   <div className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-400/15 text-[10px] font-bold text-cyan-200">
                     {initials}
                   </div>
@@ -155,16 +173,27 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                   {session.role !== "USER" && (
                     <span className="font-mono text-[9px] uppercase tracking-wider text-cyan-300/50">{session.role}</span>
                   )}
-                </div>
-                <InterwovenKitConnectButton />
-                <form action={logoutAction}>
-                  <button
-                    type="submit"
-                    className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs text-slate-400 transition hover:border-white/15 hover:text-white"
-                  >
-                    {dict.nav.logout}
-                  </button>
-                </form>
+                  <svg className={`h-3.5 w-3.5 text-slate-400 transition-transform ${userOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+                {userOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-52 rounded-xl border border-white/[0.08] bg-[rgba(3,7,17,0.97)] backdrop-blur-xl py-1.5 shadow-2xl">
+                    <div className="px-4 py-2">
+                      <InterwovenKitConnectButton />
+                    </div>
+                    <div className="my-1 border-t border-white/[0.06]" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-[13px] text-red-400 transition-colors hover:bg-white/[0.06] hover:text-red-300"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                      {dict.nav.logout}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="hidden items-center gap-2 sm:flex">
@@ -269,14 +298,13 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                 <div className="flex items-center justify-center">
                   <InterwovenKitConnectButton />
                 </div>
-                <form action={logoutAction}>
-                  <button
-                    type="submit"
-                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300 transition-all hover:border-white/15 hover:bg-white/[0.08] hover:text-white"
-                  >
-                    {dict.nav.logout}
-                  </button>
-                </form>
+                <button
+                  type="button"
+                  onClick={() => handleLogout()}
+                  className="w-full rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-2.5 text-sm text-red-400 transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300"
+                >
+                  {dict.nav.logout}
+                </button>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
