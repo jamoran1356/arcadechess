@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { InterwovenKitConnectButton } from "./interwovenkit-connect-button";
 import { LanguageSwitcher } from "./language-switcher";
 import { useDict } from "./locale-provider";
 import { useInterwovenKit } from "@initia/interwovenkit-react";
@@ -19,7 +18,7 @@ type NavbarProps = {
 export function Navbar({ session, logoutAction }: NavbarProps) {
   const pathname = usePathname();
   const dict = useDict();
-  const { disconnect: disconnectWallet } = useInterwovenKit();
+  const { disconnect: disconnectWallet, isConnected, openConnect, openWallet, initiaAddress } = useInterwovenKit();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -177,9 +176,17 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                 </button>
                 {userOpen && (
                   <div className="absolute right-0 top-full mt-1 w-52 rounded-xl border border-white/[0.08] bg-[rgba(3,7,17,0.97)] backdrop-blur-xl py-1.5 shadow-2xl">
-                    <div className="px-4 py-2">
-                      <InterwovenKitConnectButton />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { isConnected ? openWallet() : openConnect(); }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-[13px] text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 110-6h5.25A2.25 2.25 0 0121 6v6zm-3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm-12.75 0H3" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18v-6" /></svg>
+                      {isConnected ? dict.nav.manageWallet : dict.nav.connectWallet}
+                    </button>
+                    {isConnected && initiaAddress && (
+                      <p className="truncate px-4 py-1 text-[10px] font-mono text-cyan-400/60">{initiaAddress}</p>
+                    )}
                     <div className="my-1 border-t border-white/[0.06]" />
                     <button
                       type="button"
@@ -295,9 +302,16 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center justify-center">
-                  <InterwovenKitConnectButton />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => { isConnected ? openWallet() : openConnect(); }}
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300 transition-all hover:border-white/15 hover:bg-white/[0.08] hover:text-white"
+                >
+                  {isConnected ? dict.nav.manageWallet : dict.nav.connectWallet}
+                </button>
+                {isConnected && initiaAddress && (
+                  <p className="truncate text-center text-[10px] font-mono text-cyan-400/60">{initiaAddress}</p>
+                )}
                 <button
                   type="button"
                   onClick={() => handleLogout()}
