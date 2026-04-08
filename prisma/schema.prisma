@@ -211,6 +211,17 @@ model ArcadeGame {
   @@unique([gameType])
 }
 
+model TutorialVideo {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  youtubeUrl  String
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Friendship {
   id        String           @id @default(cuid())
   userId    String

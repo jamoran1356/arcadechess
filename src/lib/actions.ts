@@ -1107,3 +1107,68 @@ export async function setLocaleAction(locale: string) {
     sameSite: "lax",
   });
 }
+
+/* ── Tutorial Videos (admin) ──────────────────────────────── */
+
+export async function createTutorialVideoAction(formData: FormData) {
+  const session = await requireUser();
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
+
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const youtubeUrl = String(formData.get("youtubeUrl") ?? "").trim();
+  const sortOrder = Number(formData.get("sortOrder") ?? 0);
+
+  if (!title || !youtubeUrl) throw new Error("Title and YouTube URL are required.");
+
+  // Basic YouTube URL validation
+  if (!/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/.test(youtubeUrl)) {
+    throw new Error("Invalid YouTube URL.");
+  }
+
+  await prisma.tutorialVideo.create({
+    data: { title, description: description || null, youtubeUrl, sortOrder },
+  });
+
+  revalidatePath("/admin/tutoriales");
+  revalidatePath("/tutoriales");
+}
+
+export async function updateTutorialVideoAction(formData: FormData) {
+  const session = await requireUser();
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
+
+  const id = String(formData.get("id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const youtubeUrl = String(formData.get("youtubeUrl") ?? "").trim();
+  const sortOrder = Number(formData.get("sortOrder") ?? 0);
+  const isActive = formData.get("isActive") === "true";
+
+  if (!id || !title || !youtubeUrl) throw new Error("Missing fields.");
+
+  if (!/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/.test(youtubeUrl)) {
+    throw new Error("Invalid YouTube URL.");
+  }
+
+  await prisma.tutorialVideo.update({
+    where: { id },
+    data: { title, description: description || null, youtubeUrl, sortOrder, isActive },
+  });
+
+  revalidatePath("/admin/tutoriales");
+  revalidatePath("/tutoriales");
+}
+
+export async function deleteTutorialVideoAction(formData: FormData) {
+  const session = await requireUser();
+  if (!hasAdminAccess(session)) throw new Error("Unauthorized");
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Missing video ID.");
+
+  await prisma.tutorialVideo.delete({ where: { id } });
+
+  revalidatePath("/admin/tutoriales");
+  revalidatePath("/tutoriales");
+}

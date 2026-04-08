@@ -9,7 +9,7 @@ export function Footer() {
   return (
     <footer className="relative z-10">
       <div className="section-divider" />
-      <div className="bg-[rgba(3,7,17,0.6)] backdrop-blur-sm">
+      <div className="bg-[rgba(26,18,11,0.6)] backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-7xl flex-col items-center gap-6 px-4 py-10 sm:flex-row sm:justify-between sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-1.5 sm:items-start">
             <p className="font-display text-sm font-bold tracking-tight text-white">PlayChess Arena</p>

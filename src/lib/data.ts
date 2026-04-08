@@ -205,6 +205,31 @@ export async function getRanking(page: number, perPage: number) {
   };
 }
 
+export async function getUserRankPosition(userId: string) {
+  // Get all users ordered by wins (same ordering as getRanking)
+  const allRanked = await prisma.user.findMany({
+    where: {
+      OR: [
+        { hostedMatches: { some: {} } },
+        { joinedMatches: { some: {} } },
+      ],
+    },
+    orderBy: { wonMatches: { _count: "desc" } },
+    select: {
+      id: true,
+      _count: { select: { wonMatches: true } },
+    },
+  });
+
+  const idx = allRanked.findIndex((u) => u.id === userId);
+  if (idx === -1) return { position: null, wins: 0, totalPlayers: allRanked.length };
+  return {
+    position: idx + 1,
+    wins: allRanked[idx]._count.wonMatches,
+    totalPlayers: allRanked.length,
+  };
+}
+
 export async function getLobbySnapshot(userId?: string) {
   await ensureAutoSoloMatches();
   const [matches, me] = await Promise.all([
