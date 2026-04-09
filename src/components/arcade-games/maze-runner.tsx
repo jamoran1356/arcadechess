@@ -18,12 +18,14 @@ type Props = {
   onAction: (value: string) => void;
   onComplete: () => void;
   disabled?: boolean;
+  spectatorMarkers?: Array<{ row: number; col: number; color: string; label: string }>;
+  readOnly?: boolean;
 };
 
 const CELL = 40;
 const WALL = 2;
 
-export function MazeRunnerGame({ scenario, onAction, onComplete, disabled }: Props) {
+export function MazeRunnerGame({ scenario, onAction, onComplete, disabled, spectatorMarkers, readOnly }: Props) {
   const { grid, rows, cols, start, end } = scenario;
   const [pos, setPos] = useState(start);
   const completedRef = useRef(false);
@@ -31,7 +33,7 @@ export function MazeRunnerGame({ scenario, onAction, onComplete, disabled }: Pro
 
   const tryMove = useCallback(
     (dir: 'up' | 'down' | 'left' | 'right') => {
-      if (disabled || completedRef.current) return;
+      if (disabled || readOnly || completedRef.current) return;
 
       setPos((prev) => {
         const cell = grid[prev.row]?.[prev.col];
@@ -116,12 +118,26 @@ export function MazeRunnerGame({ scenario, onAction, onComplete, disabled }: Pro
     ctx.fillStyle = 'rgba(251,191,36,0.25)';
     ctx.fillRect(start.col * CELL + 4, start.row * CELL + 4, CELL - 8, CELL - 8);
 
-    // Draw player
-    ctx.fillStyle = '#fbbf24';
-    ctx.beginPath();
-    ctx.arc(pos.col * CELL + CELL / 2, pos.row * CELL + CELL / 2, CELL / 3, 0, Math.PI * 2);
-    ctx.fill();
-  }, [cols, end.col, end.row, grid, pos, rows, start.col, start.row]);
+    if (spectatorMarkers?.length) {
+      for (const marker of spectatorMarkers) {
+        ctx.fillStyle = marker.color;
+        ctx.beginPath();
+        ctx.arc(marker.col * CELL + CELL / 2, marker.row * CELL + CELL / 2, CELL / 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(marker.label, marker.col * CELL + CELL / 2, marker.row * CELL + CELL / 2);
+      }
+    } else {
+      // Draw player
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(pos.col * CELL + CELL / 2, pos.row * CELL + CELL / 2, CELL / 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }, [cols, end.col, end.row, grid, pos, rows, spectatorMarkers, start.col, start.row]);
 
   return (
     <div className="space-y-3">
@@ -131,13 +147,13 @@ export function MazeRunnerGame({ scenario, onAction, onComplete, disabled }: Pro
       {/* Mobile controls */}
       <div className="grid grid-cols-3 gap-2 sm:hidden">
         <div />
-        <button type="button" onPointerDown={() => tryMove('up')} className="rounded-lg border border-white/10 bg-slate-800 py-3 text-center text-lg font-bold text-white">▲</button>
+        <button type="button" disabled={Boolean(readOnly)} onPointerDown={() => tryMove('up')} className="rounded-lg border border-white/10 bg-slate-800 py-3 text-center text-lg font-bold text-white disabled:opacity-40">▲</button>
         <div />
-        <button type="button" onPointerDown={() => tryMove('left')} className="rounded-lg border border-white/10 bg-slate-800 py-3 text-center text-lg font-bold text-white">◀</button>
-        <button type="button" onPointerDown={() => tryMove('down')} className="rounded-lg border border-white/10 bg-slate-800 py-3 text-center text-lg font-bold text-white">▼</button>
-        <button type="button" onPointerDown={() => tryMove('right')} className="rounded-lg border border-white/10 bg-slate-800 py-3 text-center text-lg font-bold text-white">▶</button>
+        <button type="button" disabled={Boolean(readOnly)} onPointerDown={() => tryMove('left')} className="rounded-lg border border-white/10 bg-slate-800 py-3 text-center text-lg font-bold text-white disabled:opacity-40">◀</button>
+        <button type="button" disabled={Boolean(readOnly)} onPointerDown={() => tryMove('down')} className="rounded-lg border border-white/10 bg-slate-800 py-3 text-center text-lg font-bold text-white disabled:opacity-40">▼</button>
+        <button type="button" disabled={Boolean(readOnly)} onPointerDown={() => tryMove('right')} className="rounded-lg border border-white/10 bg-slate-800 py-3 text-center text-lg font-bold text-white disabled:opacity-40">▶</button>
       </div>
-      <p className="text-center text-xs text-slate-500 max-sm:hidden">Usa ← ↑ ↓ → o WASD</p>
+      <p className="text-center text-xs text-slate-500 max-sm:hidden">{readOnly ? 'Vista de espectadores' : 'Usa ← ↑ ↓ → o WASD'}</p>
     </div>
   );
 }

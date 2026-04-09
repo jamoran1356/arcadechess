@@ -8,8 +8,9 @@ import {
   TransactionStatus,
   TransactionType,
 } from "@prisma/client";
-import { evaluateArcadeAttempt, getSoloArcadeTimeLimitMs, type ArcadeAttempt } from "@/lib/arcade";
 import { prisma } from "@/lib/db";
+import { evaluateArcadeAttempt, getArcadeAttemptSeed, getSoloArcadeTimeLimitMs, type ArcadeAttempt } from "@/lib/arcade";
+import { clearArcadeLiveState } from "@/lib/arcade-live";
 import { getOnchainAdapter } from "@/lib/onchain/service";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { creditWallet } from "@/lib/wallet";
@@ -799,7 +800,7 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   }
 
   const boardMove = duel.boardMove as { from: string; to: string; promotion?: string | null; san: string };
-  const playerSeed = isAttacker ? `${duel.seed}:attacker` : `${duel.seed}:defender`;
+  const playerSeed = getArcadeAttemptSeed(duel.gameType, duel.seed, isAttacker ? "attacker" : "defender");
   const soloTimeLimitMs = duel.match.isSolo
     ? getSoloArcadeTimeLimitMs({
         fen: duel.match.fen,
@@ -986,6 +987,8 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   } else if (result.status === MatchStatus.FINISHED) {
     await settleDraw(match);
   }
+
+  clearArcadeLiveState(duelId);
 
   return {
     resolved: true,

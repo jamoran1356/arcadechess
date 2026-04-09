@@ -274,6 +274,36 @@ export function buildArcadeScenario(gameType: ArcadeGameType, seed: string): Arc
   }
 }
 
+export function getArcadeScenarioSeed(params: {
+  gameType: ArcadeGameType;
+  duelSeed: string;
+  viewerId?: string | null;
+  attackerId: string;
+  defenderId: string;
+}) {
+  if (params.gameType === ArcadeGameType.MAZE_RUNNER) {
+    return params.duelSeed;
+  }
+
+  if (params.viewerId === params.attackerId) {
+    return `${params.duelSeed}:attacker`;
+  }
+
+  if (params.viewerId === params.defenderId) {
+    return `${params.duelSeed}:defender`;
+  }
+
+  return `${params.duelSeed}:attacker`;
+}
+
+export function getArcadeAttemptSeed(gameType: ArcadeGameType, duelSeed: string, role: "attacker" | "defender") {
+  if (gameType === ArcadeGameType.MAZE_RUNNER) {
+    return duelSeed;
+  }
+
+  return `${duelSeed}:${role}`;
+}
+
 function squareToCoords(square: string) {
   const file = square.charCodeAt(0) - 97;
   const rank = Number(square[1]) - 1;

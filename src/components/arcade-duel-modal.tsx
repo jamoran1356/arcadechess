@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import type { ArcadeAttempt, ArcadeScenario } from "@/lib/arcade";
 import { useDict } from "@/components/locale-provider";
 import { MazeRunnerGame } from "@/components/arcade-games/maze-runner";
@@ -26,15 +25,31 @@ type ArcadeDuelModalProps = {
       antiCheat: string;
     };
     scenario: ArcadeScenario;
+    liveProgress?: {
+      attacker: {
+        actionCount: number;
+        latestValue: string | null;
+        updatedAt: number | null;
+        mazePosition: { row: number; col: number } | null;
+      };
+      defender: {
+        actionCount: number;
+        latestValue: string | null;
+        updatedAt: number | null;
+        mazePosition: { row: number; col: number } | null;
+      };
+    };
   };
-  currentUserId: string;
+  currentUserId?: string;
   onStateRefresh?: () => Promise<void>;
 };
 
 export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeDuelModalProps) {
   const dict = useDict();
   const arc = dict.arcade;
-  const myScore = currentUserId === duel.attackerId ? duel.attackerScore : duel.defenderScore;
+  const playerRole =
+    currentUserId === duel.attackerId ? "attacker" : currentUserId === duel.defenderId ? "defender" : "spectator";
+  const myScore = playerRole === "attacker" ? duel.attackerScore : playerRole === "defender" ? duel.defenderScore : null;
   const [phase, setPhase] = useState<"intro" | "active" | "submitted">(
     myScore !== null ? "submitted" : "intro",
   );
@@ -51,9 +66,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
   const submitAttemptRef = useRef<(() => Promise<void>) | null>(null);
   const duelIdRef = useRef<string | null>(null);
   const enteringRef = useRef(false);
-
-  const playerRole =
-    currentUserId === duel.attackerId ? "attacker" : currentUserId === duel.defenderId ? "defender" : "spectator";
+  const lastProgressRef = useRef<{ actionCount: number; latestValue: string | null }>({ actionCount: -1, latestValue: null });
 
   const submitAttempt = useCallback(async () => {
     if (phase === "submitted" || startTimeRef.current === null) {
@@ -90,8 +103,30 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
     });
   }, [arc.submitError, arc.submitSuccess, duel.id, onStateRefresh, phase]);
 
+  const pushProgress = useCallback((actionCount: number, latestValue: string | null) => {
+    if (playerRole === "spectator") {
+      return;
+    }
+
+    if (
+      lastProgressRef.current.actionCount === actionCount &&
+      lastProgressRef.current.latestValue === latestValue
+    ) {
+      return;
+    }
+
+    lastProgressRef.current = { actionCount, latestValue };
+    void fetch(`/api/duels/${duel.id}/progress`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actionCount, latestValue }),
+    }).catch(() => {
+      // progreso en vivo best-effort
+    });
+  }, [duel.id, playerRole]);
+
   useEffect(() => {
-    const myScoreResolved = (currentUserId === duel.attackerId ? duel.attackerScore : duel.defenderScore) !== null;
+    const myScoreResolved = (playerRole === "attacker" ? duel.attackerScore : playerRole === "defender" ? duel.defenderScore : null) !== null;
 
     if (duelIdRef.current !== duel.id) {
       duelIdRef.current = duel.id;
@@ -101,6 +136,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
       setTargetIndex(0);
       setMemoryIndex(0);
       setKeyIndex(0);
+      lastProgressRef.current = { actionCount: -1, latestValue: null };
       actionsRef.current = [];
       startTimeRef.current = null;
       setPhase(myScoreResolved ? "submitted" : "intro");
@@ -110,7 +146,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
     if (myScoreResolved) {
       setPhase("submitted");
     }
-  }, [currentUserId, duel.attackerId, duel.attackerScore, duel.defenderScore, duel.game.timeLimitMs, duel.id]);
+  }, [duel.attackerScore, duel.defenderScore, duel.game.timeLimitMs, duel.id, playerRole]);
 
   useEffect(() => {
     submitAttemptRef.current = submitAttempt;
@@ -156,6 +192,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
         ...actionsRef.current,
         { at: Math.max(0, Math.round(event.timeStamp - startedAt)), value: expected },
       ];
+      pushProgress(actionsRef.current.length, expected);
       const nextIndex = keyIndex + 1;
       setKeyIndex(nextIndex);
       if (nextIndex === duel.scenario.sequence.length) {
@@ -277,6 +314,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
       ...actionsRef.current,
       { at: Math.max(0, Math.round(event.timeStamp - startedAt)), value },
     ];
+    pushProgress(actionsRef.current.length, value);
     const nextIndex = targetIndex + 1;
     setTargetIndex(nextIndex);
     if (nextIndex === duel.scenario.targets.length) {
@@ -294,6 +332,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
       ...actionsRef.current,
       { at: Math.max(0, Math.round(event.timeStamp - startedAt)), value },
     ];
+    pushProgress(actionsRef.current.length, value);
     const nextIndex = memoryIndex + 1;
     setMemoryIndex(nextIndex);
     if (duel.scenario.kind === "memory" && nextIndex === (duel.scenario as { sequence: string[] }).sequence.length) {
@@ -333,8 +372,149 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
     return () => window.clearInterval(interval);
   }, [duel.id, onStateRefresh]);
 
+  const spectatorTotalActions =
+    duel.scenario.kind === "targets"
+      ? duel.scenario.targets.length
+      : duel.scenario.kind === "memory"
+        ? duel.scenario.sequence.length
+        : duel.scenario.kind === "keys"
+          ? duel.scenario.sequence.length
+          : duel.scenario.kind === "reaction"
+            ? duel.scenario.rounds
+            : null;
+
+  function getSpectatorDetail(actionCount: number, latestValue: string | null) {
+    if (duel.scenario.kind === "targets") {
+      const next = duel.scenario.targets[actionCount]?.id ?? "completo";
+      return `Objetivos: ${actionCount}/${duel.scenario.targets.length} · Siguiente: ${next}`;
+    }
+    if (duel.scenario.kind === "memory") {
+      const next = duel.scenario.sequence[actionCount] ?? "completo";
+      return `Secuencia: ${actionCount}/${duel.scenario.sequence.length} · Siguiente: ${next}`;
+    }
+    if (duel.scenario.kind === "keys") {
+      const next = duel.scenario.sequence[actionCount] ?? "completo";
+      return `Teclas: ${actionCount}/${duel.scenario.sequence.length} · Siguiente: ${next}`;
+    }
+    if (duel.scenario.kind === "maze") {
+      return latestValue ? `Última celda: ${latestValue}` : `Pasos: ${actionCount}`;
+    }
+    if (duel.scenario.kind === "reaction") {
+      if (latestValue?.startsWith("react:")) {
+        return `Última reacción: ${latestValue.replace("react:", "")} ms`;
+      }
+      if (latestValue?.startsWith("early:")) {
+        return "Penalizó por anticiparse";
+      }
+      return `Rondas registradas: ${actionCount}`;
+    }
+    if (duel.scenario.kind === "pong") {
+      if (latestValue?.startsWith("final:")) {
+        return `Marcador final: ${latestValue.replace("final:", "")}`;
+      }
+      if (latestValue?.startsWith("player-score:")) {
+        return `Anotó: ${latestValue.replace("player-score:", "")}`;
+      }
+      if (latestValue?.startsWith("cpu-score:")) {
+        return `Recibió punto: ${latestValue.replace("cpu-score:", "")}`;
+      }
+      return latestValue ? `Evento: ${latestValue}` : `Eventos: ${actionCount}`;
+    }
+    return `Acciones registradas: ${actionCount}`;
+  }
+
   if (playerRole === "spectator") {
-    return null;
+    const mazeMarkers = [
+      duel.liveProgress?.attacker?.mazePosition
+        ? { ...duel.liveProgress.attacker.mazePosition, color: "#22d3ee", label: "A" }
+        : null,
+      duel.liveProgress?.defender?.mazePosition
+        ? { ...duel.liveProgress.defender.mazePosition, color: "#fbbf24", label: "D" }
+        : null,
+    ].filter(Boolean) as Array<{ row: number; col: number; color: string; label: string }>;
+
+    const spectatorCards = [
+      {
+        key: "attacker",
+        label: duel.attackerName,
+        enteredAt: duel.attackerEnteredAt,
+        score: duel.attackerScore,
+        actionCount: duel.liveProgress?.attacker?.actionCount ?? 0,
+        latestValue: duel.liveProgress?.attacker?.latestValue ?? null,
+        accent: "border-cyan-400/30 bg-cyan-400/10",
+      },
+      {
+        key: "defender",
+        label: duel.defenderName,
+        enteredAt: duel.defenderEnteredAt,
+        score: duel.defenderScore,
+        actionCount: duel.liveProgress?.defender?.actionCount ?? 0,
+        latestValue: duel.liveProgress?.defender?.latestValue ?? null,
+        accent: "border-amber-400/30 bg-amber-400/10",
+      },
+    ];
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-slate-950 p-8 shadow-2xl">
+          <div className="mb-6 flex items-start justify-between gap-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white">{duel.game.name}</h2>
+              <p className="mt-1 text-sm text-slate-400">{duel.game.blurb}</p>
+            </div>
+            <div className="text-right text-sm text-slate-400">
+              <p>Modo espectador</p>
+              <p className="mt-1 text-slate-500">{duel.attackerName} vs {duel.defenderName}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {spectatorCards.map((card) => (
+              <div key={card.key} className={`rounded-2xl border p-4 ${card.accent}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-white">{card.label}</p>
+                  {card.score !== null ? (
+                    <span className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white">
+                      Score {card.score}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-3 text-sm text-slate-200">
+                  {card.score !== null
+                    ? "Intento enviado"
+                    : card.enteredAt
+                      ? "Jugando ahora"
+                      : "Aún no entra al minijuego"}
+                </p>
+                {spectatorTotalActions ? (
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full bg-white/70 transition-all"
+                      style={{ width: `${Math.min(100, Math.round((card.actionCount / spectatorTotalActions) * 100))}%` }}
+                    />
+                  </div>
+                ) : null}
+                <p className="mt-2 text-xs text-slate-300">{getSpectatorDetail(card.actionCount, card.latestValue)}</p>
+              </div>
+            ))}
+          </div>
+
+          {duel.scenario.kind === "maze" ? (
+            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+              <p className="mb-4 text-sm text-slate-300">Ambos jugadores ven el mismo laberinto. A = atacante, D = defensor.</p>
+              <MazeRunnerGame
+                scenario={duel.scenario as import("@/components/arcade-games/maze-runner").MazeScenario}
+                onAction={() => {}}
+                onComplete={() => {}}
+                disabled
+                readOnly
+                spectatorMarkers={mazeMarkers}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -464,6 +644,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
                     ...actionsRef.current,
                     { at: Math.max(0, Math.round(performance.now() - startedAt)), value },
                   ];
+                  pushProgress(actionsRef.current.length, value);
                 }}
                 onComplete={() => void submitAttemptRef.current?.()}
                 disabled={phase !== "active"}
@@ -479,6 +660,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
                     ...actionsRef.current,
                     { at: Math.max(0, Math.round(performance.now() - startedAt)), value },
                   ];
+                  pushProgress(actionsRef.current.length, value);
                 }}
                 onComplete={() => void submitAttemptRef.current?.()}
                 disabled={phase !== "active"}
@@ -495,6 +677,7 @@ export function ArcadeDuelModal({ duel, currentUserId, onStateRefresh }: ArcadeD
                     ...actionsRef.current,
                     { at: Math.max(0, Math.round(performance.now() - startedAt)), value },
                   ];
+                  pushProgress(actionsRef.current.length, value);
                 }}
                 onComplete={() => void submitAttemptRef.current?.()}
                 disabled={phase !== "active"}

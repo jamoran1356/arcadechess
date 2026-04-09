@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, TransactionNetwork, TransactionStatus, UserRole } from "@prisma/client";
-import { buildArcadeScenario, getArcadeDefinition, getSoloArcadeTimeLimitMs, arcadeLibrary } from "@/lib/arcade";
+import { arcadeLibrary, buildArcadeScenario, getArcadeDefinition, getArcadeScenarioSeed, getSoloArcadeTimeLimitMs } from "@/lib/arcade";
+import { getArcadeLiveState } from "@/lib/arcade-live";
 import { prisma } from "@/lib/db";
 import { getEnabledNetworks } from "@/lib/networks";
 import { getSupportedNetworks } from "@/lib/onchain/service";
@@ -82,6 +83,15 @@ function decimalToString(value: Prisma.Decimal) {
 
 function asStringArray(value: Prisma.JsonValue | null | undefined) {
   return Array.isArray(value) ? value.map(String) : [];
+}
+
+function parseMazePosition(value: string | null | undefined) {
+  if (!value) return null;
+  const [row, col] = value.split(",").map(Number);
+  if (!Number.isInteger(row) || !Number.isInteger(col)) {
+    return null;
+  }
+  return { row, col };
 }
 
 export async function getLandingSnapshot() {
@@ -553,6 +563,7 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
             : getArcadeDefinition(pendingDuel.gameType).timeLimitMs,
       }
     : null;
+  const liveProgress = pendingDuel ? getArcadeLiveState(pendingDuel.id) : null;
   const totalBetPool = match.bets.reduce((sum, bet) => sum + Number(bet.amount.toString()), 0);
   const hostBetPool = match.bets
     .filter((bet) => bet.predictedWinnerId === match.hostId)
@@ -636,13 +647,31 @@ export async function getMatchSnapshot(matchId: string, viewerId?: string) {
           seed: pendingDuel.seed,
           scenario: buildArcadeScenario(
             pendingDuel.gameType,
-            viewerId === pendingDuel.attackerId
-              ? `${pendingDuel.seed}:attacker`
-              : `${pendingDuel.seed}:defender`,
+            getArcadeScenarioSeed({
+              gameType: pendingDuel.gameType,
+              duelSeed: pendingDuel.seed,
+              viewerId,
+              attackerId: pendingDuel.attackerId,
+              defenderId: pendingDuel.defenderId,
+            }),
           ),
           attackerScore: pendingDuel.attackerScore,
           defenderScore: pendingDuel.defenderScore,
           winnerId: pendingDuel.winnerId,
+          liveProgress: {
+            attacker: {
+              actionCount: liveProgress?.attacker?.actionCount ?? 0,
+              latestValue: liveProgress?.attacker?.latestValue ?? null,
+              updatedAt: liveProgress?.attacker?.updatedAt ?? null,
+              mazePosition: parseMazePosition(liveProgress?.attacker?.latestValue),
+            },
+            defender: {
+              actionCount: liveProgress?.defender?.actionCount ?? 0,
+              latestValue: liveProgress?.defender?.latestValue ?? null,
+              updatedAt: liveProgress?.defender?.updatedAt ?? null,
+              mazePosition: parseMazePosition(liveProgress?.defender?.latestValue),
+            },
+          },
           boardMove: pendingDuel.boardMove as { from: string; to: string; san: string },
         }
       : null,

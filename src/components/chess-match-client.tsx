@@ -37,6 +37,8 @@ type MatchClientProps = {
       id: string;
       attackerId: string;
       defenderId: string;
+      gameType: string;
+      seed?: string;
       attackerEnteredAt: string | null;
       defenderEnteredAt: string | null;
       attackerName: string;
@@ -50,6 +52,20 @@ type MatchClientProps = {
         antiCheat: string;
       };
       scenario: import("@/lib/arcade").ArcadeScenario;
+      liveProgress?: {
+        attacker: {
+          actionCount: number;
+          latestValue: string | null;
+          updatedAt: number | null;
+          mazePosition: { row: number; col: number } | null;
+        };
+        defender: {
+          actionCount: number;
+          latestValue: string | null;
+          updatedAt: number | null;
+          mazePosition: { row: number; col: number } | null;
+        };
+      };
     } | null;
   };
   currentUserId?: string;
@@ -300,7 +316,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
       return;
     }
 
-    const intervalMs = status === "ARCADE_PENDING" ? 4000 : 1500;
+    const intervalMs = status === "ARCADE_PENDING" ? 1000 : 1500;
     const intervalId = window.setInterval(() => {
       void syncMatchState().catch(() => {
         // best-effort sync for versus matches
@@ -632,7 +648,7 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
         <MatchChat matchId={match.id} currentUserId={currentUserId} />
       </aside>
 
-      {pendingDuel && currentUserId ? (
+      {pendingDuel ? (
         <ArcadeDuelModal duel={pendingDuel} currentUserId={currentUserId} onStateRefresh={syncMatchState} />
       ) : null}
 
