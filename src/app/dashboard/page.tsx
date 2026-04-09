@@ -88,7 +88,7 @@ export default async function DashboardPage() {
     <div className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="grid gap-6 lg:grid-cols-[290px_minmax(0,1fr)] xl:gap-8">
         <aside className="lg:sticky lg:top-6 lg:self-start">
-          <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(103,232,249,0.16),transparent_34%),linear-gradient(180deg,rgba(30,20,12,0.98),rgba(22,14,8,0.96))] p-6 shadow-[0_24px_90px_rgba(0,0,0,0.35)]">
+          <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(103,232,249,0.16),transparent_34%),linear-gradient(180deg,rgba(7,16,28,0.98),rgba(5,11,19,0.96))] p-6 shadow-[0_24px_90px_rgba(0,0,0,0.35)]">
             <p className="eyebrow">Control Deck</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">{user.name}</h1>
             <p className="mt-2 text-sm text-slate-300">{user.email}</p>
@@ -124,7 +124,7 @@ export default async function DashboardPage() {
         </aside>
 
         <main className="grid gap-6 xl:gap-8">
-          <section id="overview" className="relative overflow-hidden rounded-[2.4rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.14),transparent_34%),rgba(26,18,11,0.92)] p-6 lg:p-8">
+          <section id="overview" className="relative overflow-hidden rounded-[2.4rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.14),transparent_34%),rgba(2,6,23,0.92)] p-6 lg:p-8">
             <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:28px_28px]" />
             <div className="relative grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
               <div>
@@ -185,7 +185,7 @@ export default async function DashboardPage() {
                 user.wallets.filter((w) => enabledNetworks.includes(w.network)).map((wallet) => {
                   const addrUrl = getExplorerAddressUrl(wallet.network, wallet.address);
                   return (
-                    <article key={wallet.id} className={`rounded-[1.75rem] border p-5 shadow-[0_20px_60px_rgba(26,18,11,0.25)] ${getWalletAccent(wallet.network)}`}>
+                    <article key={wallet.id} className={`rounded-[1.75rem] border p-5 shadow-[0_20px_60px_rgba(2,6,23,0.25)] ${getWalletAccent(wallet.network)}`}>
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-mono text-xs uppercase tracking-[0.18em] opacity-80">{wallet.network}</p>
                         <span className="rounded-full border border-current/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] opacity-80">Live</span>

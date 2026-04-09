@@ -40,7 +40,7 @@ export default async function RootLayout({
       lang={locale}
       className={`${display.variable} ${mono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[#1a120b] text-stone-100">
+      <body className="min-h-full bg-[#030711] text-stone-100">
         <InterwovenKitProviders>
           <LocaleProvider locale={locale} dict={dict}>
             <div className="relative min-h-screen overflow-hidden">

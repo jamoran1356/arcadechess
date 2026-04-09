@@ -87,7 +87,7 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
   return (
     <header className="sticky top-0 z-40">
       {/* ── Primary bar: logo + nav links + auth ── */}
-      <div className="border-b border-white/[0.06] bg-[rgba(26,18,11,0.85)] backdrop-blur-xl">
+      <div className="border-b border-white/[0.06] bg-[rgba(3,7,17,0.85)] backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           {/* Logo */}
           <Link href="/" className="group flex items-center gap-3">
@@ -139,7 +139,7 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                 <svg className={`h-3.5 w-3.5 transition-transform ${helpOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
               </button>
               {helpOpen && (
-                <div className="absolute left-0 top-full mt-1 w-48 rounded-xl border border-white/[0.08] bg-[rgba(26,18,11,0.97)] backdrop-blur-xl py-1.5 shadow-2xl">
+                <div className="absolute left-0 top-full mt-1 w-48 rounded-xl border border-white/[0.08] bg-[rgba(3,7,17,0.97)] backdrop-blur-xl py-1.5 shadow-2xl">
                   {helpLinks.map((link) => (
                     <Link
                       key={link.href}
@@ -176,7 +176,7 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                   <svg className={`h-3.5 w-3.5 text-slate-400 transition-transform ${userOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
                 </button>
                 {userOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-52 rounded-xl border border-white/[0.08] bg-[rgba(26,18,11,0.97)] backdrop-blur-xl py-1.5 shadow-2xl">
+                  <div className="absolute right-0 top-full mt-1 w-52 rounded-xl border border-white/[0.08] bg-[rgba(3,7,17,0.97)] backdrop-blur-xl py-1.5 shadow-2xl">
                     <button
                       type="button"
                       onClick={() => { isConnected ? openWallet() : openConnect(); }}
@@ -251,7 +251,7 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
         />
 
         <div
-          className={`absolute right-0 top-0 h-full w-72 border-l border-white/[0.06] bg-[rgba(26,18,11,0.98)] p-6 pt-20 shadow-[−24px_0_80px_rgba(0,0,0,0.6)] transition-transform duration-300 ${
+          className={`absolute right-0 top-0 h-full w-72 border-l border-white/[0.06] bg-[rgba(3,7,17,0.98)] p-6 pt-20 shadow-[−24px_0_80px_rgba(0,0,0,0.6)] transition-transform duration-300 ${
             mobileOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >

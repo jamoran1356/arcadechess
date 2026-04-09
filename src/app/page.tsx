@@ -48,7 +48,7 @@ export default async function Home() {
               "url('https://upload.wikimedia.org/wikipedia/commons/3/34/Chess_game_in_Heraklion%2C_Crete.jpg')",
           }}
         />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(26,18,11,0.55)_0%,rgba(26,18,11,0.85)_60%,rgba(26,18,11,0.95)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,7,17,0.55)_0%,rgba(3,7,17,0.85)_60%,rgba(3,7,17,0.95)_100%)]" />
 
         <div className="relative z-10 mx-auto flex min-h-[74vh] max-w-5xl flex-col items-center justify-center px-6 py-20 text-center">
           <p className="eyebrow animate-fade-in">{t.heroEyebrow}</p>
