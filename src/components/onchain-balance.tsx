@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useInterwovenKit } from "@initia/interwovenkit-react";
+import { useWallet as useSolanaWallet } from "@solana/wallet-adapter-react";
+import { useFlowWallet } from "@/hooks/use-flow-wallet";
 
 type Props = {
   address: string;
@@ -11,25 +13,37 @@ type Props = {
 };
 
 export function OnchainBalance({ address, network, walletId }: Props) {
-  const { initiaAddress, isConnected } = useInterwovenKit();
+  const { initiaAddress, isConnected: initiaConnected } = useInterwovenKit();
+  const { publicKey: solanaPublicKey, connected: solanaConnected } = useSolanaWallet();
+  const { address: flowAddress, connected: flowConnected } = useFlowWallet();
   const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [linked, setLinked] = useState(false);
 
-  // The real address to query: use InterwovenKit address for INITIA, else the stored address
-  const realAddress =
-    network === "INITIA" && isConnected && initiaAddress ? initiaAddress : address;
+  // Resolve the correct wallet address per network
+  const connectedAddress =
+    network === "INITIA" && initiaConnected && initiaAddress ? initiaAddress :
+    network === "SOLANA" && solanaConnected && solanaPublicKey ? solanaPublicKey.toBase58() :
+    network === "FLOW" && flowConnected && flowAddress ? flowAddress :
+    null;
+
+  const isWalletConnectedForNetwork =
+    (network === "INITIA" && initiaConnected) ||
+    (network === "SOLANA" && solanaConnected) ||
+    (network === "FLOW" && flowConnected);
+
+  const realAddress = connectedAddress || address;
 
   const isPlaceholder =
     realAddress.startsWith("initia_") ||
     realAddress.startsWith("flow_") ||
     realAddress.startsWith("solana_");
 
-  // Auto-link InterwovenKit address to platform wallet
+  // Auto-link wallet address to platform wallet
   useEffect(() => {
-    if (network !== "INITIA" || !isConnected || !initiaAddress || linked) return;
-    if (address === initiaAddress) {
+    if (!isWalletConnectedForNetwork || !connectedAddress || linked) return;
+    if (address === connectedAddress) {
       setLinked(true);
       return;
     }
@@ -37,11 +51,11 @@ export function OnchainBalance({ address, network, walletId }: Props) {
     fetch("/api/wallet/link", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address: initiaAddress, network: "INITIA" }),
+      body: JSON.stringify({ address: connectedAddress, network }),
     })
       .then((res) => { if (res.ok) { setLinked(true); router.refresh(); } })
       .catch(() => {});
-  }, [network, isConnected, initiaAddress, address, linked]);
+  }, [network, isWalletConnectedForNetwork, connectedAddress, address, linked, router]);
 
   // Fetch on-chain balance
   useEffect(() => {
@@ -64,7 +78,7 @@ export function OnchainBalance({ address, network, walletId }: Props) {
       .finally(() => setLoading(false));
   }, [realAddress, network, isPlaceholder]);
 
-  if (isPlaceholder && network === "INITIA" && !isConnected) {
+  if (isPlaceholder && !isWalletConnectedForNetwork) {
     return <p className="mt-1 text-xs opacity-50">Conecta tu wallet para ver el saldo on-chain</p>;
   }
 

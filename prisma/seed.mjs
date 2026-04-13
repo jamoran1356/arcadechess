@@ -91,6 +91,14 @@ async function main() {
   });
 
   console.log("✅ Database seed completed: demo users removed, gameplay tables reset, arcade games loaded");
+
+  // Enable all 3 networks in platform config
+  await prisma.platformConfig.upsert({
+    where: { key: "default" },
+    update: { enabledNetworks: ["INITIA", "SOLANA", "FLOW"] },
+    create: { key: "default", enabledNetworks: ["INITIA", "SOLANA", "FLOW"] },
+  });
+  console.log("✅ Enabled networks: INITIA, SOLANA, FLOW");
 }
 
 main()

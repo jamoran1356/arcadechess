@@ -5,7 +5,9 @@ import { ArcadeGameType } from "@prisma/client";
 import { createMatchAction } from "@/lib/actions";
 import { DialogModal } from "@/components/dialog-modal";
 import { useEscrowTx } from "@/hooks/use-escrow-tx";
-import { getInitiaExplorerTxUrl } from "@/lib/explorer";
+import { useSolanaEscrowTx } from "@/hooks/use-solana-wallet";
+import { useFlowEscrowTx } from "@/hooks/use-flow-wallet";
+import { getExplorerTxUrlClient } from "@/lib/explorer";
 
 type WalletInfo = { id: string; network: string; balance: string };
 
@@ -14,6 +16,12 @@ type FeeConfig = { matchFeeBps: number };
 function computeFee(stake: number, cfg: FeeConfig) {
   return (stake * cfg.matchFeeBps) / 10_000;
 }
+
+const NETWORK_TOKEN: Record<string, string> = {
+  INITIA: "INIT",
+  SOLANA: "SOL",
+  FLOW: "FLOW",
+};
 
 type Props = {
   wallets: WalletInfo[];
@@ -40,10 +48,26 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [escrowTxHash, setEscrowTxHash] = useState<string | null>(null);
+  const [escrowTxNetwork, setEscrowTxNetwork] = useState<string>("INITIA");
   const defaultNetwork = enabledNetworks[0] ?? "INITIA";
-  const [preview, setPreview] = useState({ stake: "0", fee: "0", total: "0", token: "INIT", network: defaultNetwork, walletBalance: "0" });
+  const [selectedNetwork, setSelectedNetwork] = useState(defaultNetwork);
+  const defaultToken = NETWORK_TOKEN[defaultNetwork] ?? "INIT";
+  const [preview, setPreview] = useState({ stake: "0", fee: "0", total: "0", token: defaultToken, network: defaultNetwork, walletBalance: "0" });
   const filteredWallets = wallets.filter((w) => enabledNetworks.includes(w.network));
-  const { sendToEscrow, isWalletConnected, walletAddress } = useEscrowTx();
+
+  // Multi-network hooks
+  const { sendToEscrow: sendToInitiaEscrow, isWalletConnected: initiaConnected, walletAddress: initiaAddress } = useEscrowTx();
+  const { sendToEscrow: sendToSolanaEscrow, isWalletConnected: solanaConnected, walletAddress: solanaAddress } = useSolanaEscrowTx();
+  const { sendToEscrow: sendToFlowEscrow, isWalletConnected: flowConnected, walletAddress: flowAddress } = useFlowEscrowTx();
+
+  function getWalletForNetwork(network: string) {
+    switch (network) {
+      case "INITIA": return { connected: initiaConnected, address: initiaAddress, send: sendToInitiaEscrow };
+      case "SOLANA": return { connected: solanaConnected, address: solanaAddress, send: sendToSolanaEscrow };
+      case "FLOW":   return { connected: flowConnected, address: flowAddress, send: sendToFlowEscrow };
+      default: return { connected: false, address: null, send: null };
+    }
+  }
 
   function handleSubmitClick(e: React.FormEvent) {
     e.preventDefault();
@@ -53,8 +77,8 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
 
     const fd = new FormData(form);
     const stake = Number(fd.get("stakeAmount") ?? 0);
-    const token = String(fd.get("stakeToken") ?? "INIT");
-    const network = String(fd.get("network") ?? "INITIA");
+    const network = String(fd.get("network") ?? defaultNetwork);
+    const token = NETWORK_TOKEN[network] ?? "INIT";
     const solo = fd.get("isSolo") === "true";
 
     if (stake < 0 || (!solo && stake <= 0)) {
@@ -85,15 +109,20 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
     startTransition(async () => {
       try {
         const fd = new FormData(form);
-        if (walletAddress) fd.set("walletAddress", walletAddress);
         const network = String(fd.get("network") ?? defaultNetwork);
+        const networkWallet = getWalletForNetwork(network);
 
-        // Sign real on-chain tx for INITIA network (skip when total is 0, e.g. free solo)
+        // Set the token based on network
+        fd.set("stakeToken", NETWORK_TOKEN[network] ?? "INIT");
+
+        if (networkWallet.address) fd.set("walletAddress", networkWallet.address);
+
+        // Sign real on-chain tx if wallet connected for this network
         const total = Number(preview.total);
-        if (network === "INITIA" && isWalletConnected && total > 0) {
-          const txHash = await sendToEscrow(total, `playchess:create`);
+        if (networkWallet.connected && networkWallet.send && total > 0) {
+          const txHash = await networkWallet.send(total, `playchess:create`);
           setEscrowTxHash(txHash);
-          // Show explorer link, wait for user to continue
+          setEscrowTxNetwork(network);
           return;
         }
 
@@ -114,7 +143,10 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
       try {
         const fd = new FormData(form);
         fd.set("escrowTxHash", escrowTxHash!);
-        if (walletAddress) fd.set("walletAddress", walletAddress);
+        const network = String(fd.get("network") ?? defaultNetwork);
+        fd.set("stakeToken", NETWORK_TOKEN[network] ?? "INIT");
+        const networkWallet = getWalletForNetwork(network);
+        if (networkWallet.address) fd.set("walletAddress", networkWallet.address);
         const result = await createMatchAction(fd);
         if (result?.error) throw new Error(result.error);
       } catch (err: unknown) {
@@ -140,11 +172,14 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <input name="stakeAmount" type="number" min="0" step="0.01" className="input" placeholder={t.stakeLabel} required />
-          <input name="stakeToken" className="input" defaultValue="INIT" />
+          <input name="stakeToken" type="hidden" value={NETWORK_TOKEN[selectedNetwork] ?? "INIT"} />
+          <div className="input flex items-center bg-white/5 text-sm text-slate-300">
+            {NETWORK_TOKEN[selectedNetwork] ?? "INIT"}
+          </div>
           {enabledNetworks.length === 1 ? (
             <input type="hidden" name="network" value={defaultNetwork} />
           ) : (
-            <select name="network" className="input" defaultValue={defaultNetwork}>
+            <select name="network" className="input" defaultValue={defaultNetwork} onChange={(e) => setSelectedNetwork(e.target.value)}>
               {enabledNetworks.map((network) => (
                 <option key={network} value={network}>{network}</option>
               ))}
@@ -216,7 +251,7 @@ export function CreateMatchForm({ wallets, enabledNetworks, arcadeLibrary, feeCo
               <span>Depósito de <strong>{preview.total} {preview.token}</strong> confirmado</span>
             </div>
             {(() => {
-              const url = getInitiaExplorerTxUrl(escrowTxHash);
+              const url = getExplorerTxUrlClient(escrowTxNetwork, escrowTxHash);
               return url ? (
                 <a
                   href={url}

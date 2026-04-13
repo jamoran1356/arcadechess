@@ -186,14 +186,26 @@ export async function logoutAction() {
 
 /* ── Wallet-based authentication ── */
 
-export async function walletAuthAction(address: string): Promise<{ needsProfile: boolean } | { error: string }> {
-  if (!address || !address.startsWith("init1") || address.length < 30) {
+export async function walletAuthAction(address: string, network?: string): Promise<{ needsProfile: boolean } | { error: string }> {
+  if (!address || address.length < 10) {
     return { error: "Dirección de wallet inválida." };
   }
 
+  // Detect network from address format if not provided
+  const resolvedNetwork: TransactionNetwork = (() => {
+    if (network === "SOLANA") return TransactionNetwork.SOLANA;
+    if (network === "FLOW") return TransactionNetwork.FLOW;
+    if (network === "INITIA") return TransactionNetwork.INITIA;
+    // Auto-detect from address format
+    if (address.startsWith("init1")) return TransactionNetwork.INITIA;
+    if (address.startsWith("0x")) return TransactionNetwork.FLOW;
+    // Solana addresses are base58 (no prefix), typically 32-44 chars
+    return TransactionNetwork.SOLANA;
+  })();
+
   // Check if wallet already linked to a user
   const existingWallet = await prisma.wallet.findFirst({
-    where: { address, network: TransactionNetwork.INITIA },
+    where: { address, network: resolvedNetwork },
     include: { user: { select: { id: true, name: true, email: true, role: true } } },
   });
 
@@ -205,7 +217,7 @@ export async function walletAuthAction(address: string): Promise<{ needsProfile:
   }
 
   // Create new user with placeholder email
-  const placeholderEmail = `${address}@wallet.playchess`;
+  const placeholderEmail = `${address.slice(0, 24)}@wallet.playchess`;
   const truncName = `${address.slice(0, 8)}…${address.slice(-4)}`;
 
   const user = await prisma.user.create({
@@ -214,7 +226,7 @@ export async function walletAuthAction(address: string): Promise<{ needsProfile:
       email: placeholderEmail,
       passwordHash: await hashPassword(randomUUID()),
       wallets: {
-        create: [{ network: TransactionNetwork.INITIA, address, balance: "0" }],
+        create: [{ network: resolvedNetwork, address, balance: "0" }],
       },
     },
   });
@@ -303,13 +315,18 @@ export async function createMatchAction(formData: FormData): Promise<{ error: st
   let onchainMatchIndex: number | undefined;
 
   if (!isSolo) {
-    // Validate balance on-chain (not from DB)
+    // Validate balance on-chain (not from DB) — skip for placeholder addresses
     const adapter = getOnchainAdapter(parsed.data.network);
-    if (effectiveHostAddress.startsWith("init1")) {
+    const isRealAddress = !effectiveHostAddress.startsWith("initia_") &&
+      !effectiveHostAddress.startsWith("solana_") &&
+      !effectiveHostAddress.startsWith("flow_");
+
+    if (isRealAddress) {
+      const token = parsed.data.stakeToken.toUpperCase();
       const onchainBal = await adapter.queryBalance(effectiveHostAddress);
       if (!onchainBal || onchainBal.amount < Number(hostTotalLock)) {
         return {
-          error: `Fondos insuficientes on-chain. Necesitas ${hostTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+          error: `Fondos insuficientes on-chain. Necesitas ${hostTotalLock} ${token} pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
         };
       }
     }
@@ -417,13 +434,18 @@ export async function joinMatchAction(formData: FormData): Promise<{ error: stri
     await prisma.wallet.update({ where: { id: guestWallet.id }, data: { address: clientWalletAddress } });
   }
 
-  // Validate balance on-chain
+  // Validate balance on-chain — skip for placeholder addresses
   const adapter = getOnchainAdapter(match.preferredNetwork);
-  if (effectiveGuestAddress.startsWith("init1")) {
+  const isRealGuestAddress = !effectiveGuestAddress.startsWith("initia_") &&
+    !effectiveGuestAddress.startsWith("solana_") &&
+    !effectiveGuestAddress.startsWith("flow_");
+
+  if (isRealGuestAddress) {
+    const token = match.stakeToken.toUpperCase();
     const onchainBal = await adapter.queryBalance(effectiveGuestAddress);
     if (!onchainBal || onchainBal.amount < Number(guestTotalLock)) {
       return {
-        error: `Fondos insuficientes on-chain. Necesitas ${guestTotalLock} INIT pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
+        error: `Fondos insuficientes on-chain. Necesitas ${guestTotalLock} ${token} pero tu saldo es ${onchainBal?.amount.toFixed(6) ?? "0.000000"}. Deposita fondos en tu wallet.`,
       };
     }
   }

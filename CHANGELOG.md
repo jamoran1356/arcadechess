@@ -5,6 +5,92 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Beta] — 2026-04-10
+
+### Added
+
+- **Multi-network wallet integration** — Full client-side wallet connection for Solana and Flow, replicating all Initia functionality:
+  - Solana: `@solana/wallet-adapter-react` with Phantom and Solflare adapters
+  - Flow: `@onflow/fcl` lazy-loaded with testnet discovery wallet (Blocto/Lilico)
+  - New hooks: `use-solana-wallet.ts` (escrow via SystemProgram.transfer + memo), `use-flow-wallet.ts` (FCL authenticate + FLOW token transfer)
+  - `interwovenkit-providers.tsx` wraps app with SolanaProviders (ConnectionProvider + WalletProvider + WalletModalProvider)
+
+- **Multi-network match creation & joining** — `create-match-form.tsx` and `join-match-form.tsx` now support escrow signing on all 3 networks with `NETWORK_TOKEN` mapping (INITIA→INIT, SOLANA→SOL, FLOW→FLOW) and dynamic token display.
+
+- **Multi-network wallet login** — `auth-form.tsx` shows 3 wallet login options (Initia cyan, Solana amber, Flow emerald). `walletAuthAction` auto-detects network from address format.
+
+- **Multi-network balance display** — `onchain-balance.tsx` detects connected wallet per network and auto-links real addresses to platform wallets.
+
+- **Multi-network navbar** — 3 separate wallet connection buttons in desktop dropdown and mobile drawer with network-specific colors and truncated addresses. Logout disconnects all wallets.
+
+- **Client-safe explorer URLs** — `getExplorerTxUrlClient()` in `explorer.ts` for Initia, Solana (devnet), and Flow (testnet).
+
+- **FCL type declarations** — `src/types/onflow-fcl.d.ts` with types for `@onflow/fcl` and `@onflow/types`.
+
+- **Network enablement in seed** — `prisma/seed.mjs` now upserts platformConfig with `enabledNetworks: ["INITIA", "SOLANA", "FLOW"]`.
+
+### Changed
+
+- `actions.ts` balance validation extended from Initia-only to all 3 networks.
+- `walletAuthAction` extended to auto-detect Solana and Flow addresses.
+- `.env` now includes `NEXT_PUBLIC_SOLANA_ADMIN_ADDRESS`.
+
+### Fixed
+
+- **TypeScript compilation clean** — Resolved all pre-existing TS7016 errors for `@onflow/fcl` by adding ambient type declarations. `npx tsc --noEmit` now exits with 0 errors.
+
+---
+
+## [Beta] — 2026-04-10
+
+### Added
+
+- **Solana real on-chain escrow** — Rewrote the Anchor contract (`contracts/solana-anchor/programs/arcade_escrow/src/lib.rs`) to custody real SOL in a PDA vault, matching the Initia escrow architecture:
+  - `initialize_vault`: one-time setup for admin-controlled vault PDA
+  - `create_match` + `deposit_funds`: create match and deposit SOL from admin treasury
+  - `settle_to_winner`: transfer prize SOL from vault to winner
+  - `settle_draw`: refund both players from vault
+  - `refund_match`: cancel and return all deposits
+  - `place_bet` / `settle_bet`: bet SOL custody through vault
+  - All entry functions admin-gated (same custody model as Initia)
+  - Sequential `match_index` tracking via vault `match_count`
+
+- **Solana adapter rewrite** — Replaced mock adapter (`src/lib/onchain/solana.ts`) with real Solana devnet integration:
+  - Uses `@solana/web3.js` + raw Anchor instruction encoding
+  - Admin keypair from `SOLANA_PAYER_KEYPAIR` env var
+  - PDA derivation for vault, match, and bet accounts
+  - Real `queryBalance()` via `connection.getBalance()`
+  - Graceful fallback to mock mode when not configured
+  - Explorer links with `?cluster=devnet` suffix
+
+- **Solana dependencies** — Added `@solana/web3.js@1`, `@coral-xyz/anchor`, `bs58` to project dependencies.
+
+- **Flow real on-chain escrow** — Rewrote the Cadence contract (`contracts/flow/ArcadeEscrow.cdc`) with real FLOW token custody:
+  - Contract now imports `FlowToken` and `FungibleToken` for real token transfers
+  - `Admin` resource pattern: only deployer account can create/settle/refund matches
+  - `depositFunds`: receives `@{FungibleToken.Vault}` payment, custodies in contract vault
+  - `settleToWinner`: withdraws from vault and sends FLOW to winner's receiver capability
+  - `settleDraw` / `refundMatch`: returns deposited FLOW to both players
+  - Sequential `matchCount` tracking (same model as Initia/Solana)
+  - Cadence 1.0 syntax with entitlement-based access control
+
+- **Flow adapter rewrite** — Replaced mock adapter (`src/lib/onchain/flow.ts`) with real Flow testnet integration:
+  - Uses `@onflow/fcl` for query/mutate with server-side authorization
+  - ECDSA P-256 + SHA3-256 signing via `elliptic` + `sha3`
+  - Cadence transaction templates for all escrow operations
+  - Real `queryBalance()` via Flow REST API
+  - Graceful fallback to mock mode when not configured
+  - Explorer links to testnet.flowscan.io
+
+- **Flow dependencies** — Added `@onflow/fcl`, `@onflow/types`, `elliptic`, `sha3`, `@types/elliptic` to project dependencies.
+
+### Changed
+
+- Updated `.env.example` with Solana devnet configuration variables (`SOLANA_PAYER_KEYPAIR`).
+- Explorer URL filter now excludes `sol_mock_` hashes from generating links.
+
+---
+
 ## [Beta] — 2026-03-31
 
 ### Added

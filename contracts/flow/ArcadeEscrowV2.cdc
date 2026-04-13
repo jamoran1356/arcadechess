@@ -1,7 +1,7 @@
 import "FlowToken"
 import "FungibleToken"
 
-access(all) contract ArcadeEscrow {
+access(all) contract ArcadeEscrowV2 {
 
     // ─── Events ──────────────────────────────────────────────────────────────
     access(all) event MatchCreated(matchIndex: UInt64, host: Address, stakePerPlayer: UFix64, entryFee: UFix64)
@@ -41,7 +41,7 @@ access(all) contract ArcadeEscrow {
             self.entryFee = entryFee
             self.hostDeposited = 0.0
             self.guestDeposited = 0.0
-            self.status = ArcadeEscrow.STATUS_OPEN
+            self.status = ArcadeEscrowV2.STATUS_OPEN
             self.settledAt = 0.0
             self.winner = nil
         }
@@ -57,23 +57,23 @@ access(all) contract ArcadeEscrow {
                 self.guestDeposited = self.guestDeposited + amount
             }
             if self.hostDeposited > 0.0 && self.guestDeposited > 0.0 {
-                self.status = ArcadeEscrow.STATUS_FUNDED
+                self.status = ArcadeEscrowV2.STATUS_FUNDED
             }
         }
 
         access(contract) fun settle(winner: Address) {
-            self.status = ArcadeEscrow.STATUS_SETTLED
+            self.status = ArcadeEscrowV2.STATUS_SETTLED
             self.winner = winner
             self.settledAt = getCurrentBlock().timestamp
         }
 
         access(contract) fun settleAsDraw() {
-            self.status = ArcadeEscrow.STATUS_DRAW
+            self.status = ArcadeEscrowV2.STATUS_DRAW
             self.settledAt = getCurrentBlock().timestamp
         }
 
         access(contract) fun cancel() {
-            self.status = ArcadeEscrow.STATUS_CANCELLED
+            self.status = ArcadeEscrowV2.STATUS_CANCELLED
         }
     }
 
@@ -88,8 +88,8 @@ access(all) contract ArcadeEscrow {
     // Admin resource stored in deployer account
     access(all) resource Admin {
         access(all) fun createMatch(host: Address, stakePerPlayer: UFix64, entryFee: UFix64): UInt64 {
-            let matchIndex = ArcadeEscrow.matchCount
-            ArcadeEscrow.matchCount = ArcadeEscrow.matchCount + 1
+            let matchIndex = ArcadeEscrowV2.matchCount
+            ArcadeEscrowV2.matchCount = ArcadeEscrowV2.matchCount + 1
 
             let escrow = MatchEscrow(
                 matchIndex: matchIndex,
@@ -97,7 +97,7 @@ access(all) contract ArcadeEscrow {
                 stakePerPlayer: stakePerPlayer,
                 entryFee: entryFee
             )
-            ArcadeEscrow.matches[matchIndex] = escrow
+            ArcadeEscrowV2.matches[matchIndex] = escrow
 
             emit MatchCreated(matchIndex: matchIndex, host: host, stakePerPlayer: stakePerPlayer, entryFee: entryFee)
             return matchIndex
@@ -105,50 +105,50 @@ access(all) contract ArcadeEscrow {
 
         access(all) fun depositFunds(matchIndex: UInt64, player: Address, payment: @{FungibleToken.Vault}) {
             pre {
-                ArcadeEscrow.matches.containsKey(matchIndex): "Match not found"
+                ArcadeEscrowV2.matches.containsKey(matchIndex): "Match not found"
             }
             let amount = payment.balance
-            ArcadeEscrow.vault.deposit(from: <-payment)
+            ArcadeEscrowV2.vault.deposit(from: <-payment)
 
-            var escrow = ArcadeEscrow.matches.remove(key: matchIndex)!
+            var escrow = ArcadeEscrowV2.matches.remove(key: matchIndex)!
             escrow.deposit(player: player, amount: amount)
-            ArcadeEscrow.matches[matchIndex] = escrow
+            ArcadeEscrowV2.matches[matchIndex] = escrow
 
             emit FundsDeposited(matchIndex: matchIndex, player: player, amount: amount)
         }
 
         access(all) fun settleToWinner(matchIndex: UInt64, winner: Address, prizeAmount: UFix64) {
             pre {
-                ArcadeEscrow.matches.containsKey(matchIndex): "Match not found"
+                ArcadeEscrowV2.matches.containsKey(matchIndex): "Match not found"
             }
-            var escrow = ArcadeEscrow.matches.remove(key: matchIndex)!
-            assert(escrow.status == ArcadeEscrow.STATUS_FUNDED, message: "Match not funded")
+            var escrow = ArcadeEscrowV2.matches.remove(key: matchIndex)!
+            assert(escrow.status == ArcadeEscrowV2.STATUS_FUNDED, message: "Match not funded")
             assert(winner == escrow.host || winner == escrow.guest, message: "Invalid winner")
             let pool = escrow.hostDeposited + escrow.guestDeposited
             assert(prizeAmount <= pool, message: "Prize exceeds pool")
 
             // Transfer prize from vault to winner
-            let prize <- ArcadeEscrow.vault.withdraw(amount: prizeAmount)
+            let prize <- ArcadeEscrowV2.vault.withdraw(amount: prizeAmount)
             let receiverCap = getAccount(winner).capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
             let receiver = receiverCap.borrow() ?? panic("Winner has no FLOW receiver")
             receiver.deposit(from: <-prize)
 
             escrow.settle(winner: winner)
-            ArcadeEscrow.matches[matchIndex] = escrow
+            ArcadeEscrowV2.matches[matchIndex] = escrow
 
             emit WinnerPaid(matchIndex: matchIndex, winner: winner, prizeAmount: prizeAmount, timestamp: getCurrentBlock().timestamp)
         }
 
         access(all) fun settleDraw(matchIndex: UInt64) {
             pre {
-                ArcadeEscrow.matches.containsKey(matchIndex): "Match not found"
+                ArcadeEscrowV2.matches.containsKey(matchIndex): "Match not found"
             }
-            var escrow = ArcadeEscrow.matches.remove(key: matchIndex)!
-            assert(escrow.status == ArcadeEscrow.STATUS_FUNDED, message: "Match not funded")
+            var escrow = ArcadeEscrowV2.matches.remove(key: matchIndex)!
+            assert(escrow.status == ArcadeEscrowV2.STATUS_FUNDED, message: "Match not funded")
 
             // Refund host
             if escrow.hostDeposited > 0.0 {
-                let hostRefund <- ArcadeEscrow.vault.withdraw(amount: escrow.hostDeposited)
+                let hostRefund <- ArcadeEscrowV2.vault.withdraw(amount: escrow.hostDeposited)
                 let hostCap = getAccount(escrow.host).capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                 let hostReceiver = hostCap.borrow() ?? panic("Host has no FLOW receiver")
                 hostReceiver.deposit(from: <-hostRefund)
@@ -157,7 +157,7 @@ access(all) contract ArcadeEscrow {
 
             // Refund guest
             if escrow.guestDeposited > 0.0 {
-                let guestRefund <- ArcadeEscrow.vault.withdraw(amount: escrow.guestDeposited)
+                let guestRefund <- ArcadeEscrowV2.vault.withdraw(amount: escrow.guestDeposited)
                 let guestAddr = escrow.guest!
                 let guestCap = getAccount(guestAddr).capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                 let guestReceiver = guestCap.borrow() ?? panic("Guest has no FLOW receiver")
@@ -166,22 +166,22 @@ access(all) contract ArcadeEscrow {
             }
 
             escrow.settleAsDraw()
-            ArcadeEscrow.matches[matchIndex] = escrow
+            ArcadeEscrowV2.matches[matchIndex] = escrow
             emit DrawSettled(matchIndex: matchIndex)
         }
 
         access(all) fun refundMatch(matchIndex: UInt64) {
             pre {
-                ArcadeEscrow.matches.containsKey(matchIndex): "Match not found"
+                ArcadeEscrowV2.matches.containsKey(matchIndex): "Match not found"
             }
-            var escrow = ArcadeEscrow.matches.remove(key: matchIndex)!
+            var escrow = ArcadeEscrowV2.matches.remove(key: matchIndex)!
             assert(
-                escrow.status == ArcadeEscrow.STATUS_OPEN || escrow.status == ArcadeEscrow.STATUS_FUNDED,
+                escrow.status == ArcadeEscrowV2.STATUS_OPEN || escrow.status == ArcadeEscrowV2.STATUS_FUNDED,
                 message: "Match not refundable"
             )
 
             if escrow.hostDeposited > 0.0 {
-                let hostRefund <- ArcadeEscrow.vault.withdraw(amount: escrow.hostDeposited)
+                let hostRefund <- ArcadeEscrowV2.vault.withdraw(amount: escrow.hostDeposited)
                 let hostCap = getAccount(escrow.host).capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                 let hostReceiver = hostCap.borrow() ?? panic("Host has no FLOW receiver")
                 hostReceiver.deposit(from: <-hostRefund)
@@ -189,7 +189,7 @@ access(all) contract ArcadeEscrow {
             }
 
             if escrow.guestDeposited > 0.0 && escrow.guest != nil {
-                let guestRefund <- ArcadeEscrow.vault.withdraw(amount: escrow.guestDeposited)
+                let guestRefund <- ArcadeEscrowV2.vault.withdraw(amount: escrow.guestDeposited)
                 let guestAddr = escrow.guest!
                 let guestCap = getAccount(guestAddr).capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                 let guestReceiver = guestCap.borrow() ?? panic("Guest has no FLOW receiver")
@@ -198,7 +198,7 @@ access(all) contract ArcadeEscrow {
             }
 
             escrow.cancel()
-            ArcadeEscrow.matches[matchIndex] = escrow
+            ArcadeEscrowV2.matches[matchIndex] = escrow
             emit MatchCancelled(matchIndex: matchIndex)
         }
     }
@@ -231,6 +231,6 @@ access(all) contract ArcadeEscrow {
 
         // Store Admin resource in deployer account
         let admin <- create Admin()
-        self.account.storage.save(<-admin, to: /storage/ArcadeEscrowAdmin)
+        self.account.storage.save(<-admin, to: /storage/ArcadeEscrowV2Admin)
     }
 }

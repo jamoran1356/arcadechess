@@ -7,6 +7,9 @@ import { usePathname } from "next/navigation";
 import { LanguageSwitcher } from "./language-switcher";
 import { useDict } from "./locale-provider";
 import { useInterwovenKit } from "@initia/interwovenkit-react";
+import { useWallet as useSolanaWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useFlowWallet } from "@/hooks/use-flow-wallet";
 
 type NavSession = { name: string; role: string } | null;
 
@@ -19,6 +22,16 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
   const pathname = usePathname();
   const dict = useDict();
   const { disconnect: disconnectWallet, isConnected, openConnect, openWallet, initiaAddress } = useInterwovenKit();
+  const { publicKey: solanaPublicKey, connected: solanaConnected, disconnect: disconnectSolana } = useSolanaWallet();
+  const { setVisible: setSolanaModalVisible } = useWalletModal();
+  const { address: flowAddress, connected: flowConnected, connect: connectFlow, disconnect: disconnectFlow } = useFlowWallet();
+
+  // Aggregate wallet statuses for display
+  const connectedWallets: { network: string; address: string; disconnect: () => void }[] = [];
+  if (isConnected && initiaAddress) connectedWallets.push({ network: "INITIA", address: initiaAddress, disconnect: disconnectWallet });
+  if (solanaConnected && solanaPublicKey) connectedWallets.push({ network: "SOLANA", address: solanaPublicKey.toBase58(), disconnect: disconnectSolana });
+  if (flowConnected && flowAddress) connectedWallets.push({ network: "FLOW", address: flowAddress, disconnect: disconnectFlow });
+  const anyWalletConnected = connectedWallets.length > 0;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -81,6 +94,8 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
 
   function handleLogout() {
     try { disconnectWallet(); } catch {}
+    try { disconnectSolana(); } catch {}
+    try { disconnectFlow(); } catch {}
     logoutAction();
   }
 
@@ -183,10 +198,32 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                       className="flex w-full items-center gap-2 px-4 py-2.5 text-[13px] text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 110-6h5.25A2.25 2.25 0 0121 6v6zm-3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm-12.75 0H3" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18v-6" /></svg>
-                      {isConnected ? dict.nav.manageWallet : dict.nav.connectWallet}
+                      Initia: {isConnected ? "Wallet" : dict.nav.connectWallet}
                     </button>
                     {isConnected && initiaAddress && (
                       <p className="truncate px-4 py-1 text-[10px] font-mono text-cyan-400/60">{initiaAddress}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { solanaConnected ? disconnectSolana() : setSolanaModalVisible(true); }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-[13px] text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 110-6h5.25A2.25 2.25 0 0121 6v6zm-3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm-12.75 0H3" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18v-6" /></svg>
+                      Solana: {solanaConnected ? "Conectada" : dict.nav.connectWallet}
+                    </button>
+                    {solanaConnected && solanaPublicKey && (
+                      <p className="truncate px-4 py-1 text-[10px] font-mono text-amber-400/60">{solanaPublicKey.toBase58()}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { flowConnected ? disconnectFlow() : connectFlow(); }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-[13px] text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 110-6h5.25A2.25 2.25 0 0121 6v6zm-3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm-12.75 0H3" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18v-6" /></svg>
+                      Flow: {flowConnected ? "Conectada" : dict.nav.connectWallet}
+                    </button>
+                    {flowConnected && flowAddress && (
+                      <p className="truncate px-4 py-1 text-[10px] font-mono text-emerald-400/60">{flowAddress}</p>
                     )}
                     <div className="my-1 border-t border-white/[0.06]" />
                     <button
@@ -308,10 +345,30 @@ export function Navbar({ session, logoutAction }: NavbarProps) {
                   onClick={() => { isConnected ? openWallet() : openConnect(); }}
                   className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300 transition-all hover:border-white/15 hover:bg-white/[0.08] hover:text-white"
                 >
-                  {isConnected ? dict.nav.manageWallet : dict.nav.connectWallet}
+                  Initia: {isConnected ? dict.nav.manageWallet : dict.nav.connectWallet}
                 </button>
                 {isConnected && initiaAddress && (
                   <p className="truncate text-center text-[10px] font-mono text-cyan-400/60">{initiaAddress}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { solanaConnected ? disconnectSolana() : setSolanaModalVisible(true); }}
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300 transition-all hover:border-white/15 hover:bg-white/[0.08] hover:text-white"
+                >
+                  Solana: {solanaConnected ? "Conectada" : dict.nav.connectWallet}
+                </button>
+                {solanaConnected && solanaPublicKey && (
+                  <p className="truncate text-center text-[10px] font-mono text-amber-400/60">{solanaPublicKey.toBase58()}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { flowConnected ? disconnectFlow() : connectFlow(); }}
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-slate-300 transition-all hover:border-white/15 hover:bg-white/[0.08] hover:text-white"
+                >
+                  Flow: {flowConnected ? "Conectada" : dict.nav.connectWallet}
+                </button>
+                {flowConnected && flowAddress && (
+                  <p className="truncate text-center text-[10px] font-mono text-emerald-400/60">{flowAddress}</p>
                 )}
                 <button
                   type="button"

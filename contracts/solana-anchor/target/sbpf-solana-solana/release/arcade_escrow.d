@@ -1,1 +1,1 @@
-C:\wamp\www\proyectos\playchess\contracts\solana-anchor\target\sbpf-solana-solana\release\arcade_escrow.so: C:\wamp\www\proyectos\playchess\contracts\solana-anchor\programs\arcade_escrow\src\lib.rs
+\\?\C:\wamp\www\proyectos\playchess\contracts\solana-anchor\target\sbpf-solana-solana\release\arcade_escrow.so: \\?\C:\wamp\www\proyectos\playchess\contracts\solana-anchor\programs\arcade_escrow\src\lib.rs

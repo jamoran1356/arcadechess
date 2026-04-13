@@ -26,7 +26,7 @@ const explorerAddrBaseUrls: Record<TransactionNetwork, string> = {
 };
 
 export function getExplorerTxUrl(network: TransactionNetwork, txHash: string): string | null {
-  if (!txHash || txHash.startsWith("mock-") || txHash.startsWith("demo-")) return null;
+  if (!txHash || txHash.startsWith("mock-") || txHash.startsWith("demo-") || txHash.startsWith("sol_mock_") || txHash.startsWith("flow_mock_")) return null;
   const base = explorerTxBaseUrls[network];
   const suffix = network === TransactionNetwork.SOLANA ? "?cluster=devnet" : "";
   return `${base}/${txHash}${suffix}`;
@@ -60,7 +60,7 @@ export function getSupportedNetworks(enabledList?: TransactionNetwork[]) {
       id: TransactionNetwork.FLOW,
       name: "Flow",
       summary: "Ruta alternativa para coleccionables y settlement de partidas curadas.",
-      status: process.env.FLOW_ACCESS_NODE ? "Configurado" : "Contrato Cadence de referencia incluido",
+      status: process.env.FLOW_ADMIN_PRIVATE_KEY && process.env.FLOW_ADMIN_PRIVATE_KEY !== "abc123def456ghi789jkl000" ? "Configurado" : "Contrato Cadence de referencia incluido",
       contractAddress: flowContract,
       explorerUrl: flowContract
         ? `https://testnet.flowscan.io/account/${flowContract}`

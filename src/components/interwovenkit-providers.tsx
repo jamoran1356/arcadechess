@@ -1,6 +1,6 @@
 'use client';
 
-import { PropsWithChildren, useEffect } from "react";
+import { PropsWithChildren, useEffect, useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { mainnet } from "wagmi/chains";
@@ -11,7 +11,15 @@ import {
   TESTNET,
 } from "@initia/interwovenkit-react";
 import interwovenKitStyles from "@initia/interwovenkit-react/styles.js";
+import {
+  ConnectionProvider,
+  WalletProvider,
+} from "@solana/wallet-adapter-react";
+import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adapter-wallets";
+import "@solana/wallet-adapter-react-ui/styles.css";
 
+// ─── Initia config ──────────────────────────────────────────────────────
 const wagmiConfig = createConfig({
   connectors: [initiaPrivyWalletConnector],
   chains: [mainnet],
@@ -38,6 +46,24 @@ function resolveInterwovenChainId() {
 
 const defaultInterwovenChainId = resolveInterwovenChainId();
 
+// ─── Solana config ──────────────────────────────────────────────────────
+const SOLANA_RPC = process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com";
+
+function SolanaProviders({ children }: PropsWithChildren) {
+  const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], []);
+
+  return (
+    <ConnectionProvider endpoint={SOLANA_RPC}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>
+          {children}
+        </WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
+  );
+}
+
+// ─── Combined provider ──────────────────────────────────────────────────
 export function InterwovenKitProviders({ children }: PropsWithChildren) {
   useEffect(() => {
     injectStyles(interwovenKitStyles);
@@ -51,7 +77,9 @@ export function InterwovenKitProviders({ children }: PropsWithChildren) {
           defaultChainId={defaultInterwovenChainId}
           enableAutoSign={true}
         >
-          {children}
+          <SolanaProviders>
+            {children}
+          </SolanaProviders>
         </InterwovenKitProvider>
       </WagmiProvider>
     </QueryClientProvider>

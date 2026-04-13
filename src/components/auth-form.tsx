@@ -5,6 +5,9 @@ import { useActionState, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useInterwovenKit } from "@initia/interwovenkit-react";
+import { useWallet as useSolanaWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useFlowWallet } from "@/hooks/use-flow-wallet";
 import { loginAction, registerAction, walletAuthAction } from "@/lib/actions";
 import { useDict } from "@/components/locale-provider";
 
@@ -44,19 +47,22 @@ function InitiaLogo({ className }: { className?: string }) {
 
 /* ── Wallet login section ── */
 function WalletSection() {
-  const { isConnected, openConnect, initiaAddress } = useInterwovenKit();
+  const { isConnected: initiaConnected, openConnect: initiaConnect, initiaAddress } = useInterwovenKit();
+  const { publicKey: solanaPublicKey, connected: solanaConnected, disconnect: disconnectSolana } = useSolanaWallet();
+  const { setVisible: setSolanaModalVisible } = useWalletModal();
+  const { address: flowAddress, connected: flowConnected, connect: flowConnect } = useFlowWallet();
   const [walletPending, startWalletTransition] = useTransition();
   const [walletError, setWalletError] = useState<string | null>(null);
   const router = useRouter();
   const t = useDict();
   const a = t.auth;
 
-  function handleWalletAuth() {
-    if (!initiaAddress) return;
+  function handleWalletAuth(address: string, network: string) {
+    if (!address) return;
     setWalletError(null);
 
     startWalletTransition(async () => {
-      const result = await walletAuthAction(initiaAddress);
+      const result = await walletAuthAction(address, network);
       if ("error" in result) {
         setWalletError(result.error);
         return;
@@ -68,39 +74,65 @@ function WalletSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <InitiaLogo className="h-8 w-8 shrink-0" />
-        <div>
-          <p className="text-sm font-semibold text-white">{a.walletTitle}</p>
-          <p className="text-xs text-slate-400">{a.walletHint}</p>
-        </div>
+      {/* Initia */}
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-widest text-cyan-300/70">Initia</p>
+        {!initiaConnected ? (
+          <button type="button" onClick={initiaConnect} className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-6 py-3 text-sm font-medium text-cyan-200 transition hover:border-cyan-400/50 hover:bg-cyan-500/20">
+            {a.walletConnect}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/5 px-4 py-2.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="truncate font-mono text-xs text-emerald-200">{initiaAddress}</span>
+            </div>
+            <button type="button" onClick={() => handleWalletAuth(initiaAddress!, "INITIA")} disabled={walletPending} className="button-primary flex w-full items-center justify-center gap-2 px-6 py-3 text-sm disabled:opacity-60">
+              {walletPending ? a.processing : a.walletEnter}
+            </button>
+          </div>
+        )}
       </div>
 
-      {!isConnected ? (
-        <button
-          type="button"
-          onClick={openConnect}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-400/30 bg-violet-500/10 px-6 py-3 text-sm font-medium text-violet-200 transition hover:border-violet-400/50 hover:bg-violet-500/20"
-        >
-          <InitiaLogo className="h-5 w-5" />
-          {a.walletConnect}
-        </button>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/5 px-4 py-2.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            <span className="truncate font-mono text-xs text-emerald-200">{initiaAddress}</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleWalletAuth}
-            disabled={walletPending}
-            className="button-primary flex w-full items-center justify-center gap-2 px-6 py-3 text-sm disabled:opacity-60"
-          >
-            {walletPending ? a.processing : a.walletEnter}
+      {/* Solana */}
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-widest text-amber-300/70">Solana</p>
+        {!solanaConnected ? (
+          <button type="button" onClick={() => setSolanaModalVisible(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-6 py-3 text-sm font-medium text-amber-200 transition hover:border-amber-400/50 hover:bg-amber-500/20">
+            {a.walletConnect}
           </button>
-        </div>
-      )}
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/5 px-4 py-2.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="truncate font-mono text-xs text-emerald-200">{solanaPublicKey?.toBase58()}</span>
+            </div>
+            <button type="button" onClick={() => handleWalletAuth(solanaPublicKey!.toBase58(), "SOLANA")} disabled={walletPending} className="button-primary flex w-full items-center justify-center gap-2 px-6 py-3 text-sm disabled:opacity-60">
+              {walletPending ? a.processing : a.walletEnter}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Flow */}
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-300/70">Flow</p>
+        {!flowConnected ? (
+          <button type="button" onClick={flowConnect} className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-6 py-3 text-sm font-medium text-emerald-200 transition hover:border-emerald-400/50 hover:bg-emerald-500/20">
+            {a.walletConnect}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/5 px-4 py-2.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="truncate font-mono text-xs text-emerald-200">{flowAddress}</span>
+            </div>
+            <button type="button" onClick={() => handleWalletAuth(flowAddress!, "FLOW")} disabled={walletPending} className="button-primary flex w-full items-center justify-center gap-2 px-6 py-3 text-sm disabled:opacity-60">
+              {walletPending ? a.processing : a.walletEnter}
+            </button>
+          </div>
+        )}
+      </div>
 
       {walletError ? <p className="text-sm text-rose-300">{walletError}</p> : null}
     </div>

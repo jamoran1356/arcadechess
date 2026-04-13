@@ -4,7 +4,9 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { joinMatchAction, startSoloMatchAction } from "@/lib/actions";
 import { DialogModal } from "@/components/dialog-modal";
 import { useEscrowTx } from "@/hooks/use-escrow-tx";
-import { getInitiaExplorerTxUrl } from "@/lib/explorer";
+import { useSolanaEscrowTx } from "@/hooks/use-solana-wallet";
+import { useFlowEscrowTx } from "@/hooks/use-flow-wallet";
+import { getExplorerTxUrlClient } from "@/lib/explorer";
 
 type Props = {
   matchId: string;
@@ -34,7 +36,20 @@ export function JoinMatchForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [escrowTxHash, setEscrowTxHash] = useState<string | null>(null);
-  const { sendToEscrow, isWalletConnected, walletAddress } = useEscrowTx();
+  const { sendToEscrow: sendToInitiaEscrow, isWalletConnected: initiaConnected, walletAddress: initiaAddress } = useEscrowTx();
+  const { sendToEscrow: sendToSolanaEscrow, isWalletConnected: solanaConnected, walletAddress: solanaAddress } = useSolanaEscrowTx();
+  const { sendToEscrow: sendToFlowEscrow, isWalletConnected: flowConnected, walletAddress: flowAddress } = useFlowEscrowTx();
+
+  function getWalletForNetwork(net: string) {
+    switch (net) {
+      case "INITIA": return { connected: initiaConnected, address: initiaAddress, send: sendToInitiaEscrow };
+      case "SOLANA": return { connected: solanaConnected, address: solanaAddress, send: sendToSolanaEscrow };
+      case "FLOW":   return { connected: flowConnected, address: flowAddress, send: sendToFlowEscrow };
+      default: return { connected: false, address: null, send: null };
+    }
+  }
+
+  const networkWallet = getWalletForNetwork(network);
 
   const stake = Number(stakeAmount);
   const fee = Number(entryFee);
@@ -57,13 +72,13 @@ export function JoinMatchForm({
       try {
         const fd = new FormData();
         fd.set("matchId", matchId);
-        if (walletAddress) fd.set("walletAddress", walletAddress);
+        if (networkWallet.address) fd.set("walletAddress", networkWallet.address);
 
         const totalNum = Number(total);
 
-        // Sign real on-chain tx for INITIA network only when there's something to lock
-        if (network === "INITIA" && isWalletConnected && totalNum > 0) {
-          const txHash = await sendToEscrow(totalNum, `playchess:${isSolo ? "solo" : "join"}:${matchId}`);
+        // Sign real on-chain tx when wallet connected for the match network
+        if (networkWallet.connected && networkWallet.send && totalNum > 0) {
+          const txHash = await networkWallet.send(totalNum, `playchess:${isSolo ? "solo" : "join"}:${matchId}`);
           setEscrowTxHash(txHash);
           return; // Show explorer link, wait for user to continue
         }
@@ -89,7 +104,7 @@ export function JoinMatchForm({
         const fd = new FormData();
         fd.set("matchId", matchId);
         fd.set("escrowTxHash", escrowTxHash!);
-        if (walletAddress) fd.set("walletAddress", walletAddress);
+        if (networkWallet.address) fd.set("walletAddress", networkWallet.address);
 
         if (isSolo) {
           await startSoloMatchAction(fd);
@@ -155,7 +170,7 @@ export function JoinMatchForm({
               <span>Depósito de <strong>{total} {stakeToken}</strong> confirmado</span>
             </div>
             {(() => {
-              const url = getInitiaExplorerTxUrl(escrowTxHash);
+              const url = getExplorerTxUrlClient(network, escrowTxHash);
               return url ? (
                 <a
                   href={url}
