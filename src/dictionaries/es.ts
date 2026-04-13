@@ -1,7 +1,7 @@
 export const es = {
   nav: {
     brand: "Arcade Chess Engine",
-    brandTitle: "PlayChess Arena",
+    brandTitle: "Arcade Chess Arena",
     home: "Inicio",
     lobby: "Lobby",
     dashboard: "Dashboard",
