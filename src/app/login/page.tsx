@@ -11,14 +11,6 @@ export default async function LoginPage() {
         <p className="eyebrow">{t.eyebrow}</p>
         <h1 className="mt-3 text-5xl font-semibold leading-none text-white">{t.title}</h1>
         <p className="mt-5 max-w-xl text-lg leading-8 text-slate-300">{t.subtitle}</p>
-
-        <div className="panel mt-8 rounded-[2rem] p-6">
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-cyan-200/70">{t.secureLabel}</p>
-          <div className="mt-4 space-y-3 text-sm text-slate-300">
-            <p>{t.noCredentials}</p>
-            <p>{t.noCredentialsHint}</p>
-          </div>
-        </div>
       </div>
 
       <div className="flex items-center justify-center">
