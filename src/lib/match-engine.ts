@@ -104,6 +104,89 @@ function buildSoloDefenderScore(gameType: ArcadeGameType, seed: string) {
   }
 }
 
+type SoloDifficulty = "BASIC" | "INTERMEDIATE" | "ADVANCED";
+
+function getSoloDifficultyFromMatch(title: string, theme: string): SoloDifficulty {
+  const text = `${title} ${theme}`.toLowerCase();
+  if (text.includes("avanzad") || text.includes("maestro") || text.includes("pro")) {
+    return "ADVANCED";
+  }
+  if (text.includes("intermedio") || text.includes("competitivo")) {
+    return "INTERMEDIATE";
+  }
+  return "BASIC";
+}
+
+function estimateMaterialScore(chess: Chess) {
+  const pieceValues: Record<string, number> = {
+    p: 100,
+    n: 320,
+    b: 330,
+    r: 500,
+    q: 900,
+    k: 0,
+  };
+
+  let score = 0;
+  const board = chess.board();
+  for (const row of board) {
+    for (const piece of row) {
+      if (!piece) continue;
+      const value = pieceValues[piece.type] ?? 0;
+      score += piece.color === "b" ? value : -value;
+    }
+  }
+  return score;
+}
+
+function pickBotMove(
+  chess: Chess,
+  difficulty: SoloDifficulty,
+) {
+  const botMoves = chess.moves({ verbose: true });
+  if (botMoves.length === 0) {
+    return null;
+  }
+
+  if (difficulty === "BASIC") {
+    return botMoves[Math.floor(Math.random() * botMoves.length)] ?? null;
+  }
+
+  if (difficulty === "INTERMEDIATE") {
+    const tacticalMoves = botMoves.filter((move) => move.flags.includes("c") || move.flags.includes("e") || move.san.includes("+"));
+    const pool = tacticalMoves.length > 0 ? tacticalMoves : botMoves;
+    return pool[Math.floor(Math.random() * pool.length)] ?? null;
+  }
+
+  let bestMove = botMoves[0];
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const move of botMoves) {
+    const candidate = new Chess(chess.fen());
+    candidate.move({ from: move.from, to: move.to, promotion: move.promotion });
+
+    let score = estimateMaterialScore(candidate);
+    if (candidate.isCheckmate()) score += 100_000;
+    if (move.flags.includes("c") || move.flags.includes("e")) score += 120;
+    if (move.san.includes("+")) score += 40;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = move;
+    }
+  }
+
+  return bestMove;
+}
+
+function isFreeSoloArcadeMatch(
+  isSolo: boolean,
+  stakeAmount: Prisma.Decimal,
+  arcadeGamePool: ArcadeGameType[],
+) {
+  return isSolo && Number(stakeAmount.toString()) <= 0 && arcadeGamePool.length > 0;
+}
+
 type MatchProgressState = {
   fen: string;
   turn: string;
@@ -204,7 +287,15 @@ export async function syncMatchTimeoutIfNeeded(matchId: string) {
   return winnerId;
 }
 
-function advanceSoloBotTurn(state: MatchProgressState) {
+function advanceSoloBotTurn(
+  state: MatchProgressState,
+  options: {
+    hostId: string;
+    difficulty: SoloDifficulty;
+    tutorialFreeArcade: boolean;
+    arcadeGamePool: ArcadeGameType[];
+  },
+) {
   if (state.status === MatchStatus.FINISHED || state.turn !== "b") {
     return { ...state, isBotCheckmate: false };
   }
@@ -219,8 +310,7 @@ function advanceSoloBotTurn(state: MatchProgressState) {
   });
 
   const botChess = new Chess(state.fen);
-  const botMoves = botChess.moves({ verbose: true });
-  const botMove = botMoves[Math.floor(Math.random() * botMoves.length)];
+  const botMove = pickBotMove(botChess, options.difficulty);
 
   if (!botMove) {
     return {
@@ -232,11 +322,45 @@ function advanceSoloBotTurn(state: MatchProgressState) {
     };
   }
 
-  const appliedBot = botChess.move({
-    from: botMove.from,
-    to: botMove.to,
-    promotion: botMove.promotion,
-  });
+  const isCapture = botMove.flags.includes("c") || botMove.flags.includes("e");
+
+  if (options.tutorialFreeArcade && options.arcadeGamePool.length > 0 && isCapture) {
+    // Tutorial free-solo rule: black captures always lose the arcade duel.
+    botChess.remove(botMove.from as Square);
+    const fenParts = botChess.fen().split(" ");
+    fenParts[1] = "w";
+    const resultFen = fenParts.join(" ");
+
+    let nextStatus: MatchStatus = MatchStatus.IN_PROGRESS;
+    let winnerId: string | null = null;
+    try {
+      const resultChess = new Chess(resultFen);
+      if (resultChess.isGameOver()) {
+        nextStatus = MatchStatus.FINISHED;
+        if (resultChess.isCheckmate()) {
+          winnerId = options.hostId;
+        }
+      }
+    } catch {
+      // If FEN is invalid because king was removed, white (host) wins by tutorial rule.
+      nextStatus = MatchStatus.FINISHED;
+      winnerId = options.hostId;
+    }
+
+    return {
+      fen: resultFen,
+      turn: "w",
+      status: nextStatus,
+      winnerId,
+      isBotCheckmate: false,
+      moveHistory: [...state.moveHistory, `${botMove.san} [arcade-loss tutorial-black]`],
+      whiteClockMs: clocks.whiteClockMs,
+      blackClockMs: clocks.blackClockMs,
+      turnStartedAt: nextStatus === MatchStatus.IN_PROGRESS ? new Date() : null,
+    };
+  }
+
+  const appliedBot = botChess.move({ from: botMove.from, to: botMove.to, promotion: botMove.promotion });
 
   const nextStatus = botChess.isGameOver() ? MatchStatus.FINISHED : MatchStatus.IN_PROGRESS;
   const isBotCheckmate = botChess.isCheckmate();
@@ -809,7 +933,24 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
       })
     : undefined;
   const evaluation = evaluateArcadeAttempt(duel.gameType, playerSeed, attempt, { timeLimitMs: soloTimeLimitMs });
-  const score = Math.max(0, Math.round(evaluation.score));
+  const freeTutorialMode = isFreeSoloArcadeMatch(
+    duel.match.isSolo,
+    duel.match.stakeAmount,
+    asGameTypes(duel.match.arcadeGamePool),
+  );
+  const attackerColor = duel.match.turn === "b" ? "b" : "w";
+
+  let score = Math.max(0, Math.round(evaluation.score));
+  let forcedDefenderScore: number | null = null;
+  if (freeTutorialMode) {
+    if (attackerColor === "w") {
+      score = Math.max(1, score);
+      forcedDefenderScore = Math.max(0, score - 1);
+    } else {
+      score = Math.max(1, score);
+      forcedDefenderScore = score + 1;
+    }
+  }
 
   let updatedDuel = await prisma.arcadeDuel.update({
     where: { id: duelId },
@@ -819,10 +960,11 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   });
 
   if (duel.match.isSolo && isAttacker && updatedDuel.defenderScore === null) {
+    const defenderScore = forcedDefenderScore ?? buildSoloDefenderScore(duel.gameType, `${duel.seed}:defender`);
     updatedDuel = await prisma.arcadeDuel.update({
       where: { id: duelId },
       data: {
-        defenderScore: buildSoloDefenderScore(duel.gameType, `${duel.seed}:defender`),
+        defenderScore,
         defenderEnteredAt: updatedDuel.defenderEnteredAt ?? new Date(),
       },
     });
@@ -993,7 +1135,11 @@ export async function submitArcadeAttempt(duelId: string, userId: string, attemp
   return {
     resolved: true,
     botPending: match.isSolo && result.status === MatchStatus.IN_PROGRESS,
-    message: result.attackerWins
+    message: freeTutorialMode
+      ? (attackerColor === "w"
+        ? "Modo tutorial: blancas ganan el minijuego y la captura se aplica."
+        : "Modo tutorial: negras pierden el minijuego y no conquistan la casilla.")
+      : result.attackerWins
       ? "El atacante gano el duelo y conquista la casilla."
       : "El defensor sostuvo la casilla y el tablero continua.",
     winnerId: result.duelWinnerId,
@@ -1017,6 +1163,10 @@ export async function performBotMove(matchId: string) {
       hostId: true,
       guestId: true,
       winnerId: true,
+      title: true,
+      theme: true,
+      stakeAmount: true,
+      arcadeGamePool: true,
     },
   });
 
@@ -1052,7 +1202,16 @@ export async function performBotMove(matchId: string) {
     turnStartedAt: match.turnStartedAt ?? null,
   };
 
-  const nextState = advanceSoloBotTurn(currentState);
+  const arcadeGamePool = asGameTypes(match.arcadeGamePool);
+  const difficulty = getSoloDifficultyFromMatch(match.title, match.theme);
+  const tutorialFreeArcade = isFreeSoloArcadeMatch(match.isSolo, match.stakeAmount, arcadeGamePool);
+
+  const nextState = advanceSoloBotTurn(currentState, {
+    hostId: match.hostId,
+    difficulty,
+    tutorialFreeArcade,
+    arcadeGamePool,
+  });
 
   await prisma.match.update({
     where: { id: matchId },

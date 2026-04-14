@@ -7,16 +7,22 @@ import { getEnabledNetworks } from "@/lib/networks";
 import { getSupportedNetworks } from "@/lib/onchain/service";
 import { getPlatformConfig } from "@/lib/platform-config";
 
-const AUTO_SOLO_TARGET = 9;
+const AUTO_SOLO_TARGET_PER_NETWORK = 3;
 const AUTO_SOLO_EMAIL = "arena-bot@playchess.local";
 
 async function ensureAutoSoloMatches() {
-  const openSoloCount = await prisma.match.count({
-    where: { status: "OPEN", isSolo: true, guestId: null },
-  });
+  const enabledNetworks = await getEnabledNetworks();
+  const availableNetworks = getSupportedNetworks(enabledNetworks).map((network) => network.id as TransactionNetwork);
+  const fallbackNetworks: TransactionNetwork[] = [TransactionNetwork.INITIA, TransactionNetwork.FLOW, TransactionNetwork.SOLANA];
+  const targetNetworks = (availableNetworks.length > 0 ? availableNetworks : fallbackNetworks)
+    .filter((network): network is TransactionNetwork =>
+      network === TransactionNetwork.INITIA ||
+      network === TransactionNetwork.FLOW ||
+      network === TransactionNetwork.SOLANA,
+    );
 
-  if (openSoloCount >= AUTO_SOLO_TARGET) {
-    return;
+  if (targetNetworks.length === 0) {
+    targetNetworks.push(TransactionNetwork.INITIA);
   }
 
   let bot = await prisma.user.findUnique({ where: { email: AUTO_SOLO_EMAIL } });
@@ -31,49 +37,58 @@ async function ensureAutoSoloMatches() {
     });
   }
 
-  const toCreate = AUTO_SOLO_TARGET - openSoloCount;
-
-  // Presets: first 3 are classic (no blockchain, no arcade), rest have arcade/stake
+  // Presets: 3 niveles tutoriales gratis + opciones competitivas
   const presets = [
-    // ── Classic: sin blockchain, sin minijuegos ──
-    { title: "Clásica Rápida 3m",  theme: "Ajedrez clásico sin blockchain", clock: 180_000,  stake: "0.000000", fee: "0.000000", arcade: [] as string[] },
-    { title: "Clásica Blitz 5m",   theme: "Ajedrez clásico sin blockchain", clock: 300_000,  stake: "0.000000", fee: "0.000000", arcade: [] as string[] },
-    { title: "Clásica Rapid 10m",  theme: "Ajedrez clásico sin blockchain", clock: 600_000,  stake: "0.000000", fee: "0.000000", arcade: [] as string[] },
-    // ── Arcade gratuitas (con minijuego, sin stake) ──
-    { title: "Solo Flash 1m",      theme: "Ritmo extremo con arcade",       clock: 60_000,   stake: "0.000000", fee: "0.000000", arcade: ["TARGET_RUSH", "MEMORY_GRID"] },
-    { title: "Solo Arcade 3m",     theme: "Minijuegos en cada captura",     clock: 180_000,  stake: "0.000000", fee: "0.000000", arcade: ["TARGET_RUSH", "MEMORY_GRID", "REACTION_DUEL"] },
-    { title: "Solo Custom 5m",     theme: "Partida gratuita con arcade",    clock: 300_000,  stake: "0.000000", fee: "0.000000", arcade: ["TARGET_RUSH", "MEMORY_GRID"] },
-    // ── Arcade con stake (requiere blockchain) ──
-    { title: "Solo Blitz 5m",      theme: "Capturas con arcade y apuesta",  clock: 300_000,  stake: "0.250000", fee: "0.050000", arcade: ["TARGET_RUSH", "MEMORY_GRID"] },
-    { title: "Solo Rapid 10m",     theme: "Control clásico con apuesta",    clock: 600_000,  stake: "0.500000", fee: "0.050000", arcade: ["TARGET_RUSH", "MEMORY_GRID", "MAZE_RUNNER"] },
-    { title: "Solo Pro 15m",       theme: "Partida avanzada con apuesta",   clock: 900_000,  stake: "1.000000", fee: "0.100000", arcade: ["TARGET_RUSH", "MEMORY_GRID", "PING_PONG", "MAZE_RUNNER"] },
+    { title: "Tutorial Básico 3m",      theme: "Gratis vs sistema. Capturas blancas ganan arcade.",             clock: 180_000, stake: "0.000000", fee: "0.000000", arcade: ["TARGET_RUSH"] },
+    { title: "Tutorial Intermedio 5m",  theme: "Gratis vs sistema. Ritmo medio y arcade guiado.",               clock: 300_000, stake: "0.000000", fee: "0.000000", arcade: ["TARGET_RUSH", "MEMORY_GRID"] },
+    { title: "Tutorial Avanzado 10m",   theme: "Gratis vs sistema. Más presión de tiempo y secuencias.",        clock: 600_000, stake: "0.000000", fee: "0.000000", arcade: ["TARGET_RUSH", "MEMORY_GRID", "REACTION_DUEL"] },
+    { title: "Solo Competitivo 5m",     theme: "Arcade con stake y bot intermedio.",                             clock: 300_000, stake: "0.250000", fee: "0.050000", arcade: ["TARGET_RUSH", "MEMORY_GRID"] },
+    { title: "Solo Competitivo 10m",    theme: "Arcade con stake y control clásico.",                            clock: 600_000, stake: "0.500000", fee: "0.050000", arcade: ["TARGET_RUSH", "MEMORY_GRID", "MAZE_RUNNER"] },
+    { title: "Solo Maestro 15m",        theme: "Arcade completo y bot avanzado.",                                clock: 900_000, stake: "1.000000", fee: "0.100000", arcade: ["TARGET_RUSH", "MEMORY_GRID", "PING_PONG", "MAZE_RUNNER"] },
   ];
 
-  for (let i = 0; i < toCreate; i += 1) {
-    const preset = presets[i % presets.length];
-    await prisma.match.create({
-      data: {
-        id: randomUUID(),
-        title: `${preset.title} #${Math.floor(Date.now() / 1000) % 10000}`,
-        theme: preset.theme,
-        boardTheme: "arena",
-        stakeAmount: preset.stake,
-        entryFee: preset.fee,
-        stakeToken: "INIT",
-        preferredNetwork: "INITIA",
-        fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        turn: "w",
-        moveHistory: [],
-        arcadeGamePool: preset.arcade,
-        isSolo: true,
-        gameClockMs: preset.clock,
-        whiteClockMs: preset.clock,
-        blackClockMs: preset.clock,
-        turnStartedAt: null,
-        status: "OPEN",
-        hostId: bot.id,
-      },
-    });
+  const networkTokenMap: Record<TransactionNetwork, string> = {
+    INITIA: "INIT",
+    FLOW: "FLOW",
+    SOLANA: "SOL",
+  };
+
+  const openCounts = await Promise.all(
+    targetNetworks.map((network) => prisma.match.count({
+      where: { status: "OPEN", isSolo: true, guestId: null, preferredNetwork: network },
+    })),
+  );
+
+  for (const [networkIndex, network] of targetNetworks.entries()) {
+    const openCount = openCounts[networkIndex] ?? 0;
+    const missing = Math.max(0, AUTO_SOLO_TARGET_PER_NETWORK - openCount);
+
+    for (let index = 0; index < missing; index += 1) {
+      const preset = presets[(networkIndex * AUTO_SOLO_TARGET_PER_NETWORK + index) % presets.length];
+      await prisma.match.create({
+        data: {
+          id: randomUUID(),
+          title: `${preset.title} ${network} #${Math.floor(Date.now() / 1000) % 10000}`,
+          theme: `${preset.theme} Red: ${network}.`,
+          boardTheme: "arena",
+          stakeAmount: preset.stake,
+          entryFee: preset.fee,
+          stakeToken: networkTokenMap[network],
+          preferredNetwork: network,
+          fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+          turn: "w",
+          moveHistory: [],
+          arcadeGamePool: preset.arcade,
+          isSolo: true,
+          gameClockMs: preset.clock,
+          whiteClockMs: preset.clock,
+          blackClockMs: preset.clock,
+          turnStartedAt: null,
+          status: "OPEN",
+          hostId: bot.id,
+        },
+      });
+    }
   }
 }
 

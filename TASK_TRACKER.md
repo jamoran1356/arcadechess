@@ -12,7 +12,7 @@ Regla de trabajo:
    - Riesgos/bloqueos
    - Proximos pasos
 
-Fecha de ultima actualizacion: 2026-04-10 (Multi-network wallet integration complete)
+Fecha de ultima actualizacion: 2026-04-14 (Solo auto-match multi-red + tutorial arcade difficulty)
 
 ---
 
@@ -120,6 +120,40 @@ Falta:
 ---
 
 ## Bitacora de ejecucion
+
+### [2026-04-14] Tarea: Partidas automáticas SOLO en Flow/Solana + tutorial arcade con dificultad
+- Objetivo:
+  - Agregar partidas automáticas solo en Flow y Solana
+  - Forzar comportamiento tutorial en partidas gratis vs sistema (blancas ganan minijuego al capturar, negras lo pierden)
+  - Escalonar dificultad de bot de básico a avanzado
+- Cambios realizados:
+  - `ensureAutoSoloMatches()` ahora asegura cupo por red (INITIA/FLOW/SOLANA) en vez de solo total global
+  - Nuevos presets solo por nivel: Tutorial Básico, Intermedio y Avanzado (gratis), más presets competitivos
+  - Las partidas auto-creadas incluyen `preferredNetwork` y `stakeToken` por red (`INIT`, `FLOW`, `SOL`)
+  - Motor solo actualizado con dificultad de bot:
+    - BASIC: aleatorio
+    - INTERMEDIATE: prioriza capturas/jaques
+    - ADVANCED: selección táctica por evaluación material 1-ply
+  - Regla tutorial en duelos arcade de partidas solo gratis:
+    - si captura blancas (usuario): resultado forzado a victoria del atacante
+    - si captura negras (sistema): resultado forzado a derrota de negras
+  - Regla tutorial adicional para movimiento del bot en captura (solo gratis): se aplica pérdida automática de negras y se registra en historial
+- Archivos tocados:
+  - src/lib/data.ts
+  - src/lib/match-engine.ts
+  - TASK_TRACKER.md
+- Validaciones ejecutadas:
+  - `get_errors` en archivos modificados: 0 errores
+  - `npx tsc --noEmit`: OK (sin salida de error)
+- Resultado:
+  - El lobby ahora puede poblar partidas solo automáticas también en Flow y Solana
+  - Las partidas gratis vs sistema se comportan como tutorial guiado del sistema arcade
+  - Dificultad del bot escalonada por preset (básico → intermedio → avanzado)
+- Pendientes abiertos:
+  - QA manual en UI de `/lobby` y `/match/[id]` para verificar ritmo real del tutorial
+  - Revisar copy/etiquetas en diccionarios si se desea exponer la dificultad en más lugares
+- Responsable:
+  - Copilot
 
 ### [2026-04-10] Tarea: Integración multi-network wallets (Solana + Flow client-side)
 - Objetivo:
