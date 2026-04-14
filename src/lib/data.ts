@@ -154,6 +154,7 @@ export async function getLandingSnapshot() {
       title: match.title,
       theme: match.theme,
       boardTheme: match.boardTheme,
+      isSolo: match.isSolo,
       status: match.status,
       stakeAmount: decimalToString(match.stakeAmount),
       entryFee: decimalToString(match.entryFee),

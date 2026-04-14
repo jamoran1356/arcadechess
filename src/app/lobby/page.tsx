@@ -6,6 +6,7 @@ import { arcadeLibrary } from "@/lib/arcade";
 import { getLobbySnapshot } from "@/lib/data";
 import { getEnabledNetworks } from "@/lib/networks";
 import { getPlatformConfig } from "@/lib/platform-config";
+import { getSoloDifficultyBadge } from "@/lib/solo-difficulty";
 import { MatchShareControls } from "@/components/match-share-controls";
 import { CreateMatchForm } from "@/components/create-match-form";
 import { LobbyClient } from "@/components/lobby-client";
@@ -90,7 +91,10 @@ export default async function LobbyPage({
         </article>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredMatches.map((match) => (
+          {filteredMatches.map((match) => {
+            const difficultyBadge = getSoloDifficultyBadge(match);
+
+            return (
             <article key={match.id} className="card-glow panel group rounded-[2rem] p-6 transition-transform duration-300 hover:-translate-y-1">
               {/* Badge row */}
               <div className="flex items-center gap-2">
@@ -108,6 +112,14 @@ export default async function LobbyPage({
                   </span>
                 )}
               </div>
+
+              {difficultyBadge ? (
+                <div className="mt-3 flex items-center gap-2">
+                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${difficultyBadge.className}`}>
+                    {difficultyBadge.label}
+                  </span>
+                </div>
+              ) : null}
 
               {/* Title + stake */}
               <h3 className="mt-4 text-xl font-bold text-white">{match.title}</h3>
@@ -153,7 +165,8 @@ export default async function LobbyPage({
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

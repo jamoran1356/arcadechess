@@ -3,6 +3,7 @@ import Image from "next/image";
 import { getSession } from "@/lib/auth";
 import { getLandingSnapshot } from "@/lib/data";
 import { getLocale } from "@/lib/i18n";
+import { getSoloDifficultyBadge } from "@/lib/solo-difficulty";
 import { getDictionary } from "@/dictionaries";
 
 export const dynamic = "force-dynamic";
@@ -157,7 +158,10 @@ export default async function Home() {
 
         <div className="grid gap-5 lg:grid-cols-3">
           {openMatches.length > 0 ? (
-            openMatches.map((match: LandingMatch) => (
+            openMatches.map((match: LandingMatch) => {
+              const difficultyBadge = getSoloDifficultyBadge(match);
+
+              return (
               <article key={match.id} className="card-glow panel rounded-[2rem] p-6 transition-transform duration-300 hover:-translate-y-1">
                 <div className="flex items-center justify-between gap-4">
                   <span className="rounded-full border border-cyan-400/20 bg-cyan-400/[0.08] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-300">
@@ -167,6 +171,13 @@ export default async function Home() {
                     {match.status.replaceAll("_", " ")}
                   </span>
                 </div>
+                {difficultyBadge ? (
+                  <div className="mt-4">
+                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${difficultyBadge.className}`}>
+                      {difficultyBadge.label}
+                    </span>
+                  </div>
+                ) : null}
                 <h3 className="mt-5 text-xl font-bold text-white">{match.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-slate-400">{match.theme}</p>
                 <div className="mt-4 flex flex-wrap gap-1.5 text-xs">
@@ -188,7 +199,8 @@ export default async function Home() {
                   </Link>
                 </div>
               </article>
-            ))
+              );
+            })
           ) : (
             <article className="panel rounded-[2rem] p-8 lg:col-span-3 text-center">
               <h3 className="text-2xl font-bold text-white">{t.noMatchesTitle}</h3>
