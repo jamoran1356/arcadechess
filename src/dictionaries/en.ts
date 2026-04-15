@@ -362,6 +362,8 @@ export const en = {
     placeBetBtn: "Bet on this match",
     promotionTitle: "Promote pawn to:",
     cancelLabel: "Cancel",
+    checkWhite: "White is in check",
+    checkBlack: "Black is in check",
   },
   minigames: {
     eyebrow: "Arcade Library",

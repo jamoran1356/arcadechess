@@ -187,6 +187,16 @@ function isFreeSoloArcadeMatch(
   return isSolo && Number(stakeAmount.toString()) <= 0 && arcadeGamePool.length > 0;
 }
 
+function isTutorialSoloMatch(match: {
+  isSolo: boolean;
+  title: string;
+  theme: string;
+}) {
+  if (!match.isSolo) return false;
+  const text = `${match.title} ${match.theme}`.toLowerCase();
+  return text.includes("tutorial");
+}
+
 type MatchProgressState = {
   fen: string;
   turn: string;
@@ -790,7 +800,8 @@ export async function performMatchMove(matchId: string, userId: string, moveInpu
 
   const isCapture = legalMove.flags.includes("c") || legalMove.flags.includes("e");
   const gamePool = asGameTypes(match.arcadeGamePool);
-  if (isCapture && gamePool.length > 0) {
+  const tutorialSoloMatch = isTutorialSoloMatch({ isSolo: match.isSolo, title: match.title, theme: match.theme });
+  if (isCapture && (gamePool.length > 0 || tutorialSoloMatch)) {
     const defenderId = (userId === match.hostId ? match.guestId : match.hostId) ?? userId;
     const gameType = gamePool[Math.floor(Math.random() * gamePool.length)] ?? ArcadeGameType.TARGET_RUSH;
 

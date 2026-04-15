@@ -364,6 +364,8 @@ export const es = {
     placeBetBtn: "Apostar en esta partida",
     promotionTitle: "¿En qué pieza quieres convertir el peón?",
     cancelLabel: "Cancelar",
+    checkWhite: "Jaque a blancas",
+    checkBlack: "Jaque a negras",
   },
   minigames: {
     eyebrow: "Biblioteca arcade",

@@ -101,6 +101,35 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
   const [legalMoveSquares, setLegalMoveSquares] = useState<string[]>([]);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
 
+  const checkState = useMemo(() => {
+    try {
+      const chess = new Chess(fen);
+      if (!chess.isCheck()) {
+        return { inCheck: false, side: null as "w" | "b" | null, kingSquare: null as string | null };
+      }
+
+      const side = chess.turn() as "w" | "b";
+      const board = chess.board();
+      let kingSquare: string | null = null;
+
+      for (let rank = 0; rank < board.length; rank += 1) {
+        const row = board[rank];
+        for (let file = 0; file < row.length; file += 1) {
+          const piece = row[file];
+          if (piece && piece.type === "k" && piece.color === side) {
+            const fileLetter = String.fromCharCode("a".charCodeAt(0) + file);
+            const rankNumber = 8 - rank;
+            kingSquare = `${fileLetter}${rankNumber}`;
+          }
+        }
+      }
+
+      return { inCheck: true, side, kingSquare };
+    } catch {
+      return { inCheck: false, side: null as "w" | "b" | null, kingSquare: null as string | null };
+    }
+  }, [fen]);
+
   const syncMatchState = useCallback(async () => {
     const response = await fetch(`/api/matches/${match.id}/state`, { cache: "no-store" });
     const data = await response.json();
@@ -458,17 +487,30 @@ export function ChessMatchClient({ match, currentUserId }: MatchClientProps) {
         background: "radial-gradient(circle, rgba(34,211,238,0.45) 24%, transparent 25%)",
       };
     }
+    if (checkState.kingSquare) {
+      styles[checkState.kingSquare] = {
+        boxShadow: "inset 0 0 0 3px rgba(251, 113, 133, 0.85)",
+        backgroundColor: "rgba(127, 29, 29, 0.42)",
+      };
+    }
     return styles;
-  }, [selectedSquare, legalMoveSquares]);
+  }, [selectedSquare, legalMoveSquares, checkState.kingSquare]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="panel rounded-[2rem] p-4 sm:p-6">
         <div className="flex items-center justify-between gap-4 pb-4">
           <p className="eyebrow">{ch.liveEyebrow}</p>
-          <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-200">
-            {turn === "w" ? ch.turnWhite : ch.turnBlack}
-          </span>
+          <div className="flex items-center gap-2">
+            {checkState.inCheck && (
+              <span className="rounded-full border border-rose-400/40 bg-rose-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-rose-200">
+                {checkState.side === "w" ? ch.checkWhite : ch.checkBlack}
+              </span>
+            )}
+            <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-200">
+              {turn === "w" ? ch.turnWhite : ch.turnBlack}
+            </span>
+          </div>
         </div>
 
         <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
